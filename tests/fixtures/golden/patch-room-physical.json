@@ -76,7 +76,7 @@
       "name": "cam-lobby-01",
       "kind": "computer",
       "namespace": "hosts",
-      "description": "Lobby camera, cabled straight to the access switch and powered over that\ncable. A class-2 PSE port delivers 6.49 W at the powered device, which is\nwhat its 5 W draw is checked against (NG-E014).\n",
+      "description": "Lobby camera, cabled straight to the access switch and powered over that\ncable. A class-2 PSE port delivers 6.49 W at the powered device, which is\nwhat its 5 W draw is checked against (NV-E014).\n",
       "labels": {
         "env": "prod",
         "role": "camera",
@@ -291,7 +291,7 @@
       "name": "sw-access-01",
       "kind": "switch",
       "namespace": "network",
-      "description": "PoE access switch in rack r2. Its uplink leaves the rack through the panel\nabove it, exactly as the server links do; its two PoE ports feed a ceiling\naccess point and a lobby camera, neither of which has a power cord.\n\nThe switch itself is dual-corded: 'psu1' to the A-side strip, 'psu2' to the\nB-side one. Both strips are in this rack, and they are on different input\nfeeds, which is what makes 'redundant: true' true (NG-E015).\n",
+      "description": "PoE access switch in rack r2. Its uplink leaves the rack through the panel\nabove it, exactly as the server links do; its two PoE ports feed a ceiling\naccess point and a lobby camera, neither of which has a power cord.\n\nThe switch itself is dual-corded: 'psu1' to the A-side strip, 'psu2' to the\nB-side one. Both strips are in this rack, and they are on different input\nfeeds, which is what makes 'redundant: true' true (NV-E015).\n",
       "labels": {
         "env": "prod",
         "role": "access",

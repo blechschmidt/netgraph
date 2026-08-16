@@ -1370,7 +1370,7 @@ def _drift_summary(report: DriftReport) -> str:
     multiple=True,
     metavar="RULE",
     shell_complete=complete_rule,
-    help="Silence a rule by id (E001, NG-C002, ...). Repeatable.",
+    help="Silence a rule by id (E001, NV-C002, ...). Repeatable.",
 )
 @click.option(
     "-F",
@@ -2319,7 +2319,7 @@ def edit_connect_command(
     """Cable two interfaces together: netviz edit connect sw1:Gi1/0/1 pc:eno1.
 
     Both ends are ``device:interface``, and both interfaces have to exist -- a
-    cable to a port nothing declares is the mistake NG-C002 exists to catch.
+    cable to a port nothing declares is the mistake NV-C002 exists to catch.
     """
     spec: dict[str, Any] = {"medium": medium}
     if speed:
@@ -8717,7 +8717,7 @@ class _Problem:
         return cls(
             severity=Severity.ERROR,
             location=error.location,
-            # Schema violations carry an ``NG-*`` id when the model supplied
+            # Schema violations carry an ``NV-*`` id when the model supplied
             # one; a syntax or I/O problem has no rule to name.
             rule=error.rule or "load",
             message=message,

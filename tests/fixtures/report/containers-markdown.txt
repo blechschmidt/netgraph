@@ -248,7 +248,7 @@ One row per stack, the initial one first and every declared namespace indented u
 | veth-green-h | (initial) | veth-green | green | — | Host end of the green pair. |
 | veth-green | green | veth-green-h | (initial) | 10.30.0.12/24 | Container end of the green pair. |
 
-One row per end, so a pair is named from both sides; 'NG-N023' is what makes the two rows agree. A veth end is an ordinary ethernet interface whose far side is another interface of this machine rather than a socket, which is why no cable terminates on one.
+One row per end, so a pair is named from both sides; 'NV-N023' is what makes the two rows agree. A veth end is an ordinary ethernet interface whose far side is another interface of this machine rather than a socket, which is why no cable terminates on one.
 
 
 <a id="links"></a>
@@ -389,7 +389,7 @@ One row per stack, the initial one first and every declared namespace indented u
 | veth-sbx-h | (initial) | veth-sbx | sandbox | 10.32.0.1/30 | Host end of the sandbox pair, addressed rather than bridged. |
 | veth-sbx | sandbox | veth-sbx-h | (initial) | 10.32.0.2/30 | Sandbox end of the pair. |
 
-One row per end, so a pair is named from both sides; 'NG-N023' is what makes the two rows agree. A veth end is an ordinary ethernet interface whose far side is another interface of this machine rather than a socket, which is why no cable terminates on one.
+One row per end, so a pair is named from both sides; 'NV-N023' is what makes the two rows agree. A veth end is an ordinary ethernet interface whose far side is another interface of this machine rather than a socket, which is why no cable terminates on one.
 
 <a id="table-netns-routes"></a>
 

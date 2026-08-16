@@ -196,7 +196,7 @@ class DevicePlan:
     def enslaved_by(self, name: str) -> Interface | None:
         """The bridge or LAG that lists ``name`` among its ``members``.
 
-        An interface may be a member of at most one aggregate (``NG-I004``), so
+        An interface may be a member of at most one aggregate (``NV-I004``), so
         the first match is the only one; the loop is over the declaration order
         so that two aggregates the validator would have refused still give a
         deterministic answer under ``--force``.

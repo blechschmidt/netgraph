@@ -4,7 +4,7 @@ Five places, the same five §16 has to hold together in:
 
 * the **model** — the port-range grammar, the action/field agreement rules, the
   family coherence between a protocol and a prefix, and the zone references
-  inside one ``spec``, each reported at schema time with an ``NG-B*`` id and the
+  inside one ``spec``, each reported at schema time with an ``NV-B*`` id and the
   path of the offending value;
 * the **derivations** — that a hook comes from the two zone fields rather than
   from a field of its own, that a chain is walked in priority order, and that
@@ -132,7 +132,7 @@ def spec_of(**fields: Any) -> Any:
 
 
 # --------------------------------------------------------------------------- #
-# Port ranges (NG-B005)
+# Port ranges (NV-B005)
 # --------------------------------------------------------------------------- #
 
 
@@ -169,7 +169,7 @@ def test_a_backwards_range_says_both_readings() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# The zone table (NG-B001 to NG-B004)
+# The zone table (NV-B001 to NV-B004)
 # --------------------------------------------------------------------------- #
 
 
@@ -183,26 +183,26 @@ def test_a_zone_holds_the_interfaces_it_names() -> None:
 
 
 def test_local_may_not_be_declared() -> None:
-    """``NG-B001``: the machine is not one of the parts its interfaces divide into."""
+    """``NV-B001``: the machine is not one of the parts its interfaces divide into."""
     with pytest.raises(SchemaError) as exc:
         parse_document(device("fw", port("eth0"), zones=[{"name": LOCAL_ZONE}]))
-    assert issues(exc) == [("NG-B001", "name")]
+    assert issues(exc) == [("NV-B001", "name")]
 
 
 def test_a_zone_is_declared_once() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(device("fw", port("eth0"), zones=[{"name": "wan"}, {"name": "wan"}]))
-    assert issues(exc) == [("NG-B001", "name")]
+    assert issues(exc) == [("NV-B001", "name")]
 
 
 def test_a_zone_holds_only_interfaces_the_device_has() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(device("fw", port("eth0"), zones=[{"name": "wan", "interfaces": ["eth9"]}]))
-    assert issues(exc) == [("NG-B002", "0")]
+    assert issues(exc) == [("NV-B002", "0")]
 
 
 def test_an_interface_is_in_at_most_one_zone() -> None:
-    """``NG-B003``: the defining property, and what makes 'from lan' a statement."""
+    """``NV-B003``: the defining property, and what makes 'from lan' a statement."""
     with pytest.raises(SchemaError) as exc:
         parse_document(
             device(
@@ -214,7 +214,7 @@ def test_an_interface_is_in_at_most_one_zone() -> None:
                 ],
             )
         )
-    assert issues(exc) == [("NG-B003", "0")]
+    assert issues(exc) == [("NV-B003", "0")]
     assert "at most one zone" in str(exc.value)
 
 
@@ -228,7 +228,7 @@ def test_a_rule_names_a_zone_the_device_has() -> None:
                 firewall={"rules": [rule(10, src_zone="dmz")]},
             )
         )
-    assert issues(exc) == [("NG-B004", "src_zone")]
+    assert issues(exc) == [("NV-B004", "src_zone")]
     # The undeclared 'local' is offered alongside the declared ones, because it
     # is an equally valid answer to what somebody meant.
     assert "'local'" in str(exc.value) and "'wan'" in str(exc.value)
@@ -244,7 +244,7 @@ def test_a_rule_from_a_zone_to_itself_is_refused() -> None:
                 firewall={"rules": [rule(10, src_zone="wan", dst_zone="wan")]},
             )
         )
-    assert issues(exc) == [("NG-B004", "dst_zone")]
+    assert issues(exc) == [("NV-B004", "dst_zone")]
 
 
 def test_a_nat_rule_names_a_zone_the_device_has() -> None:
@@ -256,18 +256,18 @@ def test_a_nat_rule_names_a_zone_the_device_has() -> None:
                 firewall={"nat": [{"type": "masquerade", "dst_zone": "wan"}]},
             )
         )
-    assert issues(exc) == [("NG-B004", "dst_zone")]
+    assert issues(exc) == [("NV-B004", "dst_zone")]
 
 
 def test_a_hub_declares_neither_zones_nor_a_firewall() -> None:
-    """``NG-H003``: no IP stack means nothing to filter with."""
+    """``NV-H003``: no IP stack means nothing to filter with."""
     with pytest.raises(SchemaError) as exc:
         parse_document(device("hub1", port("eth0"), kind="hub", zones=[{"name": "wan"}]))
-    assert issues(exc) == [("NG-H003", "zones")]
+    assert issues(exc) == [("NV-H003", "zones")]
 
 
 # --------------------------------------------------------------------------- #
-# The rule (NG-B005 to NG-B009)
+# The rule (NV-B005 to NV-B009)
 # --------------------------------------------------------------------------- #
 
 
@@ -293,7 +293,7 @@ def one_rule(**fields: Any) -> FirewallRule:
     ],
 )
 def test_a_rule_that_contradicts_itself_is_refused(fields: dict[str, Any], path: str) -> None:
-    with pytest.raises(ValueError, match=r"NG-B005|rule|port|mark|log_prefix"):
+    with pytest.raises(ValueError, match=r"NV-B005|rule|port|mark|log_prefix"):
         one_rule(**fields)
 
 
@@ -306,7 +306,7 @@ def test_an_action_is_stated_and_never_defaulted() -> None:
 def test_a_rule_selects_only_on_interfaces_the_device_has() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(device("fw", port("eth0"), firewall={"rules": [rule(10, iif="eth9")]}))
-    assert issues(exc) == [("NG-B009", "iif")]
+    assert issues(exc) == [("NV-B009", "iif")]
 
 
 def test_two_rules_of_one_family_may_not_share_a_priority() -> None:
@@ -314,7 +314,7 @@ def test_two_rules_of_one_family_may_not_share_a_priority() -> None:
         parse_document(
             device("fw", port("eth0"), firewall={"rules": [rule(10), rule(10, action="drop")]})
         )
-    assert issues(exc) == [("NG-B008", "priority")]
+    assert issues(exc) == [("NV-B008", "priority")]
 
 
 def test_two_rules_of_different_families_may_share_a_priority() -> None:
@@ -406,7 +406,7 @@ def test_a_chain_is_walked_in_priority_order() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# NAT (NG-B006)
+# NAT (NV-B006)
 # --------------------------------------------------------------------------- #
 
 
@@ -430,7 +430,7 @@ def nat(**fields: Any) -> NatRule:
 def test_a_translation_that_contradicts_itself_is_refused(
     fields: dict[str, Any], path: str
 ) -> None:
-    with pytest.raises(ValueError, match=r"NG-B006|rule|port|address"):
+    with pytest.raises(ValueError, match=r"NV-B006|rule|port|address"):
         nat(**fields)
 
 
@@ -456,7 +456,7 @@ def test_a_direction_decides_which_fields_a_translation_needs() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# The defaults (NG-B007)
+# The defaults (NV-B007)
 # --------------------------------------------------------------------------- #
 
 
@@ -475,7 +475,7 @@ def test_the_defaults_are_deny_deny_permit() -> None:
 def test_a_default_has_to_decide_the_packet(action: str) -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(device("fw", port("eth0"), firewall={"default_input": action}))
-    assert issues(exc) == [("NG-B007", "default_input")]
+    assert issues(exc) == [("NV-B007", "default_input")]
 
 
 # --------------------------------------------------------------------------- #

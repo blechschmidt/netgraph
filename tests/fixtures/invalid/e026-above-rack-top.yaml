@@ -1,4 +1,4 @@
-# E026 (NG-U002) - an element extends past the top of its rack.
+# E026 (NV-U002) - an element extends past the top of its rack.
 #
 # 'sw-b' is 4U at U41 of a 42U cabinet, so it ends at U44 and two of its units
 # are above the frame. 'position' is the lowest unit, which is exactly the

@@ -14,7 +14,7 @@ Five blocks, in the order a device declares them:
     distinguisher and an optional description. An interface binds itself to one
     with ``interfaces[].vrf``, and binding is what makes an address *private* to
     it: ``10.0.0.1/24`` in ``blue`` and ``10.0.0.1/24`` in the global instance
-    are two different addresses, so they do not collide (``NG-A004``).
+    are two different addresses, so they do not collide (``NV-A004``).
 ``spec.route_tables``
     The extra routing tables the device holds beyond the three every stack has.
     A table is a name and a number, and it exists to be *selected*: on its own
@@ -50,7 +50,7 @@ Two consequences shape the model:
 * **A rule names a table, not a route.** ``lookup`` is the ordinary action, and
   the table it names is either one of ``spec.route_tables``, one of
   ``spec.vrfs`` — a VRF *is* a table — or one of the three every stack is born
-  with (``main``, ``local``, ``default``). Nothing else resolves (``NG-F019``).
+  with (``main``, ``local``, ``default``). Nothing else resolves (``NV-F019``).
 * **Layer 4 is not a selector.** ``ip rule`` grew ``sport``/``dport`` late and
   no other implementation agrees on them; the portable way to route by port is
   to mark the packet in the firewall and match ``fwmark`` here. So the selectors
@@ -62,7 +62,7 @@ the real world, and it is an address in the inventory too; the graph layer
 resolves it against every address the inventory configures
 (:mod:`netviz.render.graph`) and the validator reports the session it could
 not place as a *warning*, because a perfectly correct eBGP session may point at
-an upstream nobody declares here (``NG-F013``).
+an upstream nobody declares here (``NV-F013``).
 
 **No secrets, ever.** As with :mod:`netviz.models.tunnel`, there is nowhere to
 put a BGP password or an OSPF authentication key: a secret in an inventory is a
@@ -159,7 +159,7 @@ _RD_RE: Final[re.Pattern[str]] = re.compile(ROUTE_DISTINGUISHER_PATTERN)
 
 
 def normalise_rd(value: Any) -> Any:
-    """Check a route distinguisher and return it unchanged (``NG-F001``).
+    """Check a route distinguisher and return it unchanged (``NV-F001``).
 
     There is nothing to normalise — an RD has exactly one spelling — but there
     is plenty to reject. RFC 4364 §4.2 gives three encodings, and each bounds
@@ -240,7 +240,7 @@ AREA_PATTERN: Final = r"^\d{1,3}(?:\.\d{1,3}){3}$"
 
 
 def normalise_area(value: Any) -> Any:
-    """Normalise an OSPF area to dotted-quad form (``NG-F006``).
+    """Normalise an OSPF area to dotted-quad form (``NV-F006``).
 
     An area identifier is a 32-bit number that RFC 2328 §C.2 writes as a dotted
     quad, and every implementation accepts both spellings: ``0`` and ``0.0.0.0``
@@ -281,7 +281,7 @@ OspfArea = Annotated[str, BeforeValidator(normalise_area), Field(pattern=AREA_PA
 #: The tables a stack has before anybody declares one, and the numbers they are
 #: reserved at (Linux ``rt_tables``; ``main`` and ``local`` are RFC 1812 §5.2.4's
 #: forwarding table split in two by the implementation). They are never declared
-#: and always resolvable, which is why ``NG-F015`` refuses to let a declaration
+#: and always resolvable, which is why ``NV-F015`` refuses to let a declaration
 #: shadow either half of an entry.
 RESERVED_TABLES: Final[Mapping[str, int]] = MappingProxyType(
     {"local": 255, "main": 254, "default": 253}
@@ -328,7 +328,7 @@ _FWMARK_INPUT_RE: Final[re.Pattern[str]] = re.compile(
 
 
 def normalise_fwmark(value: Any) -> Any:
-    """Normalise a firewall mark to ``0x1`` or ``0x1/0xff`` (``NG-F017``).
+    """Normalise a firewall mark to ``0x1`` or ``0x1/0xff`` (``NV-F017``).
 
     A mark is a 32-bit number that a firewall wrote on the packet and that a
     policy rule matches, optionally under a mask: ``0x1/0xff`` matches every
@@ -460,7 +460,7 @@ class VrfDefinition(NetvizModel):
     """
 
     name: ElementName
-    #: ``NG-F001``: an RFC 4364 §4.2 route distinguisher.
+    #: ``NV-F001``: an RFC 4364 §4.2 route distinguisher.
     rd: RouteDistinguisher
     description: str | None = None
 
@@ -471,17 +471,17 @@ class RouteTable(NetvizModel):
     A table is a name and a number and nothing else, because that is all a table
     is: a container routes are placed in. What makes it *do* anything is a policy
     rule that looks it up (§16.4) — a table nothing selects holds routes nothing
-    consults, which is ``NG-F023``.
+    consults, which is ``NV-F023``.
 
     The three tables every stack already has — ``main``, ``local`` and
     ``default`` — are never declared here and always nameable anyway; declaring
-    either their name or their number is ``NG-F015``, because a second ``main``
+    either their name or their number is ``NV-F015``, because a second ``main``
     is not a second table, it is a document that has stopped describing the
     device.
     """
 
     name: ElementName
-    #: ``NG-F015``: unique within the device, and not one of the reserved numbers.
+    #: ``NV-F015``: unique within the device, and not one of the reserved numbers.
     id: TableId
     description: str | None = None
 
@@ -494,23 +494,23 @@ class StaticRoute(NetvizModel):
     """One entry of ``spec.routes`` — a configured route (RFC 8349 ``rt:route``).
 
     A route needs somewhere to send the packet, so at least one of ``via``,
-    ``dev`` and ``blackhole`` is required (``NG-F004``); ``blackhole`` excludes
+    ``dev`` and ``blackhole`` is required (``NV-F004``); ``blackhole`` excludes
     the other two, because a route that discards has no egress.
     """
 
     prefix: IPPrefix
-    #: Next-hop address. Must be of the same family as ``prefix`` (``NG-F003``)
-    #: and reachable on a prefix the device configures (``NG-F008``).
+    #: Next-hop address. Must be of the same family as ``prefix`` (``NV-F003``)
+    #: and reachable on a prefix the device configures (``NV-F008``).
     via: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
     #: Egress interface, for a next hop on an unnumbered link or a route that
-    #: sends to an interface rather than to an address (``NG-F009``).
+    #: sends to an interface rather than to an address (``NV-F009``).
     dev: IfName | None = None
     #: The routing instance the route belongs to; the global one when unset.
     vrf: ElementName | None = None
     #: The table the route is placed in, for policy-based routing (§16.4);
     #: ``main`` when unset. Names an entry of ``spec.route_tables``, or one of
-    #: the reserved tables (``NG-F019``). A VRF is a table of its own, so naming
-    #: both is a contradiction rather than a refinement (``NG-F018``).
+    #: the reserved tables (``NV-F019``). A VRF is a table of its own, so naming
+    #: both is a contradiction rather than a refinement (``NV-F018``).
     table: ElementName | None = None
     metric: RouteMetric | None = None
     #: Discard matching packets instead of forwarding them.
@@ -518,13 +518,13 @@ class StaticRoute(NetvizModel):
 
     @model_validator(mode="after")
     def _check_table(self) -> StaticRoute:
-        """``NG-F018``: ``vrf`` and ``table`` are two spellings of one choice."""
+        """``NV-F018``: ``vrf`` and ``table`` are two spellings of one choice."""
         if self.vrf is not None and self.table is not None:
             raise field_error(
                 f"route {self.prefix} names both VRF {self.vrf!r} and table "
                 f"{self.table!r}; a VRF is a routing table of its own, so a route is "
                 f"placed in one or the other",
-                rule="NG-F018",
+                rule="NV-F018",
                 path=("table",),
             )
         return self
@@ -536,7 +536,7 @@ class StaticRoute(NetvizModel):
                 if getattr(self, key) is not None:
                     raise field_error(
                         f"a blackhole route discards packets and must not declare {key!r}",
-                        rule="NG-F004",
+                        rule="NV-F004",
                         path=(key,),
                     )
             return self
@@ -544,7 +544,7 @@ class StaticRoute(NetvizModel):
             raise field_error(
                 "a route needs somewhere to send the packet: declare 'via', 'dev', "
                 "or 'blackhole: true'",
-                rule="NG-F004",
+                rule="NV-F004",
                 path=("via",),
             )
         if self.via is not None and self.via.version != self.prefix.version:
@@ -552,7 +552,7 @@ class StaticRoute(NetvizModel):
                 f"next hop {self.via} is IPv{self.via.version} but {self.prefix} is "
                 f"IPv{self.prefix.version}; a next hop is resolved on the destination's "
                 f"own address family",
-                rule="NG-F003",
+                rule="NV-F003",
                 path=("via",),
             )
         return self
@@ -612,7 +612,7 @@ class PolicyRule(NetvizModel):
     mistake — it is how the database is terminated.
     """
 
-    #: ``NG-F020``: unique within the device, per family.
+    #: ``NV-F020``: unique within the device, per family.
     priority: RulePriority
     #: Which family's database the rule is installed in. Derived from ``src`` and
     #: ``dst`` when they say so, and both families when nothing does.
@@ -626,55 +626,55 @@ class PolicyRule(NetvizModel):
     #: This is how a port, a user or an application reaches the policy database:
     #: something marks, and this matches (§16.9).
     fwmark: Fwmark | None = None
-    #: The interface the packet arrived on (``NG-F021``).
+    #: The interface the packet arrived on (``NV-F021``).
     iif: IfName | None = None
-    #: The interface the packet would leave by (``NG-F021``). Only meaningful for
+    #: The interface the packet would leave by (``NV-F021``). Only meaningful for
     #: locally originated traffic, which is the point: it is how a socket bound
     #: to one uplink is routed by that uplink's table.
     oif: IfName | None = None
     #: The DSCP code point the packet carries (RFC 2474).
     dscp: Dscp | None = None
     #: Match everything the selectors do *not* — iproute2's ``not``. Meaningless
-    #: without a selector to invert, which is ``NG-F017``.
+    #: without a selector to invert, which is ``NV-F017``.
     invert: Boolean = False
     action: PolicyAction = PolicyAction.LOOKUP
     #: The table to route by, required by ``lookup`` and refused by everything
-    #: else (``NG-F016``). Names an entry of ``spec.route_tables``, a VRF, or a
-    #: reserved table (``NG-F019``).
+    #: else (``NV-F016``). Names an entry of ``spec.route_tables``, a VRF, or a
+    #: reserved table (``NV-F019``).
     table: ElementName | None = None
     #: The priority to jump to, required by ``goto`` and refused by everything
-    #: else (``NG-F016``). Strictly greater than this rule's own, since the
+    #: else (``NV-F016``). Strictly greater than this rule's own, since the
     #: database is walked upwards and a backwards jump is a loop.
     goto: RulePriority | None = None
     description: str | None = None
 
     @model_validator(mode="after")
     def _check_action(self) -> PolicyRule:
-        """``NG-F016``: the action and the thing it acts on agree."""
+        """``NV-F016``: the action and the thing it acts on agree."""
         if self.action is PolicyAction.LOOKUP and self.table is None:
             raise field_error(
                 "a 'lookup' rule needs the table to look up: name one in 'table', or "
                 "choose an action that discards ('blackhole', 'unreachable', 'prohibit')",
-                rule="NG-F016",
+                rule="NV-F016",
                 path=("table",),
             )
         if self.action is not PolicyAction.LOOKUP and self.table is not None:
             raise field_error(
                 f"a {self.action.value!r} rule does not route the packet, so it must not "
                 f"name a table",
-                rule="NG-F016",
+                rule="NV-F016",
                 path=("table",),
             )
         if self.action is PolicyAction.GOTO and self.goto is None:
             raise field_error(
                 "a 'goto' rule needs the priority it jumps to",
-                rule="NG-F016",
+                rule="NV-F016",
                 path=("goto",),
             )
         if self.action is not PolicyAction.GOTO and self.goto is not None:
             raise field_error(
                 f"'goto' is the jump target of a 'goto' rule; this one is {self.action.value!r}",
-                rule="NG-F016",
+                rule="NV-F016",
                 path=("goto",),
             )
         if self.goto is not None and self.goto <= self.priority:
@@ -682,20 +682,20 @@ class PolicyRule(NetvizModel):
                 f"this rule is at priority {self.priority} and jumps to {self.goto}; the "
                 f"database is walked from the lowest priority upwards, so a jump that does "
                 f"not go forwards is a loop",
-                rule="NG-F016",
+                rule="NV-F016",
                 path=("goto",),
             )
         return self
 
     @model_validator(mode="after")
     def _check_selectors(self) -> PolicyRule:
-        """``NG-F017``: the selectors agree with each other and with the family."""
+        """``NV-F017``: the selectors agree with each other and with the family."""
         if self.src is not None and self.dst is not None and self.src.version != self.dst.version:
             raise field_error(
                 f"'src' is {self.src} and 'dst' is {self.dst}; one rule matches one "
                 f"address family, so the two prefixes cannot be IPv{self.src.version} "
                 f"and IPv{self.dst.version}",
-                rule="NG-F017",
+                rule="NV-F017",
                 path=("dst",),
             )
         if self.family is not None:
@@ -705,14 +705,14 @@ class PolicyRule(NetvizModel):
                     raise field_error(
                         f"the rule is declared {self.family.value} but {key!r} is "
                         f"{prefix}, which is IPv{prefix.version}",
-                        rule="NG-F017",
+                        rule="NV-F017",
                         path=(key,),
                     )
         if self.invert and not self.selectors:
             raise field_error(
                 "'invert' matches everything the selectors do not, and this rule has no "
                 "selector to invert, so it would match nothing at all",
-                rule="NG-F017",
+                rule="NV-F017",
                 path=("invert",),
             )
         return self
@@ -793,7 +793,7 @@ class OspfConfig(NetvizModel):
     area: OspfArea = "0.0.0.0"
     router_id: RouterId | None = None
     #: The interfaces OSPF runs on. Each must be an interface of the device
-    #: (``NG-F010``); the list is non-empty and free of duplicates (``NG-F006``).
+    #: (``NV-F010``); the list is non-empty and free of duplicates (``NV-F006``).
     interfaces: list[IfName] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -803,7 +803,7 @@ class OspfConfig(NetvizModel):
             if name in seen:
                 raise field_error(
                     f"interface {name!r} is listed twice",
-                    rule="NG-F006",
+                    rule="NV-F006",
                     path=("interfaces", index),
                 )
             seen.add(name)
@@ -838,13 +838,13 @@ class BgpConfig(NetvizModel):
 
     @model_validator(mode="after")
     def _check_neighbors(self) -> BgpConfig:
-        """``NG-F007``: one session per neighbour address."""
+        """``NV-F007``: one session per neighbour address."""
         seen: set[ipaddress.IPv4Address | ipaddress.IPv6Address] = set()
         for index, neighbor in enumerate(self.neighbors):
             if neighbor.address in seen:
                 raise field_error(
                     f"neighbour {neighbor.address} is declared twice",
-                    rule="NG-F007",
+                    rule="NV-F007",
                     path=("neighbors", index, "address"),
                 )
             seen.add(neighbor.address)
@@ -874,7 +874,7 @@ class RoutingConfig(NetvizModel):
         One device commonly gives OSPF and BGP the same identifier — usually a
         loopback address — and that is one identity, not a duplicate, which is
         why the two are de-duplicated before anything compares them across
-        devices (``NG-F012``).
+        devices (``NV-F012``).
         """
         ids = [
             block.router_id

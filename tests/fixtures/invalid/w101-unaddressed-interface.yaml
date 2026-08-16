@@ -1,4 +1,4 @@
-# W101 (NG-I013) - an interface neither routes nor switches.
+# W101 (NV-I013) - an interface neither routes nor switches.
 #
 # 'pc-a:eth1' is enabled, carries no address and has no 'vlan' block, and no
 # other interface is stacked on it. It has to stay enabled - that is the rule -

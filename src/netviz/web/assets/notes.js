@@ -27,7 +27,7 @@
  * ...with one rule that is not obvious and is load-bearing. An annotation that
  * has never been placed gets its **whole `spec.geometry` block in one write**,
  * because `x` on its own is a position that places nothing and §21 says so
- * (NG-G005): a leaf-at-a-time sequence onto a missing block would be refused at
+ * (NV-G005): a leaf-at-a-time sequence onto a missing block would be refused at
  * the first operation. One that is already placed gets a field at a time, which
  * is what a reviewer wants to read in the changes drawer. That is the same rule
  * netviz/drawio/reconcile.py applies to a diagram coming home from draw.io,
@@ -102,7 +102,7 @@ window.netvizNotes = (function () {
     // screen -- that is what keeps the pan and the zoom -- so a previous overlay
     // is still in it and has to go, or every repaint would leave another.
     if (graph) {
-      Array.prototype.forEach.call(graph.querySelectorAll("g.ng-annotations"), function (stale) {
+      Array.prototype.forEach.call(graph.querySelectorAll("g.nv-annotations"), function (stale) {
         stale.remove();
       });
     }
@@ -115,7 +115,7 @@ window.netvizNotes = (function () {
     if (!graph) { picked = null; return; }
     frame.offset = measureOffset(graph, geometry, details);
     host = document.createElementNS(SVG_NS, "g");
-    host.setAttribute("class", "ng-annotations");
+    host.setAttribute("class", "nv-annotations");
     // Furniture, not content: what the overlay says is said again in the status
     // line and by the commands, and a screen reader walking a field of handles
     // learns nothing from it. See a11y.js.
@@ -343,7 +343,7 @@ window.netvizNotes = (function () {
     if (!chosen) { return; }
     var outline = liveBox(chosen);
     if (!outline) { return; }
-    host.appendChild(rectangle(outline, "ng-anno-picked"));
+    host.appendChild(rectangle(outline, "nv-anno-picked"));
     if (!ctx || !ctx.writable()) { return; }
     handlesFor(chosen, outline).forEach(function (node) { host.appendChild(node); });
   }
@@ -374,7 +374,7 @@ window.netvizNotes = (function () {
   }
 
   function band(entry, box) {
-    var node = rectangle(box, "ng-anno-band");
+    var node = rectangle(box, "nv-anno-band");
     node.setAttribute("stroke-width", String(HIT_WIDTH));
     node.setAttribute("data-annotation", entry.id);
     if (!isPlaced(entry)) { node.setAttribute("data-follows", "members"); }
@@ -395,11 +395,11 @@ window.netvizNotes = (function () {
   function handle(point, kind, which) {
     var at = toSvg(point);
     var node = document.createElementNS(SVG_NS, "circle");
-    // Deliberately *not* also `ng-handle`, however alike the two look: links.js
+    // Deliberately *not* also `nv-handle`, however alike the two look: links.js
     // claims every element carrying that class the moment it is pressed, and a
     // handle claimed by the wrong layer is a gesture that silently does nothing.
     // The style is shared in app.css instead, which is where it belongs.
-    node.setAttribute("class", "ng-anno-handle ng-anno-handle-" + kind);
+    node.setAttribute("class", "nv-anno-handle nv-anno-handle-" + kind);
     node.setAttribute("cx", String(round(at[0])));
     node.setAttribute("cy", String(round(at[1])));
     node.setAttribute("r", String(HANDLE));
@@ -479,7 +479,7 @@ window.netvizNotes = (function () {
   function grab(event) {
     if (!ctx || !ctx.writable() || !host || editing) { return false; }
     var target = event.target;
-    if (target && target.classList && target.classList.contains("ng-anno-handle")) {
+    if (target && target.classList && target.classList.contains("nv-anno-handle")) {
       var chosen = selection();
       if (!chosen) { return false; }
       begin(chosen, target.getAttribute("data-handle"), target.getAttribute("data-which"), event);

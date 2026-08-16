@@ -172,16 +172,16 @@ def test_the_wildcard_is_offered_before_the_individual_rules() -> None:
 
 
 def test_the_schema_aliases_are_offered_once_the_prefix_looks_like_one() -> None:
-    aliases = values(["validate", "--disable"], "NG-C")
-    assert aliases, "the NG-* vocabulary is accepted, so it must be completable"
-    assert all(alias.startswith("NG-C") for alias in aliases)
-    assert "NG-C002" in aliases
+    aliases = values(["validate", "--disable"], "NV-C")
+    assert aliases, "the NV-* vocabulary is accepted, so it must be completable"
+    assert all(alias.startswith("NV-C") for alias in aliases)
+    assert "NV-C002" in aliases
     assert not any(alias.startswith("NG") for alias in values(["validate", "--disable"], "E"))
 
 
 def test_rule_completion_ignores_case() -> None:
     assert values(["validate", "--disable"], "e00") == values(["validate", "--disable"], "E00")
-    assert "NG-C002" in values(["validate", "--disable"], "ng-c0")
+    assert "NV-C002" in values(["validate", "--disable"], "nv-c0")
 
 
 def test_only_the_rules_with_a_choice_to_make_are_offered_for_choose() -> None:

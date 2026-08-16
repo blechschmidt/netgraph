@@ -213,7 +213,7 @@ line separating one interface stanza from the next, are content.
       ipv4:
         addresses: [10.1.10.51/24]
         # The Vlan10 SVI on sw-north-dist-01. 'gateway' is checked against this
-        # interface's own prefixes by NG-A013; 'netviz ipam' reports it.
+        # interface's own prefixes by NV-A013; 'netviz ipam' reports it.
         gateway: 10.1.10.1
 ```
 
@@ -273,7 +273,7 @@ written `key: null`, which is the form a reader cannot mistake for a line
 somebody forgot to finish.
 
 An empty *document* in a multi-document file becomes an explicit `null`. The
-loader treats the two identically (`NG-L004`), so nothing downstream can tell;
+loader treats the two identically (`NV-L004`), so nothing downstream can tell;
 dropping the document instead would renumber every document after it and move
 the line every diagnostic points at.
 
@@ -340,8 +340,8 @@ with the same discovery [`validate`](commands/validate.md) and
 [`render`](commands/render.md) use, so all of `docs/schema.md` §2.1
 applies unchanged:
 
-- only `*.yaml` and `*.yml`, compared case-insensitively (`NG-L001`);
-- nothing under a path component starting with `.` or `_` (`NG-L002`);
+- only `*.yaml` and `*.yml`, compared case-insensitively (`NV-L001`);
+- nothing under a path component starting with `.` or `_` (`NV-L002`);
 - nothing a [`.netvizignore`](schema.md) excludes.
 
 That is a deliberate limit rather than an incidental one. A file the inventory

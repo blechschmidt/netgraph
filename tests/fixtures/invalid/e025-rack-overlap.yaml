@@ -1,4 +1,4 @@
-# E025 (NG-U001) - two elements are bolted into the same rack unit.
+# E025 (NV-U001) - two elements are bolted into the same rack unit.
 #
 # 'sw-a' is 2U at U10, so it fills U10 and U11 - and 'sw-b' claims U11. One of
 # the two positions was copied from the other and never changed.

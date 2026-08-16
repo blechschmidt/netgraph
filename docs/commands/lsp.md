@@ -99,6 +99,6 @@ turns that off for a client that does its own file watching and sends
 * [`netviz validate`](validate.md) — the same checks from the command line, and
   the `--fix` catalogue the code actions come from.
 * [`docs/validation-rules.md`](../validation-rules.md) — every rule, which the
-  `NG-*` code on each diagnostic links to.
+  `NV-*` code on each diagnostic links to.
 * [`netviz web`](web.md) — the other editor: the diagram and the YAML side by
   side, in a browser.

@@ -99,9 +99,9 @@ _THEME_ADAPTER: Final[TypeAdapter[Theme]] = TypeAdapter(Theme)
 
 #: pydantic error types that map onto a schema rule of §10.
 _RULE_BY_ERROR_TYPE: Final[dict[str, str]] = {
-    "extra_forbidden": "NG-D005",
-    "union_tag_invalid": "NG-D003",
-    "union_tag_not_found": "NG-D003",
+    "extra_forbidden": "NV-D005",
+    "union_tag_invalid": "NV-D003",
+    "union_tag_not_found": "NV-D003",
 }
 _PYDANTIC_PREFIXES: Final[tuple[str, ...]] = (
     "Value error, ",
@@ -178,7 +178,7 @@ def parse_layout(document: Any, *, source: str | None = None) -> Layout:
     Geometry is checked for *shape* only — a view netviz draws, coordinates
     that are finite numbers, a positive size. Whether a key names something the
     inventory still holds is not knowable from one document, so it is left to
-    the validator (``NG-Y001``), which can see the whole tree and reports it as
+    the validator (``NV-Y001``), which can see the whole tree and reports it as
     a warning that ``netviz layout --prune`` clears.
 
     Raises:
@@ -220,7 +220,7 @@ def parse_test_suite(document: Any, *, source: str | None = None) -> TestSuite:
 
     Only the *shape* of each assertion is checked here — that it names a claim
     netviz can grade, and that every key it carries belongs to that claim
-    (``NG-T003``). Whether ``from: pc-alice`` names anything is not knowable from
+    (``NV-T003``). Whether ``from: pc-alice`` names anything is not knowable from
     one document, and it is not the validator's question either: an assertion
     that names nothing is a **failing test**, reported by ``netviz test``
     against the assertion's own line, rather than a broken inventory.
@@ -243,7 +243,7 @@ def parse_annotation(document: Any, *, source: str | None = None) -> Annotation:
     Only the *shape* is checked — that the text is text, the colour is a colour,
     the view is a view netviz draws, and that the annotation says where it
     goes. Whether an anchor or a member names anything the inventory holds is not
-    knowable from one document, and is reported by the validator as ``NG-G001``,
+    knowable from one document, and is reported by the validator as ``NV-G001``,
     a **warning**: deleting a switch must not break ``netviz validate``, and an
     annotation about something that is gone simply is not drawn.
 
@@ -263,7 +263,7 @@ def parse_annotation(document: Any, *, source: str | None = None) -> Annotation:
                         f"{echo_value(kind)} is not an annotation; expected one of "
                         f"{', '.join(ANNOTATION_DOCUMENT_KINDS)}"
                     ),
-                    rule="NG-D003",
+                    rule="NV-D003",
                 )
             ],
             source=source,
@@ -275,18 +275,18 @@ def parse_annotation(document: Any, *, source: str | None = None) -> Annotation:
 
 
 def _not_a_mapping(document: Any) -> SchemaIssue:
-    """``NG-D001`` — the document is a scalar or a sequence, not an envelope."""
+    """``NV-D001`` — the document is a scalar or a sequence, not an envelope."""
     return SchemaIssue(
         message=(
             "a document must be a mapping with the keys apiVersion, kind, "
             f"metadata and spec, got {type(document).__name__}"
         ),
-        rule="NG-D001",
+        rule="NV-D001",
     )
 
 
 def _reject_unknown_kind(document: Mapping[str, Any], *, source: str | None) -> None:
-    """Produce a helpful ``NG-D003`` before pydantic reports a union-tag error."""
+    """Produce a helpful ``NV-D003`` before pydantic reports a union-tag error."""
     kind = document.get("kind")
     if kind is None:
         raise SchemaError(
@@ -294,7 +294,7 @@ def _reject_unknown_kind(document: Mapping[str, Any], *, source: str | None) -> 
                 SchemaIssue(
                     path=("kind",),
                     message=f"'kind' is required; expected one of {', '.join(DOCUMENT_KINDS)}",
-                    rule="NG-D001",
+                    rule="NV-D001",
                 )
             ],
             source=source,
@@ -308,7 +308,7 @@ def _reject_unknown_kind(document: Mapping[str, Any], *, source: str | None) -> 
                         f"unknown kind {echo_value(kind)}; expected one of "
                         f"{', '.join(DOCUMENT_KINDS)}"
                     ),
-                    rule="NG-D003",
+                    rule="NV-D003",
                 )
             ],
             source=source,
@@ -332,11 +332,11 @@ def _issues_from(error: PydanticValidationError) -> list[SchemaIssue]:
 def _rule_for(error_type: str, path: tuple[str | int, ...]) -> str | None:
     """Map a pydantic error onto the §10 rule it implements, when there is one."""
     if error_type == "missing" and len(path) == 1:
-        return "NG-D001"
+        return "NV-D001"
     if error_type == "literal_error" and path == ("apiVersion",):
-        return "NG-D002"
+        return "NV-D002"
     if error_type == "string_pattern_mismatch" and path == ("metadata", "name"):
-        return "NG-N001"
+        return "NV-N001"
     return _RULE_BY_ERROR_TYPE.get(error_type)
 
 

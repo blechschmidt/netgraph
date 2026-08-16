@@ -20,7 +20,7 @@ A cable terminates on a panel port exactly as it terminates on a device port
 rather than something a cable endpoint needs a second spelling for. The list is
 derived from :attr:`PatchPanelSpec.ports` rather than written out: a 24-port
 panel is 48 interfaces, all identical bar the number, which is precisely the
-typing that made ``NG-R001`` ranges necessary in the first place.
+typing that made ``NV-R001`` ranges necessary in the first place.
 
 The names are ``front/<n>`` and ``rear/<n>``. A panel port is therefore written
 in a cable exactly like any other endpoint::
@@ -82,7 +82,7 @@ REAR: Final = "rear"
 #: Both sides, in the order a run crosses them.
 PanelSide: Final[tuple[str, str]] = (FRONT, REAR)
 
-#: ``NG-P006`` — ceiling on the positions one panel may declare. The largest
+#: ``NV-P006`` — ceiling on the positions one panel may declare. The largest
 #: panel anyone ships is 96 positions in 4U; 1024 leaves room for a whole rack
 #: modelled as one document and still bounds what a typo can ask for.
 MAX_PANEL_PORTS: Final = 1024
@@ -91,10 +91,10 @@ MAX_PANEL_PORTS: Final = 1024
 PORT_RANGE_PATTERN: Final = POSITION_RANGE_PATTERN
 
 #: What :func:`~netviz.models.positions.expand_positions` is told a panel's
-#: numbered things are, so every ``NG-P006`` diagnostic reads the same way.
+#: numbered things are, so every ``NV-P006`` diagnostic reads the same way.
 _PORT_RANGE: Final[dict[str, Any]] = {
     "field": "ports",
-    "rule": "NG-P006",
+    "rule": "NV-P006",
     "limit": MAX_PANEL_PORTS,
     "noun": "patch panel",
     "unit": "position",
@@ -102,7 +102,7 @@ _PORT_RANGE: Final[dict[str, Any]] = {
 
 
 def parse_port_range(value: Any) -> tuple[str, ...]:
-    """Expand a ``ports`` shorthand into the port numbers it names (``NG-P006``).
+    """Expand a ``ports`` shorthand into the port numbers it names (``NV-P006``).
 
     A thin wrapper over :func:`~netviz.models.positions.expand_positions`; a
     PDU's ``outlets`` takes the same shorthand and shares the implementation.
@@ -228,14 +228,14 @@ class PatchPanelSpec(NetvizModel):
                     raise field_error(
                         f"'couplers' names {side} position {number!r}, which 'ports' does not "
                         f"declare",
-                        rule="NG-P007",
+                        rule="NV-P007",
                         path=("couplers", front),
                     )
             if rear in used:
                 raise field_error(
                     f"'couplers' wires front {front!r} and front {used[rear]!r} to the same "
                     f"rear position {rear!r}; a coupler joins exactly two positions",
-                    rule="NG-P007",
+                    rule="NV-P007",
                     path=("couplers", front),
                 )
             used[rear] = front

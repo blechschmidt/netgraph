@@ -210,7 +210,7 @@ def test_a_rejected_document_is_reported_identically_from_the_cache(tmp_path: Pa
 
 
 def test_a_duplicate_name_is_still_found_through_the_cache(tmp_path: Path) -> None:
-    """``NG-N002`` is decided while indexing, so it cannot be cached per file."""
+    """``NV-N002`` is decided while indexing, so it cannot be cached per file."""
     root = tmp_path / "inventory"
     write(root, "one.yaml", SWITCH.format(name="sw1", mtu=1500))
     write(root, "two.yaml", SWITCH.format(name="sw1", mtu=9000))
@@ -219,7 +219,7 @@ def test_a_duplicate_name_is_still_found_through_the_cache(tmp_path: Path) -> No
     load_tree(root, cache=store)
     warm = load_tree(root, cache=DocumentCache(tmp_path / "cache"))
 
-    assert [error.rule for error in warm.errors] == ["NG-N002"]
+    assert [error.rule for error in warm.errors] == ["NV-N002"]
     assert fingerprint_of(warm) == fingerprint_of(load_tree(root))
 
 
@@ -735,7 +735,10 @@ def test_inspecting_counts_the_current_and_the_stale_generation(tree: Path, tmp_
     directory = tmp_path / "cache"
     current = DocumentCache(directory)
     load_tree(tree, cache=current)
-    stale = DocumentCache(directory, identity=replace(current.identity, netviz="0.0.1"))
+    # ``99.0.0`` for the same reason as in the version-bump test above: a version
+    # this project will never ship. A plausible-looking number would eventually be
+    # released and then stop being a *different* generation from the current one.
+    stale = DocumentCache(directory, identity=replace(current.identity, netviz="99.0.0"))
     load_tree(tree, cache=stale)
 
     info = inspect_cache(directory, identity=current.identity)

@@ -165,7 +165,7 @@ def test_the_rule_document_names_no_rule_that_does_not_exist(validation_rules_do
     """Short ids are the validator's vocabulary; a stray one would be a lie.
 
     The lookbehind keeps the *schema* ids of the wireless group out of it:
-    ``NG-W011`` is an alias of ``W134`` and has nothing to do with a short id
+    ``NV-W011`` is an alias of ``W134`` and has nothing to do with a short id
     ``W011``, which does not exist. Every other group's letter differs from
     ``E`` and ``W``, so this is the one place the two vocabularies can collide
     in text.
@@ -389,9 +389,9 @@ def test_no_command_page_names_a_flag_that_does_not_exist(path: Path) -> None:
 
 @pytest.mark.parametrize("rule", RULES, ids=[rule.id for rule in RULES])
 def test_every_rule_id_and_alias_reaches_the_validation_reference(rule: object) -> None:
-    """``NG-*`` is the vocabulary of the specification and of ``--disable``.
+    """``NV-*`` is the vocabulary of the specification and of ``--disable``.
 
-    A reader who meets ``NG-C002`` in a diagnostic must be able to find it, so
+    A reader who meets ``NV-C002`` in a diagnostic must be able to find it, so
     both the reference and the index in ``docs/validation.md`` have to name it.
     """
     assert isinstance(rule, type(RULES[0]))

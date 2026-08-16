@@ -174,28 +174,28 @@ def test_an_interface_is_placed_in_the_namespace_it_names() -> None:
         pytest.param(
             [{"name": "a"}, {"name": "a"}],
             [port("eth0")],
-            "NG-N020",
+            "NV-N020",
             "spec.netns.1.name",
             id="a name declared twice",
         ),
         pytest.param(
             [{"name": "a", "parent": "nope"}],
             [port("eth0")],
-            "NG-N021",
+            "NV-N021",
             "spec.netns.0.parent",
             id="a parent that does not exist",
         ),
         pytest.param(
             [{"name": "a", "parent": "a"}],
             [port("eth0")],
-            "NG-N021",
+            "NV-N021",
             "spec.netns.0.parent",
             id="a namespace inside itself",
         ),
         pytest.param(
             [{"name": "a", "parent": "b"}, {"name": "b", "parent": "a"}],
             [port("eth0")],
-            "NG-N021",
+            "NV-N021",
             "spec.netns.0.parent",
             id="a two-step nesting cycle",
         ),
@@ -206,14 +206,14 @@ def test_an_interface_is_placed_in_the_namespace_it_names() -> None:
                 {"name": "c", "parent": "b"},
             ],
             [port("eth0")],
-            "NG-N021",
+            "NV-N021",
             "spec.netns.0.parent",
             id="a three-step nesting cycle",
         ),
         pytest.param(
             [],
             [port("eth0", netns="blue")],
-            "NG-N022",
+            "NV-N022",
             "spec.interfaces.0.netns",
             id="an interface in an undeclared namespace",
         ),
@@ -255,7 +255,7 @@ def test_the_tree_helper_maps_an_unset_parent_to_the_initial_namespace() -> None
 
 
 def test_the_path_walk_terminates_on_a_cycle_rather_than_spinning() -> None:
-    """``NG-N021`` refuses one, but a half-built document may still be walked."""
+    """``NV-N021`` refuses one, but a half-built document may still be walked."""
     assert netns_path("a", {"a": "b", "b": "a"}) in (("b", "a"), ("a", "b"))
 
 
@@ -321,7 +321,7 @@ def test_a_pairing_that_cannot_be_created_is_refused(
 ) -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(device("srv", *interfaces), source=None)
-    assert issues(exc.value) == [("NG-N023", path)]
+    assert issues(exc.value) == [("NV-N023", path)]
 
 
 def test_the_asymmetry_message_says_what_the_other_end_names_instead() -> None:
@@ -335,7 +335,7 @@ def test_the_asymmetry_message_says_what_the_other_end_names_instead() -> None:
 
 def test_an_adapter_has_no_stack_to_join_and_no_namespace_to_be_in() -> None:
     """§23 is about machines with a kernel; a dongle is not one."""
-    for key, rule in (("netns", "NG-N022"), ("peer", "NG-N023")):
+    for key, rule in (("netns", "NV-N022"), ("peer", "NV-N023")):
         document = {
             "apiVersion": API_VERSION,
             "kind": "adapter",

@@ -42,7 +42,7 @@ figure a breaker is sized against in normal operation.
 It is not the only figure worth having: when the other PDU fails, this one
 carries the *whole* load of everything dual-corded to it.
 :attr:`PduLoad.failover_watts` is that number, and both appear in the utilisation
-table and the load schedule. Only the first one is graded (``NG-E012``): a pair of
+table and the load schedule. Only the first one is graded (``NV-E012``): a pair of
 PDUs each sized for half the rack is a design, not an error, and reporting it as
 one would make the rule useless in the racks that have it right.
 """
@@ -82,7 +82,7 @@ __all__ = [
 ]
 
 #: How many panels one run may cross before the walk gives up. A run crossing
-#: more than this is a loop (``NG-P005``) or a plant nobody could trace; the
+#: more than this is a loop (``NV-P005``) or a plant nobody could trace; the
 #: bound is what keeps a cross-wired pair of panels from hanging the resolver.
 MAX_PATCH_HOPS: Final = 16
 
@@ -188,7 +188,7 @@ class Feed:
 
 @dataclass(frozen=True, slots=True)
 class UnresolvedInput:
-    """One ``power.inputs`` entry that names no outlet that exists (``NG-E011``)."""
+    """One ``power.inputs`` entry that names no outlet that exists (``NV-E011``)."""
 
     element: str
     index: int
@@ -210,7 +210,7 @@ class Uplink:
 
     Recorded for every interface of every ``powered_by: poe`` element, whether or
     not the far end sources power, because "the uplink lands on a port with no
-    PoE" is exactly what ``NG-E014`` has to say.
+    PoE" is exactly what ``NV-E014`` has to say.
     """
 
     #: The element the run leaves.
@@ -279,7 +279,7 @@ class PoeBudget:
     element: str
     name: str
     #: ``power.poe_budget_watts``; ``None`` when it is not recorded, in which
-    #: case ``NG-E013`` has nothing to compare against and says nothing.
+    #: case ``NV-E013`` has nothing to compare against and says nothing.
     budget_watts: float | None
     ports: tuple[PoePort, ...] = ()
 
@@ -329,7 +329,7 @@ class PduLoad:
     @property
     def used_outlets(self) -> int:
         """Outlets with a cord in them. Counted distinctly: two claims on one
-        outlet is ``NG-E010``, and counting it twice would hide the real number.
+        outlet is ``NV-E010``, and counting it twice would hide the real number.
         """
         return len({feed.outlet for feed in self.feeds})
 
@@ -497,10 +497,10 @@ class PowerPlan:
     feeds: tuple[Feed, ...] = ()
     #: Everything with something to say about power, keyed by fqn, load order.
     nodes: Mapping[str, PowerNode] = field(default_factory=dict)
-    #: ``power.inputs`` entries that name no outlet that exists (``NG-E011``).
+    #: ``power.inputs`` entries that name no outlet that exists (``NV-E011``).
     unresolved: tuple[UnresolvedInput, ...] = ()
     #: Per ``powered_by: poe`` element: the far ends of its runs, in interface
-    #: order. What ``NG-E014`` reads.
+    #: order. What ``NV-E014`` reads.
     uplinks: Mapping[str, tuple[Uplink, ...]] = field(default_factory=dict)
 
     def node(self, fqn: str) -> PowerNode | None:
@@ -517,7 +517,7 @@ class PowerPlan:
         return tuple(feed for feed in self.feeds if feed.element == element)
 
     def outlet_claims(self) -> Mapping[tuple[str, str], tuple[Feed, ...]]:
-        """``(pdu, outlet)`` -> the feeds claiming it. What ``NG-E010`` reads."""
+        """``(pdu, outlet)`` -> the feeds claiming it. What ``NV-E010`` reads."""
         claims: dict[tuple[str, str], list[Feed]] = {}
         for feed in self.feeds:
             if feed.kind is FeedKind.OUTLET:
@@ -564,7 +564,7 @@ def power_plan(inventory: Inventory) -> PowerPlan:
     Returns:
         The plan. A reference that does not resolve is *recorded*, in
         :attr:`PowerPlan.unresolved`, rather than raised or dropped: the
-        validator grades it (``NG-E011``) and the renderer still has to draw the
+        validator grades it (``NV-E011``) and the renderer still has to draw the
         feeds that do resolve, because ``--force`` must produce a picture.
     """
     pdus = inventory.pdus
@@ -777,7 +777,7 @@ def _poe_feeds(inventory: Inventory, uplinks: Mapping[str, tuple[Uplink, ...]]) 
     "Best" is the one that can deliver most: a device with two runs to two
     switches is fed by whichever actually sources power, and by the more capable
     of the two when both do. An element whose runs source no power gets no feed
-    at all, which is what ``NG-E014`` reports.
+    at all, which is what ``NV-E014`` reports.
     """
     feeds: list[Feed] = []
     for fqn, candidates in uplinks.items():

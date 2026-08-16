@@ -1,4 +1,4 @@
-# W102 (NG-C010) - the two ends of a cable disagree about the MTU.
+# W102 (NV-C010) - the two ends of a cable disagree about the MTU.
 #
 # 1500 against 9000: the classic cause of a silent path-MTU failure.
 apiVersion: netviz.dev/v1alpha1

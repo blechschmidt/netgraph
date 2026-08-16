@@ -128,7 +128,7 @@ One IGP, one AS, and one VRF (§16):
 * **BGP** is a three-router iBGP mesh in AS 65001, peering on the loopbacks. The
   peer is written as an *address*, so the session resolves against
   `192.0.2.<i>/32` and the AS numbers of both ends are checked against each
-  other (`NG-F011`).
+  other (`NV-F011`).
 * **Static routes**: each core carries a discard route for its own site summary,
   so the parts of `10.<i>.0.0/16` that are not deployed yet do not follow a
   default route back out over the backbone, plus one route pinning the next
@@ -251,24 +251,24 @@ netviz -i examples/campus render --layer l3 --no-annotations -f svg -o plain.svg
 * **The distribution switch is a layer-3 switch**, not a bridge: it declares
   `forwarding: {ipv4: true, ipv6: true}` and hosts the `Vlan10`, `Vlan20` and
   `Vlan99` SVIs that are the gateways for the site. Because it forwards IP,
-  `NG-V009` does not apply to it.
+  `NV-V009` does not apply to it.
 * **Its uplink `Ethernet52/1` carries addresses and no `vlan` block.** That is
   how a routed port is expressed: no bridge-port configuration at all. The core
   router's `xe-0/0/0` is its untagged counterpart.
 * **Access switches are layer-2 only** and keep their management address on the
   `Vlan99` SVI.
 * **Both ends of every link agree on the MTU** — 9000 across the fibre core,
-  1500 to the desk — so `NG-C010` stays quiet.
-* **Trunk ports face trunk ports.** `NG-C011` compares access VLANs across a
+  1500 to the desk — so `NV-C010` stays quiet.
+* **Trunk ports face trunk ports.** `NV-C011` compares access VLANs across a
   link; two trunks are compared on their VLAN sets, which are identical here.
 * **Every trunk lists its native VLAN in `trunk_vlans`.** VLAN 1 is untagged on
   those ports whether or not it is written down, so writing it down is what
-  makes the document and the port agree — `W114` (`NG-V006`) is the rule that
+  makes the document and the port agree — `W114` (`NV-V006`) is the rule that
   says so.
 * **The templated switch's spare ports are `enabled: false`.** The template
   ships all forty-eight that way and a switch enables the ones it has patched,
-  which is both what the hardware does and what keeps `I002` (`NG-C015`) quiet
+  which is both what the hardware does and what keeps `I002` (`NV-C015`) quiet
   for a port nobody has run a cable to yet.
 * **MAC addresses come from real vendor OUIs.** A locally administered address
-  (`02:…`) is legal, and `I001` (`NG-I010`) reports it as information because no
+  (`02:…`) is legal, and `I001` (`NV-I010`) reports it as information because no
   OUI lookup can trace one back to hardware.

@@ -22,7 +22,7 @@ from netviz.models.style import Style
 
 __all__ = ["Adapter", "AdapterSpec", "UpstreamPort", "UpstreamType"]
 
-#: ``NG-X003`` — the interface types an adapter may present downstream.
+#: ``NV-X003`` — the interface types an adapter may present downstream.
 ADAPTER_INTERFACE_TYPES: Final[frozenset[InterfaceType]] = frozenset(
     {InterfaceType.ETHERNET, InterfaceType.WIFI, InterfaceType.LAG}
 )
@@ -56,7 +56,7 @@ class UpstreamPort(NetvizModel):
     #: Host-bus rate, e.g. ``5Gbps`` for USB 3.0.
     speed: BitRate | None = None
     #: The host device the adapter is plugged into. A *device* reference, not an
-    #: ``ifref`` (``NG-X001``); it may be written fully qualified (§2.2).
+    #: ``ifref`` (``NV-X001``); it may be written fully qualified (§2.2).
     attached_to: ElementRef | None = None
 
 
@@ -94,17 +94,17 @@ class AdapterSpec(NetvizModel):
                     f"{interface.name!r} is placed in a network namespace, but an adapter "
                     f"declares no namespace table; a namespace belongs to the host the "
                     f"adapter is attached to (schema §23.1)",
-                    rule="NG-N022",
+                    rule="NV-N022",
                     path=("interfaces", index, "netns"),
                 )
             if interface.peer is not None:
                 raise field_error(
                     f"{interface.name!r} declares a veth peer, but an adapter is hardware "
                     f"with no network stack of its own to join (schema §23.2)",
-                    rule="NG-N023",
+                    rule="NV-N023",
                     path=("interfaces", index, "peer"),
                 )
-        # NG-X004: the upstream port shares the interface namespace.
+        # NV-X004: the upstream port shares the interface namespace.
         check_interface_set(self.interfaces, reserved={self.upstream.name})
         for index, interface in enumerate(self.interfaces):
             if interface.type not in ADAPTER_INTERFACE_TYPES:
@@ -112,7 +112,7 @@ class AdapterSpec(NetvizModel):
                 raise field_error(
                     f"{interface.name!r} is of type {interface.type.value!r}; an "
                     f"adapter only supports {permitted}",
-                    rule="NG-X003",
+                    rule="NV-X003",
                     path=("interfaces", index, "type"),
                 )
             if interface.vrf is not None:
@@ -122,7 +122,7 @@ class AdapterSpec(NetvizModel):
                 raise field_error(
                     f"{interface.name!r} binds to a VRF, but an adapter declares no VRF "
                     f"table; bind the VRF on the host it is attached to",
-                    rule="NG-F002",
+                    rule="NV-F002",
                     path=("interfaces", index, "vrf"),
                 )
         return self

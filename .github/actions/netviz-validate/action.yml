@@ -22,7 +22,7 @@ inputs:
   disable:
     description: >-
       Rule ids to silence, separated by whitespace, commas or newlines. Short
-      ids (E001) and schema aliases (NG-C002) are both accepted.
+      ids (E001) and schema aliases (NV-C002) are both accepted.
     required: false
     default: ""
   output-format:

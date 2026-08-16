@@ -1,4 +1,4 @@
-# E018 (NG-T004) - 'over' names a tunnel that is not declared.
+# E018 (NV-T004) - 'over' names a tunnel that is not declared.
 #
 # Nothing called 'ipsec-core' exists, so the WireGuard tunnel is silently
 # demoted from "nested" to "straight over the underlay network".

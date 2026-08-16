@@ -37,11 +37,11 @@
 <body>
 <header>
   <h1>{{ title }}</h1>
-  <span id="ng-counts" class="counts"></span>
+  <span id="nv-counts" class="counts"></span>
   <span class="spacer"></span>
 {% if layers | length > 1 %}
   <label class="field">layer
-    <select id="ng-layer">
+    <select id="nv-layer">
 {% for layer in layers %}
       <option value="{{ loop.index0 }}">{{ layer.label }}</option>
 {% endfor %}
@@ -50,7 +50,7 @@
 {% endif %}
 {% if namespaces %}
   <label class="field" title="Dim everything outside one namespace">namespace
-    <select id="ng-namespace">
+    <select id="nv-namespace">
       <option value="">all</option>
 {% for namespace in namespaces %}
       <option value="{{ namespace }}">{{ namespace }}</option>
@@ -59,23 +59,23 @@
   </label>
 {% endif %}
 {% if toggles.ips %}
-  <label class="check" title="Show the configured addresses"><input id="ng-ips" type="checkbox" checked> IPs</label>
+  <label class="check" title="Show the configured addresses"><input id="nv-ips" type="checkbox" checked> IPs</label>
 {% endif %}
 {% if toggles.vlans %}
-  <label class="check" title="Show VLAN membership"><input id="ng-vlans" type="checkbox" checked> VLANs</label>
+  <label class="check" title="Show VLAN membership"><input id="nv-vlans" type="checkbox" checked> VLANs</label>
 {% endif %}
-  <label class="sr-only" for="ng-search">Search by name, address, MAC or VLAN</label>
-  <input id="ng-search" type="search" placeholder="search  (/)" autocomplete="off"
-    spellcheck="false" aria-controls="ng-results" aria-describedby="ng-matches">
-  <button id="ng-fit" type="button" title="Fit the diagram in the window (f)">Fit</button>
-  <button id="ng-reset" type="button" title="Back to how the page opened">Reset</button>
-  <button id="ng-help" type="button" aria-expanded="false" aria-controls="ng-keys">Keys</button>
+  <label class="sr-only" for="nv-search">Search by name, address, MAC or VLAN</label>
+  <input id="nv-search" type="search" placeholder="search  (/)" autocomplete="off"
+    spellcheck="false" aria-controls="nv-results" aria-describedby="nv-matches">
+  <button id="nv-fit" type="button" title="Fit the diagram in the window (f)">Fit</button>
+  <button id="nv-reset" type="button" title="Back to how the page opened">Reset</button>
+  <button id="nv-help" type="button" aria-expanded="false" aria-controls="nv-keys">Keys</button>
 </header>
 
 <main>
-  <div id="ng-stage" class="stage" tabindex="0" role="group"
+  <div id="nv-stage" class="stage" tabindex="0" role="group"
     aria-label="Network diagram. Drag to pan, scroll to zoom, arrow keys to move; search to find an element.">
-    <div id="ng-viewport" class="viewport">
+    <div id="nv-viewport" class="viewport">
 {% if icons %}
       {{ icons }}
 {% endif %}
@@ -89,16 +89,16 @@
   <aside class="panel">
     <div class="panel-head">
       <span>details</span>
-      <span id="ng-matches" class="hint-count" aria-live="polite"></span>
+      <span id="nv-matches" class="hint-count" aria-live="polite"></span>
     </div>
-    <ul id="ng-results" class="results"></ul>
-    <div id="ng-detail" class="detail" aria-live="polite"></div>
+    <ul id="nv-results" class="results"></ul>
+    <div id="nv-detail" class="detail" aria-live="polite"></div>
   </aside>
 </main>
 
-<div id="ng-card" class="card" hidden aria-hidden="true"></div>
+<div id="nv-card" class="card" hidden aria-hidden="true"></div>
 
-<div id="ng-keys" class="keys" hidden>
+<div id="nv-keys" class="keys" hidden>
   <dl>
     <dt>/</dt><dd>search</dd>
     <dt>arrows</dt><dd>pan (Shift: faster)</dd>

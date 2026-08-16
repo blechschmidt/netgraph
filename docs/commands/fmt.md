@@ -67,9 +67,9 @@ so `.netvizignore` and the dot- and underscore-prefix rules apply exactly as
 they do to [`validate`](validate.md) — all of
 [`docs/schema.md` §2.1](../schema.md#21-discovery-rules):
 
-* only `*.yaml` and `*.yml`, compared case-insensitively (`NG-L001`);
-* nothing under a path component starting with `.` or `_` (`NG-L002`);
-* nothing a `.netvizignore` excludes (`NG-L006`).
+* only `*.yaml` and `*.yml`, compared case-insensitively (`NV-L001`);
+* nothing under a path component starting with `.` or `_` (`NV-L002`);
+* nothing a `.netvizignore` excludes (`NV-L006`).
 
 That is a deliberate limit rather than an incidental one. A file the inventory
 ignores may not be netviz YAML at all, and rewriting it would be the formatter

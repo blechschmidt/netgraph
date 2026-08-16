@@ -1,4 +1,4 @@
-# E008 (NG-I005) - one port is a member of two aggregates.
+# E008 (NV-I005) - one port is a member of two aggregates.
 #
 # 'eth1' is listed by both 'bond0' and 'bond1'. A physical port belongs to one
 # aggregate; whichever LACP session wins, the other bond is short a lane.

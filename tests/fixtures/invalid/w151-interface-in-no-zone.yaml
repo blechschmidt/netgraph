@@ -1,4 +1,4 @@
-# W151 (NG-B011) - an interface outside the partition the device declares.
+# W151 (NV-B011) - an interface outside the partition the device declares.
 #
 # Once a device divides its interfaces into zones, one left outside is traffic
 # the policy cannot name: no rule saying 'from lan' reaches it, and what it gets

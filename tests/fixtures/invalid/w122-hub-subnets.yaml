@@ -1,4 +1,4 @@
-# W122 (NG-H005) - two elements on one hub are in different subnets.
+# W122 (NV-H005) - two elements on one hub are in different subnets.
 #
 # A hub repeats every frame to every port, so its ports are a single broadcast
 # domain. 'pc-a' and 'pc-b' are wired together and cannot reach each other.

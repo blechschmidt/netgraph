@@ -22,9 +22,9 @@ not as each unit goes by: the ``.netdev`` that creates ``vlan10`` and the
 ``.network`` of ``eno1`` that claims it are different files, in either order.
 
 **A unit the schema would reject is dropped, not written.** A bridge or bond no
-unit enslaves anything into has no ``members`` (``NG-I003``); a ``vlan`` netdev
+unit enslaves anything into has no ``members`` (``NV-I003``); a ``vlan`` netdev
 whose lower link is claimed by no ``.network``, or which states no ``[VLAN]
-Id=``, has no ``parent`` or no VID (``NG-I002``). Both would produce a tree that
+Id=``, has no ``parent`` or no VID (``NV-I002``). Both would produce a tree that
 does not load, so both are dropped with the reason on the run report — the same
 call :mod:`netviz.importer.iproute` makes for the same reason.
 
@@ -112,7 +112,7 @@ _TYPE_BY_KIND: Final[dict[str, str]] = {
     "geneve": "tunnel",
 }
 
-#: Types that may state a lower link (``NG-I002``). ``[Network] VLAN=`` and
+#: Types that may state a lower link (``NV-I002``). ``[Network] VLAN=`` and
 #: ``Tunnel=`` name a netdev of one of these and of nothing else.
 _PARENT_TYPES: Final[frozenset[str]] = frozenset({"vlan", "tunnel"})
 
@@ -484,7 +484,7 @@ def _apply_vlan(interface: DraftInterface, unit: _Unit, stream: _Stream) -> None
     """The VLAN a netdev encapsulates, or the ones a bridge port carries.
 
     A ``vlan`` netdev is read from ``[VLAN] Id=`` and nothing else: its type
-    requires an access block carrying the encapsulation (``NG-I002``), so a
+    requires an access block carrying the encapsulation (``NV-I002``), so a
     ``[BridgeVLAN]`` in the same unit — legal, if that sub-interface is itself a
     port of a filtering bridge — cannot be what the block says.
     """
@@ -627,7 +627,7 @@ def _add_interfaces(stream: _Stream, device: DraftDevice) -> None:
             stream.note(
                 f"{interface.name!r} is a {interface.type} that no unit in the capture "
                 "enslaves an interface into; netviz requires at least one member "
-                "(NG-I003), so it was not imported"
+                "(NV-I003), so it was not imported"
             )
             device.note(
                 f"{interface.name!r} was observed as a {interface.type} with no member port "
@@ -638,7 +638,7 @@ def _add_interfaces(stream: _Stream, device: DraftDevice) -> None:
             stream.note(
                 f"{interface.name!r} is a VLAN netdev, but no '.network' in the capture claims "
                 "it with 'VLAN=' or it states no '[VLAN] Id='; both are required of a VLAN "
-                "sub-interface (NG-I002), so it was not imported"
+                "sub-interface (NV-I002), so it was not imported"
             )
             continue
         added = device.add_interface(interface)

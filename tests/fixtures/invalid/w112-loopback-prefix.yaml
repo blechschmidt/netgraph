@@ -1,4 +1,4 @@
-# W112 (NG-A007) - a routed loopback carries more than a host route.
+# W112 (NV-A007) - a routed loopback carries more than a host route.
 #
 # 192.0.2.1/30 claims four addresses that exist on no wire. The prefix is a
 # point-to-point one so that W105, which would otherwise report a subnet with a

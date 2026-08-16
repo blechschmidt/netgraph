@@ -1,4 +1,4 @@
-# W108 (NG-I007) - a loopback interface declares a MAC address.
+# W108 (NV-I007) - a loopback interface declares a MAC address.
 #
 # A software loopback has no medium and therefore no hardware address. The
 # 127.0.0.1/8 prefix is the host-scoped one every OS configures, which W112

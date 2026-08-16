@@ -10,7 +10,7 @@ the three questions an operator asks *next*:
   :func:`next_free` picks the first one big enough.
 * **What is broken?** :func:`conflicts` reports the address-plan problems —
   and reports them by *calling the validator*, not by re-deriving them. Every
-  check here is a rule of :mod:`netviz.rules` with an ``NG-*`` alias, a
+  check here is a rule of :mod:`netviz.rules` with an ``NV-*`` alias, a
   write-up in ``docs/validation-rules.md`` and a fixture under
   ``tests/fixtures/invalid/``. There is exactly one implementation of "is this
   address plan sound", and ``netviz validate`` and ``netviz ipam`` are two

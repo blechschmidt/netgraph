@@ -4,7 +4,7 @@
 gives an editor the things netviz knows and a YAML mode cannot:
 
 * **Diagnostics** — everything [`netviz validate`](commands/validate.md) reports,
-  on the line and column that caused it, as you type. Each carries its `NG-*`
+  on the line and column that caused it, as you type. Each carries its `NV-*`
   rule id as the diagnostic code and a link to that rule's own section of
   [`docs/validation-rules.md`](validation-rules.md).
 * **Completion** — the keys the schema allows at the cursor with their
@@ -204,7 +204,7 @@ against a document that has no way to satisfy them:
 
 | Rule | Why it needs the folder |
 |---|---|
-| `NG-C002`/`NG-C003` (`E001`) | whether a cable endpoint resolves |
+| `NV-C002`/`NV-C003` (`E001`) | whether a cable endpoint resolves |
 | `E015`, `E016`, `E018`, `E043` | whether an adapter's host, a tunnel's endpoint or underlay, or a group's member exists |
 | `E021`, `E023`, `E038` | whether a panel position or a PDU outlet exists |
 | `W103`, `W121`, `I002` | whether anything is cabled to this at all |

@@ -31,7 +31,7 @@ this page paraphrases, and it is the one to read when two statements disagree.
 ## One document per file, or several
 
 Both are accepted. A file MAY hold one document, or several separated by `---`
-(`NG-L004`), and the loader treats the two the same way: a document is a document
+(`NV-L004`), and the loader treats the two the same way: a document is a document
 wherever it was found, and every diagnostic quotes the file *and* the document
 index within it, `sites/hq/switches/sw-access-01.yaml#0:17`.
 
@@ -61,7 +61,7 @@ An element's **fully-qualified name** is the directory holding its document,
 relative to the inventory root, plus its `metadata.name`. A `switch` named `sw1`
 in `sites/berlin/rack1/sw1.yaml` is `sites/berlin/rack1/sw1`; one declared at the
 root is just `sw1`. `metadata.name` has to be unique only within its own
-namespace (`NG-N002`), so two racks may each hold a `sw1`.
+namespace (`NV-N002`), so two racks may each hold a `sw1`.
 
 Folders are otherwise for humans. Group by site, by rack, by tenant, by whatever
 the team already says out loud — cross-references work across any file in the
@@ -92,7 +92,7 @@ name, and plain names are resolved **outwards**:
 2. each ancestor namespace, nearest first, the root last,
 3. the inventory as a whole — but only when exactly one element carries that
    name; otherwise the reference is ambiguous and every candidate is named in the
-   diagnostic (`NG-N002`).
+   diagnostic (`NV-N002`).
 
 A reference MAY also be written fully qualified, `sites/berlin/rack1/sw1`, which
 is tried relative to the current namespace first and as an absolute name second.
@@ -112,18 +112,18 @@ The walk is recursive from the inventory root and the rules are few
 ([§2.1](schema.md#21-discovery-rules)):
 
 * only `*.yaml` and `*.yml`, compared case-insensitively; every other file is
-  ignored (`NG-L001`). A `README.md` or a `netviz.toml` beside your documents
+  ignored (`NV-L001`). A `README.md` or a `netviz.toml` beside your documents
   is not a problem.
 * nothing under a path component whose basename starts with `.` or `_`,
-  directories included (`NG-L002`). `_drafts/` and `_scratch/` are the idiom for
+  directories included (`NV-L002`). `_drafts/` and `_scratch/` are the idiom for
   work in progress, and `.git/` costs nothing to skip.
-* nothing a `.netvizignore` excludes (`NG-L006`).
+* nothing a `.netvizignore` excludes (`NV-L006`).
 * symbolic links are followed, but one that escapes the root, forms a cycle or
-  reaches an already-loaded directory is an error (`NG-L003`).
+  reaches an already-loaded directory is an error (`NV-L003`).
 
 Load order is deterministic — files sorted by their byte-wise POSIX path relative
 to the root, then by document index — so renderers produce stable output
-(`NG-L005`).
+(`NV-L005`).
 
 Loading is *total*: an unreadable file, a YAML syntax error, a schema violation
 and a duplicate name are all reported with their location and the walk
@@ -320,7 +320,7 @@ against the template's file and line, with a note naming the device that
 inherited it, so fifty devices do not report fifty copies of one mistake.
 
 ```text
-templates/access-switch.yaml#0:52  NG-I011  spec.interfaces[2].mtu: mtu 1000 is below
+templates/access-switch.yaml#0:52  NV-I011  spec.interfaces[2].mtu: mtu 1000 is below
   the IPv6 minimum of 1280 but the interface carries IPv6 addresses (inherited by
   'sw-north-acc-03' through 'spec.from: templates/c9200l-48p')
 ```
@@ -407,7 +407,7 @@ none, the document moved verbatim into it, and every cable, tunnel, group,
 layout and annotation that referred to it re-spelled so it still resolves. It is
 exactly [`netviz edit move`](commands/edit.md), and it is refused — before
 anything is written — when the target namespace already holds that name, because
-`NG-N002` says two elements in one namespace cannot share one.
+`NV-N002` says two elements in one namespace cannot share one.
 
 There is deliberately no way to make an *empty* namespace. A folder netviz
 reads is one holding a document ([which files](#which-files-the-loader-reads)),

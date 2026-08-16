@@ -267,14 +267,14 @@ edit that would introduce it is refused before anything is written:
 ```console
 $ netviz -i examples/home-lab edit set sw-home spec.style.fill navvy
 error: the edit would introduce 6 new problems; nothing has been written (use --force to write it anyway)
-  switches/sw-home.yaml#0:89:11: NG-Z001: 'navvy' is not a colour; write '#rgb', '#rrggbb' or a named colour; did you mean 'navy'?
+  switches/sw-home.yaml#0:89:11: NV-Z001: 'navvy' is not a colour; write '#rgb', '#rrggbb' or a named colour; did you mean 'navy'?
 ...
 ```
 
 The five findings elided there are the cables: a document whose style does not
 parse is a document that did not load, so the switch's ports are briefly not
 there and everything patched into them dangles. That cascade is the reason
-`NG-Z001` is refused at the moment of writing rather than reported later — a bad
+`NV-Z001` is refused at the moment of writing rather than reported later — a bad
 value is wrong when it is typed and wrong afterwards, and there is no
 half-finished gesture to protect.
 
@@ -674,8 +674,8 @@ opacity slider from one end to the other visits `opacity: 0`.
 
 | Rule | Fires when |
 |---|---|
-| [`W144`](validation-rules.md#w144--element-styled-invisible) (`NG-Z003`) | An element sets `opacity: 0`. It is still drawn, invisibly, and every link to it is still drawn into the empty space where it is — a diagram that lies. It is almost always a slider left at the wrong end; hiding an element is what the filters are for. |
-| [`W145`](validation-rules.md#w145--unreadable-label-colour) (`NG-Z005`) | An element gives `fill` and `fontColor` the same colour, so the label is drawn where nobody can read it. |
+| [`W144`](validation-rules.md#w144--element-styled-invisible) (`NV-Z003`) | An element sets `opacity: 0`. It is still drawn, invisibly, and every link to it is still drawn into the empty space where it is — a diagram that lies. It is almost always a slider left at the wrong end; hiding an element is what the filters are for. |
+| [`W145`](validation-rules.md#w145--unreadable-label-colour) (`NV-Z005`) | An element gives `fill` and `fontColor` the same colour, so the label is drawn where nobody can read it. |
 
 `W145` fires only when **both** colours are written on the same element. It
 never fires on an inherited pair: a theme setting the fill and an element the
@@ -689,8 +689,8 @@ Both are suppressible per rule and per document, exactly as every other warning
 is; their pages in [`docs/validation-rules.md`](validation-rules.md) say when
 that is the right call.
 
-The errors are a different matter. `NG-Z001` (a value outside the vocabulary),
-`NG-Z002` (an empty `style` block) and `NG-Z004` (an unusable theme document)
+The errors are a different matter. `NV-Z001` (a value outside the vocabulary),
+`NV-Z002` (an empty `style` block) and `NV-Z004` (an unusable theme document)
 are reported while the document is *read*, by the schema rather than by the
 validator, and are deliberately absent from the suppressible catalogue. There is
 nothing to suppress: an element whose style does not parse is an element that

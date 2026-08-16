@@ -147,7 +147,7 @@ spec:
     # that is what they are called: a namespace is a name space, and two
     # containers on one host both having an eth0 is the ordinary case rather
     # than a collision. netviz needs interface names to be unique within an
-    # element (NG-I001), so they are written here as <container>-eth<n>. See
+    # element (NV-I001), so they are written here as <container>-eth<n>. See
     # follow-up 24 in docs/follow-ups.md.
     # ----------------------------------------------------------------- #
     - name: legacy-eth0

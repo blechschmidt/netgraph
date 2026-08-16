@@ -1,4 +1,4 @@
-# W118 (NG-C008) - the cable and one of its endpoints disagree about speed.
+# W118 (NV-C008) - the cable and one of its endpoints disagree about speed.
 #
 # The dongle's USB upstream port is 5Gbps; the cable claims 1Gbps. Section 9.4
 # projects the cable's speed onto both ends, so the two cannot both hold.

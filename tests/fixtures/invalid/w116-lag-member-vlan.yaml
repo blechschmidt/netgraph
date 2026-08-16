@@ -1,4 +1,4 @@
-# W116 (NG-V008) - a LAG member's 'vlan' block contradicts the aggregate's.
+# W116 (NV-V008) - a LAG member's 'vlan' block contradicts the aggregate's.
 #
 # 'eth0' says access VLAN 20 while 'bond0' says access VLAN 10. Section 10.6
 # resolves the link through the aggregate, so the member's block is documented

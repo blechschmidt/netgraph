@@ -310,7 +310,7 @@ into a temporary directory — documentation, hero diagrams and every example
 rendered by `netviz render -f html` — and asserts three things a look at the
 page would not catch:
 
-* **the anchors are GitHub's.** Every `NG-*` finding netviz prints carries a
+* **the anchors are GitHub's.** Every `NV-*` finding netviz prints carries a
   help URL ending in an anchor derived from a heading. The builder's slug
   function and `tests/test_docs.py`'s are asserted equal over every heading in
   the repository, not merely written to look alike.

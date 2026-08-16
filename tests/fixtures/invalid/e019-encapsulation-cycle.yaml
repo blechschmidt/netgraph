@@ -1,4 +1,4 @@
-# E019 (NG-T005) - the 'over' references form a loop.
+# E019 (NV-T005) - the 'over' references form a loop.
 #
 # Each IPsec tunnel claims to run inside the other, so neither ever reaches the
 # underlay network. Both types encrypt, which keeps W127 out of the way.

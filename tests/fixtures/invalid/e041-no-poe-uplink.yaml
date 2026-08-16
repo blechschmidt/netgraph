@@ -1,4 +1,4 @@
-# E041 (NG-E014) - a PoE-powered device's uplink offers no PoE.
+# E041 (NV-E014) - a PoE-powered device's uplink offers no PoE.
 #
 # The camera has no power cord: 'powered_by: poe' says the run carrying its
 # traffic is its only power path. The switch port at the far end of that run

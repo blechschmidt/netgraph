@@ -63,7 +63,7 @@ def expand_positions(
     Args:
         value: What the document wrote.
         field: The key being expanded, for the diagnostic (``ports``).
-        rule: The ``NG-*`` id the error carries.
+        rule: The ``NV-*`` id the error carries.
         limit: Most numbers one document may name.
         noun: What owns them, for the diagnostic (``patch panel``).
         unit: What one of them is called (``position``, ``outlet``).

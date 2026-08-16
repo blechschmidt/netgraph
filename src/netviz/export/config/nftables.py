@@ -366,7 +366,7 @@ def _verdict_words(rule: FirewallRule) -> Iterator[str]:
     if rule.action is FirewallAction.MARK:
         # ``meta mark set`` and no verdict: the packet carries on to the next
         # rule, which is the whole reason 'mark' is not terminal (§24.2).
-        assert rule.mark is not None  # NG-B005: a 'mark' rule always names one
+        assert rule.mark is not None  # NV-B005: a 'mark' rule always names one
         yield f"meta mark set {_mark_expression(rule.mark)}"
         return
     if rule.action is FirewallAction.LOG:
@@ -433,7 +433,7 @@ def _comment(rule: FirewallRule) -> str:
     """``100 lab VPN egress`` — the priority, then whatever the document said.
 
     The priority is always there, because it is the rule's identity in the
-    inventory (``NG-B008``) and the one thing that lets a line of ``nft list
+    inventory (``NV-B008``) and the one thing that lets a line of ``nft list
     ruleset`` be found in a YAML file.
     """
     text = rule.name or rule.description or ""

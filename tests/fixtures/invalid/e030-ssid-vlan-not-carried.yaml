@@ -1,4 +1,4 @@
-# E030 (NG-W009) - an SSID's VLAN is carried nowhere on the access point.
+# E030 (NV-W009) - an SSID's VLAN is carried nowhere on the access point.
 #
 # The guest SSID is bridged into VLAN 20. VLAN 20 is declared in the device's
 # VLAN database - so W113 stays quiet - but no interface of 'ap-a' is a member

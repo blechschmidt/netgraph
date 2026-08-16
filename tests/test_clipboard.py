@@ -222,7 +222,7 @@ def test_stripping_tidies_what_it_leaves_behind() -> None:
                 },
             ],
             # `redundant` claims the device survives losing a feed; with the
-            # feeds gone it is an assertion about nothing (NG-E002).
+            # feeds gone it is an assertion about nothing (NV-E002).
             "power": {"inputs": [{"pdu": "p", "outlet": "1"}], "redundant": True},
         },
     }
@@ -315,9 +315,9 @@ def test_a_cable_with_one_end_outside_the_selection_is_dropped_and_named(
 
 
 def test_copying_a_cable_on_its_own_is_refused(arranged: Path) -> None:
-    """Two cables on one interface is NG-C001, and the message says what to do."""
+    """Two cables on one interface is NV-C001, and the message says what to do."""
     session = EditSession(root=arranged)
-    with pytest.raises(EditError, match="NG-C001"):
+    with pytest.raises(EditError, match="NV-C001"):
         session.apply(CopyElement(address="cbl-core-access"))
 
 

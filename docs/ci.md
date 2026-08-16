@@ -101,7 +101,7 @@ $ netviz -q -i inventory validate -F json
   "findings": [
     {
       "rule": "E001",
-      "alias": "NG-C002",
+      "alias": "NV-C002",
       "severity": "error",
       "message": "cable 'cables/cbl-core-desk' endpoint pc-desk:eth0: no element named 'pc-desk' is declared in this inventory",
       "element": "cables/cbl-core-desk",
@@ -132,7 +132,7 @@ Each entry of `findings`:
 | Key | Type | Meaning |
 |---|---|---|
 | `rule` | string | Canonical rule id (`E001`), or `load` for a problem the loader or the schema rejected the document over. |
-| `alias` | string \| null | The `NG-*` identifier from [the schema](schema.md) §10. |
+| `alias` | string \| null | The `NV-*` identifier from [the schema](schema.md) §10. |
 | `severity` | string | `error`, `warning` or `info`, **after** `netviz.toml`, `netviz/ignore`, `--disable` and `--strict`. |
 | `message` | string | One line, naming every element involved. |
 | `element` | string \| null | Fully-qualified name of the element the finding is anchored to. `null` for a load error, which has no element yet. |
@@ -167,7 +167,7 @@ fired** — a driver that only lists the rules that happened to trigger tells a
 reader nothing about what was checked. Each descriptor carries the id, a
 `name` (`UnknownCableEndpoint`), a short and a full description, the default
 level, and a `helpUri` pointing at the rule's section of
-[`docs/validation-rules.md`](validation-rules.md). The `NG-*` aliases travel in
+[`docs/validation-rules.md`](validation-rules.md). The `NV-*` aliases travel in
 `properties.aliases`.
 
 Severities map as SARIF requires: `error` → `error`, `warning` → `warning`,
@@ -179,9 +179,9 @@ document above a broken one does not close an alert and open an identical new
 one.
 
 Loader and schema problems are filed under the id `load` rather than under an
-`NG-*` id, and `load` is described in the driver like any other rule. That keeps
+`NV-*` id, and `load` is described in the driver like any other rule. That keeps
 every `ruleId` resolvable, which is what preserves the severity and the help
-link in the code-scanning UI; the specific `NG-D005`-style id is still in the
+link in the code-scanning UI; the specific `NV-D005`-style id is still in the
 finding's `alias` and in the JSON envelope.
 
 ## Inline annotations

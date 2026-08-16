@@ -513,7 +513,7 @@ def _route_map(
     netplan hangs every route off a device, and three kinds of route have no
     obvious one:
 
-    * a **blackhole** route, which discards what it matches and by ``NG-F004``
+    * a **blackhole** route, which discards what it matches and by ``NV-F004``
       may name neither ``via`` nor ``dev``;
     * a route whose ``dev`` names an interface netplan left out — a loopback, a
       radio with no SSID;

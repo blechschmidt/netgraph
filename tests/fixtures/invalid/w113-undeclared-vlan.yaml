@@ -1,4 +1,4 @@
-# W113 (NG-V004) - a port references a VLAN the device does not declare.
+# W113 (NV-V004) - a port references a VLAN the device does not declare.
 #
 # 'sw-a' knows about VLAN 10 only, but 'Gi0/1' is an access port in VLAN 20.
 # 'pc-b' declares no VLAN database at all, so the rule says nothing about it.

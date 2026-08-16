@@ -35,7 +35,7 @@ inventory has no way to know whether they are unless somebody writes it down.
 It is free text on purpose: what counts as "a different feed" is site knowledge
 (two utility feeds, two UPS strings, a UPS and a generator), and netviz's job
 is to notice that two feeds a device calls redundant carry the same name
-(``NG-E015``), not to decide what the names mean.
+(``NV-E015``), not to decide what the names mean.
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ __all__ = [
 #: spells it out.
 PDU_KIND: Final = "pdu"
 
-#: ``NG-E001`` — ceiling on the outlets one PDU may declare. The largest strip
+#: ``NV-E001`` — ceiling on the outlets one PDU may declare. The largest strip
 #: anybody ships is 54 outlets; 512 leaves room for a whole modular chassis
 #: modelled as one document and still bounds what a typo can ask for.
 MAX_PDU_OUTLETS: Final = 512
@@ -79,10 +79,10 @@ MAX_PDU_OUTLETS: Final = 512
 OUTLET_RANGE_PATTERN: Final = POSITION_RANGE_PATTERN
 
 #: What :func:`~netviz.models.positions.expand_positions` is told a PDU's
-#: numbered things are, so every ``NG-E001`` diagnostic reads the same way.
+#: numbered things are, so every ``NV-E001`` diagnostic reads the same way.
 _OUTLET_RANGE: Final[dict[str, Any]] = {
     "field": "outlets",
-    "rule": "NG-E001",
+    "rule": "NV-E001",
     "limit": MAX_PDU_OUTLETS,
     "noun": "power distribution unit",
     "unit": "outlet",
@@ -103,7 +103,7 @@ def parse_outlet_range(value: Any) -> tuple[str, ...]:
     Raises:
         pydantic_core.PydanticCustomError: The value is not a count or a range,
             a span is malformed or inverted, a number repeats, or the total
-            exceeds :data:`MAX_PDU_OUTLETS`. The error carries ``NG-E001``.
+            exceeds :data:`MAX_PDU_OUTLETS`. The error carries ``NV-E001``.
     """
     return expand_positions(value, **_OUTLET_RANGE)
 
@@ -129,12 +129,12 @@ class PduSpec(NetvizModel):
     #: The outlets the unit has, as a count (``24``) or spans (``1-12,17-24``).
     outlets: OutletRange
     #: How many watts may be drawn through the unit in total
-    #: (``eoPowerNameplate``). ``NG-E012`` sums the declared draws against it;
+    #: (``eoPowerNameplate``). ``NV-E012`` sums the declared draws against it;
     #: absent means "not recorded", and the sum is then reported without a
     #: verdict rather than guessed at.
     capacity_watts: Watts | None = None
     #: Which supply feeds the unit — ``A``, ``B``, ``ups-1``, ``utility``. Free
-    #: text; ``NG-E015`` compares two of them for equality and nothing more.
+    #: text; ``NV-E015`` compares two of them for equality and nothing more.
     input_feed: str | None = Field(default=None, max_length=64)
     #: How this element is drawn (§22): a ``fill``, a ``stroke``, a ``shape``
     #: and six more, each optional and each inheriting from the theme, then the

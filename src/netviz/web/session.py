@@ -250,7 +250,7 @@ def relative_path(given: str) -> str:
             raise SessionError(f"{given!r} leaves the inventory root")
         if component.startswith((".", "_")):
             raise SessionError(
-                f"{given!r} names {component!r}, which the loader never reads (NG-L002)"
+                f"{given!r} names {component!r}, which the loader never reads (NV-L002)"
             )
     if pure.suffix.lower() not in YAML_SUFFIXES:
         expected = " or ".join(sorted(YAML_SUFFIXES))

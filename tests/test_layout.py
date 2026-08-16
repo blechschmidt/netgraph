@@ -218,7 +218,7 @@ def test_two_layouts_of_one_name_are_a_load_error(pair: Path) -> None:
     write(pair, "one.yaml", layout_document("    l1: {}\n"))
     write(pair, "two.yaml", layout_document("    l2: {}\n"))
     (error,) = load_tree(pair).errors
-    assert error.rule == "NG-Y002"
+    assert error.rule == "NV-Y002"
     assert "duplicate layout name" in error.message
 
 

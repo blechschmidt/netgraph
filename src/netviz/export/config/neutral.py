@@ -315,7 +315,7 @@ def _policy(rule: PolicyRule) -> Iterator[str]:
 
     Opened by the priority, because that is the rule's identity: it is where the
     rule sits in the walk, and two rules of one family cannot share it
-    (``NG-F020``). ``family`` is written only when the document states it, since
+    (``NV-F020``). ``family`` is written only when the document states it, since
     a rule that states none is installed in both — and reading that back as
     ``ipv4`` would silently halve it.
     """

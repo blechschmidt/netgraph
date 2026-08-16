@@ -2,7 +2,7 @@
 
 Pydantic reports an error raised by a model validator at the location of the
 *model*, not of the offending value inside it. A cross-field rule such as
-``NG-I001`` ("interface names are unique within their device") therefore loses
+``NV-I001`` ("interface names are unique within their device") therefore loses
 the index that makes the diagnostic useful.
 
 :func:`field_error` encodes the rule id and the path of the offending value —
@@ -23,7 +23,7 @@ __all__ = ["decode_field_error", "field_error"]
 
 #: ASCII unit separator: never part of a human-readable message.
 _MARKER: Final = "\x1f"
-_RULE_RE: Final = re.compile(r"^(?P<rule>NG-[A-Z][0-9]{3}):\s*(?P<message>.*)$", re.DOTALL)
+_RULE_RE: Final = re.compile(r"^(?P<rule>NV-[A-Z][0-9]{3}):\s*(?P<message>.*)$", re.DOTALL)
 
 
 def field_error(
@@ -44,7 +44,7 @@ def field_error(
 def decode_field_error(message: str) -> tuple[str, str | None, tuple[str | int, ...]]:
     """Split an encoded message into ``(message, rule, path)``.
 
-    Falls back to a plain ``"NG-I001: ..."`` prefix, and finally to the message
+    Falls back to a plain ``"NV-I001: ..."`` prefix, and finally to the message
     unchanged, so errors raised by pydantic itself pass through untouched.
     """
     text, separator, payload = message.partition(_MARKER)

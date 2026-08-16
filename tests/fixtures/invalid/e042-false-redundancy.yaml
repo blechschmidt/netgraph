@@ -1,4 +1,4 @@
-# E042 (NG-E015) - a device claims redundant power that is not redundant.
+# E042 (NV-E015) - a device claims redundant power that is not redundant.
 #
 # Two cords, two outlets -- one strip. The strip, its breaker and its own feed
 # are the single point of failure the second cord was bought to remove.

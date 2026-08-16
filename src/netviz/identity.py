@@ -3,7 +3,7 @@
 Four consumers ask the same question about a ``group``'s ``spec.members`` and
 must not be able to answer it differently:
 
-* the validator (``NG-S010``…``NG-S016``),
+* the validator (``NV-S010``…``NV-S016``),
 * the identity view of the graph (``--layer identity``),
 * ``netviz list users`` and ``netviz list groups``,
 * anything that later exports the membership to a directory.
@@ -20,7 +20,7 @@ Expansion
 Nesting is the point of groups, so the interesting question is not "who is
 directly in this?" but "who is in this at all?". :meth:`IdentityPlan.expand`
 answers it by walking the nesting, and does so **cycle-safely**: a loop is
-``NG-S012``, an error, but a listing has to survive being run on an inventory
+``NV-S012``, an error, but a listing has to survive being run on an inventory
 that has one. A group in a cycle expands to everything reachable from it and
 stops, rather than not terminating.
 
@@ -103,7 +103,7 @@ class IdentityPlan:
     memberships: tuple[Membership, ...] = ()
     #: Group fqn -> the identities directly in it, in declaration order. Only
     #: entries that resolved to a ``user`` or a ``group`` appear; the rest are
-    #: ``NG-S010``'s and ``NG-S011``'s business, and a view that drew them would
+    #: ``NV-S010``'s and ``NV-S011``'s business, and a view that drew them would
     #: be drawing something that is not there.
     direct: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     #: Identity fqn -> the groups that name it directly, in load order. The

@@ -131,20 +131,20 @@ def test_schema_error_is_a_loader_error() -> None:
 @pytest.mark.parametrize("document_value", [None, [], "switch", 42])
 def test_non_mapping_document_is_rejected(document_value: Any) -> None:
     error = parse_failure(document_value)
-    assert error.issues[0].rule == "NG-D001"
+    assert error.issues[0].rule == "NV-D001"
 
 
 def test_missing_kind_is_reported_at_the_kind_field() -> None:
     error = parse_failure({"apiVersion": API_VERSION, "metadata": {"name": "x"}, "spec": {}})
     assert error.path == ("kind",)
-    assert error.issues[0].rule == "NG-D001"
+    assert error.issues[0].rule == "NV-D001"
 
 
 def test_unknown_kind_is_reported() -> None:
     doc = device()
     doc["kind"] = "gateway"
     error = parse_failure(doc)
-    assert error.issues[0].rule == "NG-D003"
+    assert error.issues[0].rule == "NV-D003"
     assert "gateway" in str(error)
 
 
@@ -153,7 +153,7 @@ def test_unknown_api_version_is_reported() -> None:
     doc["apiVersion"] = "netviz.dev/v2"
     error = parse_failure(doc)
     assert error.location == "apiVersion"
-    assert error.issues[0].rule == "NG-D002"
+    assert error.issues[0].rule == "NV-D002"
 
 
 def test_missing_api_version_is_reported() -> None:
@@ -165,7 +165,7 @@ def test_missing_api_version_is_reported() -> None:
 
 def test_unknown_keys_are_rejected_everywhere() -> None:
     error = parse_failure(device(interfaces=[{"name": "eth0", "type": "ethernet", "vlanid": 3}]))
-    assert error.issues[0].rule == "NG-D005"
+    assert error.issues[0].rule == "NV-D005"
     assert error.location == "spec.interfaces[0].vlanid"
 
 
@@ -516,7 +516,7 @@ def test_ipv6_needs_at_least_the_minimum_mtu() -> None:
             ]
         )
     )
-    assert error.issues[0].rule == "NG-I011"
+    assert error.issues[0].rule == "NV-I011"
     assert error.location == "spec.interfaces[0].mtu"
 
 
@@ -632,10 +632,10 @@ def test_trunk_frame_filter_derivation() -> None:
 @pytest.mark.parametrize(
     ("vlan", "rule"),
     [
-        ({"mode": "access", "trunk_vlans": [10]}, "NG-V002"),
-        ({"mode": "access", "native_vlan": 10}, "NG-V003"),
-        ({"mode": "trunk", "access_vlan": 10}, "NG-V002"),
-        ({"mode": "trunk"}, "NG-V002"),
+        ({"mode": "access", "trunk_vlans": [10]}, "NV-V002"),
+        ({"mode": "access", "native_vlan": 10}, "NV-V003"),
+        ({"mode": "trunk", "access_vlan": 10}, "NV-V002"),
+        ({"mode": "trunk"}, "NV-V002"),
     ],
 )
 def test_vlan_mode_consistency(vlan: dict[str, Any], rule: str) -> None:
@@ -645,7 +645,7 @@ def test_vlan_mode_consistency(vlan: dict[str, Any], rule: str) -> None:
 
 def test_duplicate_vlan_definition_is_rejected() -> None:
     error = parse_failure(device(vlans=[{"id": 10, "name": "a"}, {"id": 10, "name": "b"}]))
-    assert error.issues[0].rule == "NG-V001"
+    assert error.issues[0].rule == "NV-V001"
     assert error.location == "spec.vlans[1].id"
 
 
@@ -658,7 +658,7 @@ def test_interface_names_must_be_unique_within_a_device() -> None:
     error = parse_failure(
         device(interfaces=[{"name": "eth0", "type": "ethernet"}, {"name": "eth0", "type": "wifi"}])
     )
-    assert error.issues[0].rule == "NG-I001"
+    assert error.issues[0].rule == "NV-I001"
     assert error.location == "spec.interfaces[1].name"
 
 
@@ -705,7 +705,7 @@ def test_vlan_subinterface_requires_a_resolvable_parent() -> None:
             ]
         )
     )
-    assert error.issues[0].rule == "NG-I002"
+    assert error.issues[0].rule == "NV-I002"
     assert error.location == "spec.interfaces[0].parent"
 
 
@@ -713,14 +713,14 @@ def test_parent_is_only_allowed_on_vlan_interfaces() -> None:
     error = parse_failure(
         device(interfaces=[{"name": "eth0", "type": "ethernet", "parent": "eth1"}])
     )
-    assert error.issues[0].rule == "NG-I002"
+    assert error.issues[0].rule == "NV-I002"
 
 
 def test_vlan_interface_requires_a_parent() -> None:
     error = parse_failure(
         device(interfaces=[{"name": "eth0.10", "type": "vlan", "vlan": {"mode": "access"}}])
     )
-    assert error.issues[0].rule == "NG-I002"
+    assert error.issues[0].rule == "NV-I002"
 
 
 @pytest.mark.parametrize("aggregate", ["lag", "bridge"])
@@ -739,7 +739,7 @@ def test_aggregates_require_resolvable_members(aggregate: str) -> None:
     error = parse_failure(
         device(interfaces=[{"name": "agg0", "type": aggregate, "members": ["nope"]}])
     )
-    assert error.issues[0].rule == "NG-I003"
+    assert error.issues[0].rule == "NV-I003"
 
 
 @pytest.mark.parametrize(
@@ -754,7 +754,7 @@ def test_aggregates_require_resolvable_members(aggregate: str) -> None:
 )
 def test_invalid_member_lists(interface: dict[str, Any]) -> None:
     error = parse_failure(device(interfaces=[interface, {"name": "a", "type": "ethernet"}]))
-    assert error.issues[0].rule == "NG-I003"
+    assert error.issues[0].rule == "NV-I003"
 
 
 def test_interface_helpers() -> None:
@@ -786,25 +786,25 @@ def test_interface_helpers() -> None:
     [
         (
             {"interfaces": [{"name": "p1", "type": "ethernet", "vlan": {"mode": "access"}}]},
-            "NG-H001",
+            "NV-H001",
         ),
-        ({"interfaces": [{"name": "p1", "type": "ethernet", "ipv4": ["10.0.0.1/24"]}]}, "NG-H002"),
+        ({"interfaces": [{"name": "p1", "type": "ethernet", "ipv4": ["10.0.0.1/24"]}]}, "NV-H002"),
         (
             {
                 "interfaces": [{"name": "p1", "type": "ethernet"}],
                 "bridge": {"type": "mac-bridge"},
             },
-            "NG-H003",
+            "NV-H003",
         ),
-        ({"interfaces": [{"name": "p1", "type": "ethernet"}], "vlans": [{"id": 10}]}, "NG-H003"),
+        ({"interfaces": [{"name": "p1", "type": "ethernet"}], "vlans": [{"id": 10}]}, "NV-H003"),
         (
             {
                 "interfaces": [{"name": "p1", "type": "ethernet"}],
                 "forwarding": {"ipv4": False, "ipv6": False},
             },
-            "NG-H003",
+            "NV-H003",
         ),
-        ({"interfaces": [{"name": "p1", "type": "wifi"}]}, "NG-H004"),
+        ({"interfaces": [{"name": "p1", "type": "wifi"}]}, "NV-H004"),
     ],
 )
 def test_hub_rejects_layer2_and_layer3_configuration(spec: dict[str, Any], rule: str) -> None:
@@ -879,7 +879,7 @@ def test_self_link_is_allowed_but_detectable() -> None:
 @pytest.mark.parametrize("endpoints", [["a:1"], ["a:1", "b:2", "c:3"]])
 def test_cable_needs_exactly_two_endpoints(endpoints: list[str]) -> None:
     error = parse_failure(document("cable", "c", {"endpoints": endpoints, "medium": "copper"}))
-    assert error.issues[0].rule == "NG-C001"
+    assert error.issues[0].rule == "NV-C001"
 
 
 @pytest.mark.parametrize("endpoint", ["nocolon", "a:b:c", ":iface", "dev:"])
@@ -895,7 +895,7 @@ def test_wireless_links_reject_physical_plant_fields(field: str) -> None:
     spec: dict[str, Any] = {"endpoints": ["a:1", "b:2"], "medium": "wireless"}
     spec[field] = 2 if field == "length_m" else "cat6"
     error = parse_failure(document("cable", "c", spec))
-    assert error.issues[0].rule == "NG-C007"
+    assert error.issues[0].rule == "NV-C007"
 
 
 def test_unknown_medium_is_rejected() -> None:
@@ -959,7 +959,7 @@ def test_adapter_upstream_must_not_collide_with_a_downstream_port() -> None:
             "adapter", "adp-1", adapter_spec(interfaces=[{"name": "usb0", "type": "ethernet"}])
         )
     )
-    assert error.issues[0].rule == "NG-X004"
+    assert error.issues[0].rule == "NV-X004"
 
 
 @pytest.mark.parametrize("interface_type", ["loopback", "bridge", "vlan"])
@@ -978,7 +978,7 @@ def test_adapter_downstream_types_are_restricted(interface_type: str) -> None:
             ),
         )
     )
-    assert error.issues[0].rule in {"NG-X003", "NG-I002", "NG-I003"}
+    assert error.issues[0].rule in {"NV-X003", "NV-I002", "NV-I003"}
 
 
 def test_adapter_upstream_reference_must_be_a_device_name() -> None:
@@ -1231,7 +1231,7 @@ def test_interface_ref_mapping_form_rejects_unknown_keys() -> None:
         "spec.endpoints[0].interface",
         "spec.endpoints[0].port",
     ]
-    assert error.issues[1].rule == "NG-D005"
+    assert error.issues[1].rule == "NV-D005"
     assert "2 schema errors" in str(error)
 
 

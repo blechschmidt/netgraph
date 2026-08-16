@@ -428,7 +428,7 @@ window.netvizStyle = (function () {
    * eleven that is ten confusing lines in the changes drawer.
    *
    * Removing the *last* field takes the block with it. An empty `style: {}` is
-   * NG-Z002 -- it validates as a mapping, renders identically to no block at
+   * NV-Z002 -- it validates as a mapping, renders identically to no block at
    * all, and tells nobody it does nothing -- so the batch would be refused
    * whole. Which is the right answer for a hand-written document and the wrong
    * one here: "reset this to the theme" plainly means "stop saying anything

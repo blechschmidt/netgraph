@@ -497,7 +497,7 @@ def test_conflicts_honour_a_suppression_exactly_as_validate_does(
 
 
 def test_conflicts_honour_an_alias_in_a_suppression(overlapping: Inventory) -> None:
-    settings = ValidationConfig().with_overrides(ignore=["NG-A011"])
+    settings = ValidationConfig().with_overrides(ignore=["NV-A011"])
     assert [finding.rule for finding in conflicts(overlapping, settings)] == ["W130"]
 
 
@@ -517,7 +517,7 @@ def test_the_campus_example_demonstrates_a_gateway() -> None:
     assert interface is not None and interface.ipv4 is not None and interface.ipv6 is not None
     gateway = interface.ipv4.gateway
     assert gateway is not None
-    # On-link in the host's own prefix, which is what NG-A013 checks, and the
+    # On-link in the host's own prefix, which is what NV-A013 checks, and the
     # address of the Vlan10 SVI that actually routes for the segment.
     assert gateway in next(iter(interface.ipv4.addresses)).network
     assert str(gateway) == "10.1.10.1"
@@ -616,7 +616,7 @@ def test_the_json_report_carries_both_halves(runner: CliRunner) -> None:
         "10.30.7.0/24",
     ]
     assert [entry["rule"] for entry in payload["conflicts"]] == ["W130", "W131"]
-    assert payload["conflicts"][0]["alias"] == "NG-A010"
+    assert payload["conflicts"][0]["alias"] == "NV-A010"
     # The exact integer, not the abbreviated 2^n the table prints.
     assert payload["subnets"][1]["capacity"] == 65534
 
@@ -656,7 +656,7 @@ def test_the_conflicts_can_be_asked_for_on_their_own(runner: CliRunner) -> None:
     as_csv = invoke(runner, "-i", str(OVERLAPPING), "ipam", "--conflicts", "-F", "csv")
     rows = list(csv.DictReader(io.StringIO(as_csv.stdout)))
     assert [row["rule"] for row in rows] == ["W130", "W131"]
-    assert rows[0]["alias"] == "NG-A010"
+    assert rows[0]["alias"] == "NV-A010"
     assert rows[0]["severity"] == "warning"
 
     as_json = invoke(runner, "-i", str(OVERLAPPING), "ipam", "--conflicts", "-F", "json")

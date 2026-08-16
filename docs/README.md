@@ -127,7 +127,7 @@ This whole documentation set is also published, with those demos beside it, at
 * **[validation-rules.md](validation-rules.md)** — every rule, with what triggers it, why
   it exists, how to fix it and how to suppress it. This is where a finding's help link
   lands, so its anchors are part of netviz's interface.
-* **[schema.md](schema.md)** — the normative specification. Numbered sections and `NG-*`
+* **[schema.md](schema.md)** — the normative specification. Numbered sections and `NV-*`
   rule ids that code and diagnostics quote; the anchors are stable on purpose.
 * **[yang-mapping.md](yang-mapping.md)** — which standard each field comes from, and what
   netviz deliberately does not model.

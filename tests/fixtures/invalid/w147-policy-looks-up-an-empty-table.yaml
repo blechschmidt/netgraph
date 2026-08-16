@@ -1,4 +1,4 @@
-# W147 (NG-F022) - a policy rule that diverts traffic into a table nothing is in.
+# W147 (NV-F022) - a policy rule that diverts traffic into a table nothing is in.
 #
 # The rule matches, the lookup finds nothing, and the packet falls through to
 # the next rule -- so the traffic somebody diverted goes exactly where it would

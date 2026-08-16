@@ -3,7 +3,7 @@
 ``tools/build_site.py`` writes what GitHub Pages serves. Three things about it
 are worth a test rather than a look, because all three fail silently:
 
-* **The anchors.** Every ``NG-*`` finding netviz prints carries a help URL
+* **The anchors.** Every ``NV-*`` finding netviz prints carries a help URL
   ending in ``validation-rules.md#<anchor>``, and those anchors are GitHub's,
   derived from the heading text. A site that derived its own would answer every
   one of those links with the top of a very long page. So the builder's

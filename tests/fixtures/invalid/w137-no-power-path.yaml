@@ -1,4 +1,4 @@
-# W137 (NG-E016) - a device declares a draw but no power path.
+# W137 (NV-E016) - a device declares a draw but no power path.
 #
 # The server says it draws 400 W and does not say where from, so it appears on
 # no PDU and on no load schedule. A warning rather than an error: recording

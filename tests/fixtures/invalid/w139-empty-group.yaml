@@ -1,4 +1,4 @@
-# W139 (NG-S014) - a group with nobody in it.
+# W139 (NV-S014) - a group with nobody in it.
 #
 # 'contractors' exists and holds nothing, so anything granted to it is granted
 # to nobody -- and looks granted. A warning rather than an error, because a

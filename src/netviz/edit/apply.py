@@ -241,7 +241,7 @@ def _restore(journal: Mapping[str, str | None]) -> tuple[Operation, ...]:
 def _create(context: _Context, operation: CreateElement) -> tuple[Operation, ...]:
     fqn = qualify(operation.namespace, operation.name)
     if fqn in context.inventory.elements:
-        raise EditError(f"{fqn} already exists; a name is unique within its namespace (NG-N002)")
+        raise EditError(f"{fqn} already exists; a name is unique within its namespace (NV-N002)")
     document = _element_document(
         kind=operation.kind,
         name=operation.name,
@@ -334,7 +334,7 @@ def _copy(context: _Context, operation: CopyElement) -> tuple[Operation, ...]:
     )
     fqn = qualify(namespace, name)
     if fqn in context.inventory.elements:
-        raise EditError(f"{fqn} already exists; a name is unique within its namespace (NG-N002)")
+        raise EditError(f"{fqn} already exists; a name is unique within its namespace (NV-N002)")
 
     source = context.tree.document(located.relative, located.index)
     if source.inline:
@@ -419,7 +419,7 @@ def _rewire_copy(
     if isinstance(located.element, Cable) and not redirected:
         raise EditError(
             f"copying {located.fqn} on its own would land a second cable on interfaces that "
-            f"already have one (NG-C001); copy the elements it joins as well and the cable "
+            f"already have one (NV-C001); copy the elements it joins as well and the cable "
             f"comes with them, rewired to the copies"
         )
 
@@ -624,7 +624,7 @@ def _tidy_after_drop(context: _Context, holder: _Located, reference: Reference) 
       also declares ``powered_by`` or a draw keeps those: they are facts about
       the hardware, not about the PDU that was deleted.
     * **One input left, under ``redundant: true``.** That flag claims the device
-      survives losing a feed, which needs two (``NG-E015``); with one it is a
+      survives losing a feed, which needs two (``NV-E015``); with one it is a
       false statement about the network, and a delete that leaves one behind is
       a delete that silently made the inventory wrong. It goes with the feed it
       was about.
@@ -656,7 +656,7 @@ def _rename(context: _Context, operation: RenameElement) -> tuple[Operation, ...
     new_fqn = qualify(located.namespace, operation.new_name)
     if new_fqn in context.inventory.elements:
         raise EditError(
-            f"{new_fqn} already exists; a name is unique within its namespace (NG-N002)"
+            f"{new_fqn} already exists; a name is unique within its namespace (NV-N002)"
         )
     document = context.document(located)
     metadata = get_field(document, ("metadata",))
@@ -940,7 +940,7 @@ def _add_interface(context: _Context, operation: AddInterface) -> tuple[Operatio
     if not isinstance(interfaces, list):  # pragma: no cover - the schema says it is one
         raise EditError(f"{located.fqn}: spec.interfaces is not a sequence")
     if any(isinstance(entry, dict) and entry.get("name") == name for entry in interfaces):
-        raise EditError(f"{located.fqn} already has an interface called {name!r} (NG-I001)")
+        raise EditError(f"{located.fqn} already has an interface called {name!r} (NV-I001)")
     position = (
         len(interfaces)
         if operation.index is None
@@ -992,7 +992,7 @@ def _remove_interface(
     interfaces = get_field(handle.data, ("spec", "interfaces"))
     for name in doomed:
         # A bridge or LAG that listed the port has to stop listing it, or the
-        # document it is in no longer loads at all (``NG-I003``).
+        # document it is in no longer loads at all (``NV-I003``).
         for entry in interfaces:
             members = entry.get("members") if isinstance(entry, dict) else None
             if isinstance(members, list) and name in members:
@@ -1094,7 +1094,7 @@ def _endpoint(context: _Context, text: str) -> _Endpoint:
     owner = located.element if located.element.has_interfaces else None
     if owner is None or owner.interface(interface) is None:  # type: ignore[union-attr]
         raise EditError(
-            f"{located.fqn} has no interface called {interface!r} (NG-C002); "
+            f"{located.fqn} has no interface called {interface!r} (NV-C002); "
             f"add it first with 'netviz edit add-interface'"
         )
     return _Endpoint(located=located, written=device, interface=interface)
@@ -1524,7 +1524,7 @@ def _create_annotation(context: _Context, operation: CreateAnnotation) -> tuple[
     if operation.address in context.inventory.annotations_of(operation.kind):
         raise EditError(
             f"a {operation.kind} called {operation.address} already exists; "
-            "a name is unique within its namespace and its kind (NG-G002)"
+            "a name is unique within its namespace and its kind (NV-G002)"
         )
     document = _annotation_document(
         kind=operation.kind,

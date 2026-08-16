@@ -7,7 +7,7 @@
 #   ovpn-admin   remote access, host to concentrator
 #
 # Every MTU is the underlay's minus this tunnel's overhead (docs/schema.md
-# §14.1), which is what keeps NG-T011 quiet. There is nowhere here to put a key:
+# §14.1), which is what keeps NV-T011 quiet. There is nowhere here to put a key:
 # 'auth' names the method and nothing else (§14.2).
 apiVersion: netviz.dev/v1alpha1
 kind: tunnel

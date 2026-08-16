@@ -5,7 +5,7 @@ Everything §16 adds, in the five places it has to hold together:
 * the **model** — the route-distinguisher and OSPF-area grammars, the
   next-hop/prefix family rule, the "a route needs somewhere to send the packet"
   rule and the VRF references inside one ``spec``, each reported at schema time
-  with an ``NG-F*`` id and the path of the offending value;
+  with an ``NV-F*`` id and the path of the offending value;
 * the **address space** — that a VRF partitions it: :mod:`netviz.subnets`
   groups per instance, ``E004``/``W111`` stop firing across instances, and
   :mod:`netviz.ipam` sizes and aggregates per instance;
@@ -255,13 +255,13 @@ def test_a_next_hop_of_the_other_family_is_ng_f003() -> None:
                 "rtr", port("eth0", "10.0.0.1/30"), routes=[{"prefix": "::/0", "via": "10.0.0.2"}]
             )
         )
-    assert ("NG-F003", "via") in issues(exc)
+    assert ("NV-F003", "via") in issues(exc)
 
 
 def test_a_route_that_says_nothing_is_ng_f004() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(device("rtr", port("eth0", "10.0.0.1/30"), routes=[{"prefix": "0.0.0.0/0"}]))
-    assert ("NG-F004", "via") in issues(exc)
+    assert ("NV-F004", "via") in issues(exc)
 
 
 @pytest.mark.parametrize("key", ["via", "dev"])
@@ -274,7 +274,7 @@ def test_a_blackhole_route_with_an_egress_is_ng_f004(key: str) -> None:
     }
     with pytest.raises(SchemaError) as exc:
         parse_document(device("rtr", port("eth0", "10.0.0.1/30"), routes=[route]))
-    assert ("NG-F004", key) in issues(exc)
+    assert ("NV-F004", key) in issues(exc)
 
 
 def test_two_vrfs_of_one_name_are_ng_f001() -> None:
@@ -286,13 +286,13 @@ def test_two_vrfs_of_one_name_are_ng_f001() -> None:
                 vrfs=[{"name": "blue", "rd": "65001:1"}, {"name": "blue", "rd": "65001:2"}],
             )
         )
-    assert ("NG-F001", "name") in issues(exc)
+    assert ("NV-F001", "name") in issues(exc)
 
 
 def test_an_interface_binding_to_an_undeclared_vrf_is_ng_f002() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(device("rtr", port("eth0", "10.0.0.1/30", vrf="blue")))
-    assert ("NG-F002", "vrf") in issues(exc)
+    assert ("NV-F002", "vrf") in issues(exc)
     assert "declares no 'spec.vrfs' at all" in str(exc.value)
 
 
@@ -317,7 +317,7 @@ def test_a_route_in_an_undeclared_vrf_is_ng_f005() -> None:
                 routes=[{"prefix": "10.9.0.0/24", "blackhole": True, "vrf": "blue"}],
             )
         )
-    assert ("NG-F005", "vrf") in issues(exc)
+    assert ("NV-F005", "vrf") in issues(exc)
 
 
 def test_an_ospf_interface_listed_twice_is_ng_f006() -> None:
@@ -329,7 +329,7 @@ def test_an_ospf_interface_listed_twice_is_ng_f006() -> None:
                 routing={"ospf": {"interfaces": ["eth0", "eth0"]}},
             )
         )
-    assert exc.value.issues[0].rule == "NG-F006"
+    assert exc.value.issues[0].rule == "NV-F006"
 
 
 def test_an_ospf_block_with_no_interface_is_refused() -> None:
@@ -356,7 +356,7 @@ def test_one_neighbour_address_declared_twice_is_ng_f007() -> None:
                 },
             )
         )
-    assert ("NG-F007", "address") in issues(exc)
+    assert ("NV-F007", "address") in issues(exc)
 
 
 @pytest.mark.parametrize("asn", [0, 4294967296])
@@ -376,7 +376,7 @@ def test_a_hub_declares_no_routing() -> None:
             parse_document(
                 device("hub", {"name": "eth0", "type": "ethernet"}, kind="hub", **{key: value})
             )
-        assert ("NG-H003", key) in issues(exc)
+        assert ("NV-H003", key) in issues(exc)
 
 
 def test_an_adapter_interface_binds_to_no_vrf() -> None:
@@ -393,7 +393,7 @@ def test_an_adapter_interface_binds_to_no_vrf() -> None:
                 },
             }
         )
-    assert ("NG-F002", "vrf") in issues(exc)
+    assert ("NV-F002", "vrf") in issues(exc)
 
 
 def test_a_device_looks_its_own_vrfs_up() -> None:
@@ -1376,7 +1376,7 @@ def test_a_rule_with_no_selector_matches_everything() -> None:
         ({"fwmark": "0x1"}, ("ipv4", "ipv6")),
         ({"family": "ipv6"}, ("ipv6",)),
         # A stated family wins over a derived one only when the two agree, which
-        # NG-F017 is what enforces; here it is the *absence* of a prefix that
+        # NV-F017 is what enforces; here it is the *absence* of a prefix that
         # leaves the field to decide.
         ({"family": "ipv4", "fwmark": "0x1"}, ("ipv4",)),
     ],
@@ -1391,13 +1391,13 @@ def test_a_rule_is_installed_in_the_families_it_selects(
 def test_a_declared_reserved_table_is_ng_f015() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(device("rtr", port("eth0"), route_tables=[{"name": "main", "id": 5}]))
-    assert issues(exc) == [("NG-F015", "name")]
+    assert issues(exc) == [("NV-F015", "name")]
 
 
 def test_a_table_numbered_at_a_reserved_id_is_ng_f015() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(device("rtr", port("eth0"), route_tables=[{"name": "mine", "id": 254}]))
-    assert issues(exc) == [("NG-F015", "id")]
+    assert issues(exc) == [("NV-F015", "id")]
     assert "reserved for 'main'" in str(exc.value)
 
 
@@ -1411,13 +1411,13 @@ def test_a_table_numbered_at_a_reserved_id_is_ng_f015() -> None:
 def test_a_table_declared_twice_is_ng_f015(tables: list[dict[str, Any]], key: str) -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(device("rtr", port("eth0"), route_tables=tables))
-    assert issues(exc) == [("NG-F015", key)]
+    assert issues(exc) == [("NV-F015", key)]
 
 
 def test_a_lookup_with_no_table_is_ng_f016() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(policy_device({"priority": 1}))
-    assert issues(exc) == [("NG-F016", "table")]
+    assert issues(exc) == [("NV-F016", "table")]
 
 
 @pytest.mark.parametrize(
@@ -1434,7 +1434,7 @@ def test_an_action_that_disagrees_with_its_argument_is_ng_f016(
 ) -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(policy_device({"priority": 1, **fields}))
-    assert issues(exc) == [("NG-F016", key)]
+    assert issues(exc) == [("NV-F016", key)]
 
 
 def test_a_goto_that_jumps_forwards_is_accepted() -> None:
@@ -1453,7 +1453,7 @@ def test_a_goto_that_jumps_forwards_is_accepted() -> None:
 def test_incoherent_selectors_are_ng_f017(fields: dict[str, Any], key: str) -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(policy_device(rule(1, **fields)))
-    assert issues(exc) == [("NG-F017", key)]
+    assert issues(exc) == [("NV-F017", key)]
 
 
 def test_a_route_naming_both_a_vrf_and_a_table_is_ng_f018() -> None:
@@ -1466,13 +1466,13 @@ def test_a_route_naming_both_a_vrf_and_a_table_is_ng_f018() -> None:
                 routes=[{"prefix": "0.0.0.0/0", "via": "10.0.0.2", "vrf": "blue", "table": "main"}],
             )
         )
-    assert issues(exc) == [("NG-F018", "table")]
+    assert issues(exc) == [("NV-F018", "table")]
 
 
 def test_a_rule_looking_up_an_undeclared_table_is_ng_f019() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(policy_device(rule(1, table="nowhere")))
-    assert issues(exc) == [("NG-F019", "table")]
+    assert issues(exc) == [("NV-F019", "table")]
     assert "'default', 'local', 'main'" in str(exc.value), "the reserved three are offered"
 
 
@@ -1485,7 +1485,7 @@ def test_a_route_placed_in_an_undeclared_table_is_ng_f019() -> None:
                 routes=[{"prefix": "0.0.0.0/0", "via": "10.0.0.2", "table": "nowhere"}],
             )
         )
-    assert issues(exc) == [("NG-F019", "table")]
+    assert issues(exc) == [("NV-F019", "table")]
 
 
 def test_a_vrf_is_a_table_a_rule_may_look_up() -> None:
@@ -1507,7 +1507,7 @@ def test_a_vrf_is_a_table_a_rule_may_look_up() -> None:
 def test_two_rules_of_one_family_at_one_priority_are_ng_f020() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(policy_device(rule(100, src="10.0.0.0/8"), rule(100, src="10.9.0.0/16")))
-    assert issues(exc) == [("NG-F020", "priority")]
+    assert issues(exc) == [("NV-F020", "priority")]
 
 
 def test_one_priority_in_two_families_is_two_rules() -> None:
@@ -1519,7 +1519,7 @@ def test_one_priority_in_two_families_is_two_rules() -> None:
 def test_a_rule_selecting_on_an_unknown_interface_is_ng_f021() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_document(policy_device(rule(1, oif="eth9")))
-    assert issues(exc) == [("NG-F021", "oif")]
+    assert issues(exc) == [("NV-F021", "oif")]
 
 
 def test_the_database_is_walked_in_priority_order() -> None:

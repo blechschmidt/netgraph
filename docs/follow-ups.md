@@ -573,7 +573,7 @@ renderings on this tree instead of 2106. `_resolve_endpoint` and
 `_resolve_tunnel_end` called `Device.interface(name)`, a linear scan of
 `spec.interfaces`, when `_build_context` was already building the
 name-to-interface map two rules later; the map is now built first and the
-resolvers read it. `NG-I001` makes interface names unique within an element, so
+resolvers read it. `NV-I001` makes interface names unique within an element, so
 the map and the scan cannot disagree.
 
 **`E004` groups on objects and renders only what it reports** (34.5 → 4.9 ms).
@@ -2416,14 +2416,14 @@ Raised while writing `examples/docker`, which is what
 container runtime produces it: six namespaces on one machine, and every one of
 them with an interface the runtime called `eth0`.
 
-`NG-I001` says interface names are unique **within their device**, and every
+`NV-I001` says interface names are unique **within their device**, and every
 interface of every namespace of a machine is on one device. So the document
 cannot say what `ip link` says:
 
 ```yaml
     - name: eth0            # in c-web
       netns: c-web
-    - name: eth0            # in c-api -- refused, NG-I001
+    - name: eth0            # in c-api -- refused, NV-I001
       netns: c-api
 ```
 
@@ -2513,7 +2513,7 @@ and the schema has no word for that: `type` is one of seven values and none of
 them is `macvlan`, `ipvlan` or `tap`, while `peer` is the only field that says
 "this interface was made as half of something else".
 
-So the example annotates the device with `netviz/ignore: NG-C015` and a
+So the example annotates the device with `netviz/ignore: NV-C015` and a
 comment naming all four interfaces, and `tests.yaml` names them a second time in
 the query that asserts every other interface in a namespace is one end of a
 veth pair. Two lists of the same four names, kept in step by hand, is the cost.
@@ -2578,7 +2578,7 @@ Recorded so a later reviewer knows these were examined rather than skipped.
   the `-T` flag, and the call is bounded by a timeout.
 - **Symlink traversal out of the inventory is refused.** `_within_root` resolves
   each link and rejects anything not under the root; revisits and cycles are
-  reported (`NG-L003`).
+  reported (`NV-L003`).
 - **Output paths.** `--output` is a direct command-line argument, so a path
   outside the tree is the user's stated intent, not a traversal. Nothing derives
   an output path from inventory *content*, which is where traversal would matter.

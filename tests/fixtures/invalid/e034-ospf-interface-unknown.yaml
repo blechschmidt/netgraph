@@ -1,4 +1,4 @@
-# E034 (NG-F010) - OSPF is enabled on an interface the device does not have.
+# E034 (NV-F010) - OSPF is enabled on an interface the device does not have.
 #
 # The area is only as wide as the interfaces that run it, so 'eth9' is an
 # adjacency that will never come up - and a link that looks like it is in the

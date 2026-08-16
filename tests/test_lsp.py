@@ -508,7 +508,7 @@ class TestDiagnostics:
         uri = driver.open(links, text)
         diagnostics = driver.wait_for_diagnostics(uri)
         [problem] = [entry for entry in diagnostics if entry["severity"] == 1]
-        assert problem["code"] == "NG-C002"
+        assert problem["code"] == "NV-C002"
         assert problem["source"] == "netviz"
         assert "port9" in problem["message"]
         assert problem["codeDescription"]["href"].endswith(
@@ -545,7 +545,7 @@ class TestDiagnostics:
             version=2,
         )
         broken = driver.wait_for_diagnostics(uri)
-        assert [entry["code"] for entry in broken if entry["severity"] == 1] == ["NG-C002"]
+        assert [entry["code"] for entry in broken if entry["severity"] == 1] == ["NV-C002"]
 
         driver.forget_diagnostics()
         driver.change(
@@ -565,7 +565,7 @@ class TestDiagnostics:
         uri = driver.open(switch, switch.read_text(encoding="utf-8").replace("port1", "portX", 1))
         assert driver.wait_for_diagnostics(uri) is not None
         cable_diagnostics = driver.wait_for_diagnostics(path_to_uri(links))
-        assert any(entry["code"] == "NG-C002" for entry in cable_diagnostics)
+        assert any(entry["code"] == "NV-C002" for entry in cable_diagnostics)
 
     def test_a_change_on_disk_refreshes_without_the_client(self, inventory: Path) -> None:
         """The whole point of watching: an edit made by another tool still lands."""
@@ -582,8 +582,8 @@ class TestDiagnostics:
             encoding="utf-8",
         )
         client.server._queue.put_nowait(_changed_event(links))
-        diagnostics = client.wait_for_diagnostics(uri, _has_code("NG-C002"))
-        assert any(entry["code"] == "NG-C002" for entry in diagnostics)
+        diagnostics = client.wait_for_diagnostics(uri, _has_code("NV-C002"))
+        assert any(entry["code"] == "NV-C002" for entry in diagnostics)
         client.close()
 
     def test_watched_file_notifications_from_the_client_also_refresh(
@@ -602,7 +602,7 @@ class TestDiagnostics:
             "workspace/didChangeWatchedFiles",
             {"changes": [{"uri": uri, "type": 2}]},
         )
-        assert driver.wait_for_diagnostics(uri, _has_code("NG-C002"))
+        assert driver.wait_for_diagnostics(uri, _has_code("NV-C002"))
 
 
 def _has_code(code: str) -> Callable[[list[dict[str, Any]]], bool]:

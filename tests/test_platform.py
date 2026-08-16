@@ -281,7 +281,7 @@ def test_the_temporary_file_is_one_the_loader_would_skip(tmp_path: Path, monkeyp
     """A crash between the write and the rename must not add a document.
 
     The temporary name starts with a dot, which is the loader's own rule for
-    "do not read this" (NG-L002), so a leftover is inert rather than a phantom
+    "do not read this" (NV-L002), so a leftover is inert rather than a phantom
     element with a syntax error.
     """
     seen: list[str] = []

@@ -1,4 +1,4 @@
-# W136 (NG-F014) - a VRF nothing is bound to.
+# W136 (NV-F014) - a VRF nothing is bound to.
 #
 # The instance holds no address and no connected route, so the isolation it was
 # declared to create does not exist: everything is still in the global table.

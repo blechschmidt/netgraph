@@ -84,7 +84,7 @@ __all__ = [
 ]
 
 #: The rule every problem in a theme document is reported under.
-THEME_RULE: Final = "NG-Z004"
+THEME_RULE: Final = "NV-Z004"
 
 #: What a ``label`` value is set to in order to match the *presence* of the
 #: label rather than a particular value.
@@ -169,7 +169,7 @@ class ThemeSpec(NetvizModel):
 
     @model_validator(mode="after")
     def _not_empty(self) -> ThemeSpec:
-        """``NG-Z004``: a theme with no rules would style nothing.
+        """``NV-Z004``: a theme with no rules would style nothing.
 
         The same reasoning as an empty ``style`` block: it validates, it renders
         identically to no theme at all, and the writer gets no signal that the

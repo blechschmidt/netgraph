@@ -77,7 +77,7 @@ spec:
     - assert: has-interface
       name: every switch has a management SVI
       description: |
-        The management address lives on an SVI rather than on a port (NG-V009),
+        The management address lives on an SVI rather than on a port (NV-V009),
         so a switch without one cannot be reached to be configured.
       select: kind=switch
       interface: Vlan99

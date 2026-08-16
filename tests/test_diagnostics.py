@@ -156,7 +156,7 @@ def test_the_envelope_carries_the_documented_keys() -> None:
 
     (finding,) = envelope["findings"]
     assert finding["rule"] == "E001"
-    assert finding["alias"] == "NG-C002"
+    assert finding["alias"] == "NV-C002"
     assert finding["severity"] == "error"
     assert finding["element"] == "cbl-dangling"
     assert finding["namespace"] == ""
@@ -316,7 +316,7 @@ def test_a_load_error_is_reported_under_the_load_rule(tmp_path: Path) -> None:
 
 
 def test_a_schema_problem_is_titled_by_its_alias(tmp_path: Path) -> None:
-    """``load`` is not a useful heading; ``NG-D005`` is."""
+    """``load`` is not a useful heading; ``NV-D005`` is."""
     write(
         tmp_path,
         broken=document(
@@ -326,7 +326,7 @@ def test_a_schema_problem_is_titled_by_its_alias(tmp_path: Path) -> None:
         ),
     )
     (line,) = as_github(report_for(tmp_path)).splitlines()
-    assert "title=NG-D005 document rejected by the schema" in line
+    assert "title=NV-D005 document rejected by the schema" in line
     assert "unknown key" in line
 
 
@@ -616,7 +616,7 @@ def test_disable_is_honoured_by_every_format(runner: CliRunner, output_format: s
 
 def test_disable_accepts_the_schema_alias(runner: CliRunner) -> None:
     result = invoke(
-        runner, "-q", "-i", str(BROKEN), "validate", "-F", "json", "--disable", "NG-C002"
+        runner, "-q", "-i", str(BROKEN), "validate", "-F", "json", "--disable", "NV-C002"
     )
     assert json.loads(result.stdout)["findings"] == []
 

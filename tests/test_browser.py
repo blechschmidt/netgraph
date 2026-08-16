@@ -650,7 +650,7 @@ def _centre(locator: Locator) -> tuple[float, float]:
     """Where to put the mouse to hit ``locator``, once it is actually there.
 
     ``bounding_box()`` answers ``None`` for an element that is not laid out at
-    that instant, and every locator here is positional — ``.ng-handle-bend >>
+    that instant, and every locator here is positional — ``.nv-handle-bend >>
     nth=0`` is *whichever* handle is first right now. The editor rebuilds the
     whole viewport on each state change, so the element the call resolved a
     moment ago is a different DOM node from the one it resolves next, and a
@@ -1012,13 +1012,13 @@ def arranged(open_editor: OpenEditor, *, writable: bool = True) -> Editor:
     """A writable session over an arranged diagram, showing the arranged view."""
     editor = open_editor(writable=writable, extra={"layout.yaml": ARRANGED_LAYOUT})
     editor.page.select_option("#layer", ARRANGED_LAYER)
-    expect(editor.page.locator(".ng-link-hit").first).to_be_attached(timeout=TIMEOUT_MS)
+    expect(editor.page.locator(".nv-link-hit").first).to_be_attached(timeout=TIMEOUT_MS)
     return editor
 
 
 def band(editor: Editor, link: str = A_CABLE) -> Locator:
     """The invisible band along one link, which is what a click on it hits."""
-    return editor.page.locator(f'.ng-link-hit[data-link="{link}"]').first
+    return editor.page.locator(f'.nv-link-hit[data-link="{link}"]').first
 
 
 def press_on(editor: Editor, locator: Locator, *, button: str = "left") -> None:
@@ -1042,12 +1042,12 @@ def bends(editor: Editor, link: str = A_CABLE) -> list[dict[str, float]]:
 def test_selecting_a_link_reveals_its_handles(open_editor: OpenEditor) -> None:
     """Nothing is grabbable until a link is picked, or the canvas is a field of dots."""
     editor = arranged(open_editor)
-    assert editor.page.locator(".ng-handle").count() == 0
+    assert editor.page.locator(".nv-handle").count() == 0
 
     press_on(editor, band(editor))
-    expect(editor.page.locator(".ng-handle-add")).to_have_count(1)
+    expect(editor.page.locator(".nv-handle-add")).to_have_count(1)
     # Two bends are stored for this cable, and each gets a handle of its own.
-    assert editor.page.locator(".ng-handle-bend").count() == len(bends(editor))
+    assert editor.page.locator(".nv-handle-bend").count() == len(bends(editor))
 
 
 def test_dragging_a_bend_writes_the_new_route_to_disk(open_editor: OpenEditor) -> None:
@@ -1059,7 +1059,7 @@ def test_dragging_a_bend_writes_the_new_route_to_disk(open_editor: OpenEditor) -
     assert original, "this cable is routed, so it has bends to drag"
 
     press_on(editor, band(editor))
-    handle = editor.page.locator(".ng-handle-bend").first
+    handle = editor.page.locator(".nv-handle-bend").first
     start = _centre(handle)
     mouse = editor.page.mouse
     mouse.move(*start)
@@ -1101,7 +1101,7 @@ def test_double_clicking_a_link_drops_a_bend_and_right_clicking_takes_it_away(
         "double-clicking a link has to drop a bend"
     )
 
-    press_on(editor, editor.page.locator(".ng-handle-bend").first, button="right")
+    press_on(editor, editor.page.locator(".nv-handle-bend").first, button="right")
     assert editor.settles(lambda: len(bends(editor)) == original, timeout=TIMEOUT_MS / 1000), (
         "right-clicking a bend has to remove it"
     )
@@ -1146,7 +1146,7 @@ def test_pinning_the_computed_route_writes_it_as_bends(open_editor: OpenEditor) 
     """
     editor = open_editor(writable=True, extra={"layout.yaml": _obstructed_layout()})
     editor.page.select_option("#layer", ARRANGED_LAYER)
-    expect(editor.page.locator(".ng-link-hit").first).to_be_attached(timeout=TIMEOUT_MS)
+    expect(editor.page.locator(".nv-link-hit").first).to_be_attached(timeout=TIMEOUT_MS)
 
     link = "cables/cbl-sw-nas"
     published = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["geometry"]["links"][link]
@@ -1178,7 +1178,7 @@ def test_pinning_the_computed_route_writes_it_as_bends(open_editor: OpenEditor) 
     after = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["geometry"]["links"][link]
     assert after["routed"] == [], "a pinned route must not be recomputed on top of itself"
     editor.page.evaluate("id => window.netvizLinks.select(id)", link)
-    expect(editor.page.locator(".ng-handle-bend")).to_have_count(len(published["routed"]))
+    expect(editor.page.locator(".nv-handle-bend")).to_have_count(len(published["routed"]))
 
 
 def test_a_read_only_session_shows_a_route_and_offers_no_handle(
@@ -1188,7 +1188,7 @@ def test_a_read_only_session_shows_a_route_and_offers_no_handle(
     editor = arranged(open_editor, writable=False)
     press_on(editor, band(editor))
     editor.page.wait_for_timeout(300)
-    assert editor.page.locator(".ng-handle").count() == 0
+    assert editor.page.locator(".nv-handle").count() == 0
 
 
 def test_the_canvas_and_the_renderer_route_a_link_identically(
@@ -1313,7 +1313,7 @@ def annotated(open_editor: OpenEditor, *, writable: bool = True) -> Editor:
     # The band, not the note: a note is drawn at every layer, the unarranged one
     # the page opens on included, so waiting for the note would race the render
     # that puts the *arranged* view -- and with it the overlay -- on screen.
-    expect(editor.page.locator(".ng-anno-band").first).to_be_attached(timeout=TIMEOUT_MS)
+    expect(editor.page.locator(".nv-anno-band").first).to_be_attached(timeout=TIMEOUT_MS)
     return editor
 
 
@@ -1482,14 +1482,14 @@ def test_an_area_pinned_to_a_rectangle_is_resized_by_its_corner(
     open_editor: OpenEditor,
 ) -> None:
     editor = annotated(open_editor)
-    band_ = editor.page.locator(".ng-anno-band:not([data-follows])").first
+    band_ = editor.page.locator(".nv-anno-band:not([data-follows])").first
     box = band_.bounding_box()
     assert box is not None
     # On the outline rather than in the middle: the band is a stroke, so that the
     # inside of a zone stays clickable for the devices in it.
     editor.page.mouse.click(box["x"] + box["width"] / 2, box["y"] + 1)
 
-    handle = editor.page.locator(".ng-anno-handle-corner").first
+    handle = editor.page.locator(".nv-anno-handle-corner").first
     expect(handle).to_be_attached()
     start = _centre(handle)
     mouse = editor.page.mouse
@@ -1521,7 +1521,7 @@ def test_an_area_drawn_round_its_members_says_why_it_will_not_move(
     editor = annotated(open_editor)
     assert editor.session is not None
     before = editor.session.revision
-    band_ = editor.page.locator(".ng-anno-band[data-follows]").first
+    band_ = editor.page.locator(".nv-anno-band[data-follows]").first
     box = band_.bounding_box()
     assert box is not None
 
@@ -1566,7 +1566,7 @@ def test_the_annotation_toggle_takes_the_commentary_off_the_canvas(
     editor.press("Alt+n")
 
     expect(note_shape(editor)).to_have_count(0)
-    assert editor.page.locator(".ng-anno-band").count() == 0
+    assert editor.page.locator(".nv-anno-band").count() == 0
     assert "annotations off" in editor.announced()
     # Nothing was written: hiding commentary is a way of looking at the diagram.
     assert "name: why-here" in editor.read("annotations.yaml")
@@ -1578,7 +1578,7 @@ def test_a_read_only_session_shows_the_commentary_and_offers_no_handle(
     editor = annotated(open_editor, writable=False)
     note_shape(editor).click()
     editor.page.wait_for_timeout(300)
-    assert editor.page.locator(".ng-anno-handle").count() == 0
+    assert editor.page.locator(".nv-anno-handle").count() == 0
     box = note_shape(editor).bounding_box()
     assert box is not None
     editor.page.mouse.dblclick(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
@@ -1729,7 +1729,7 @@ def test_right_clicking_a_bend_removes_it_and_shows_no_menu(open_editor: OpenEdi
         "no bend to right-click"
     )
 
-    press_on(editor, editor.page.locator(".ng-handle-bend").first, button="right")
+    press_on(editor, editor.page.locator(".nv-handle-bend").first, button="right")
 
     assert editor.settles(lambda: len(bends(editor)) == original, timeout=TIMEOUT_MS / 1000), (
         "the bend outlived its right-click"
@@ -1863,13 +1863,13 @@ def grouped(open_editor: OpenEditor, **kwargs: Any) -> Editor:
     extra.update(kwargs.pop("extra", {}))
     editor = open_editor(writable=True, extra=extra, **kwargs)
     editor.page.check("#group")
-    expect(editor.page.locator(".ng-container").first).to_be_attached(timeout=TIMEOUT_MS)
+    expect(editor.page.locator(".nv-container").first).to_be_attached(timeout=TIMEOUT_MS)
     return editor
 
 
 def container(editor: Editor, namespace: str) -> Locator:
     """The frame drawn around one namespace."""
-    return editor.page.locator(f'.ng-container[data-container="{namespace}"]').first
+    return editor.page.locator(f'.nv-container[data-container="{namespace}"]').first
 
 
 def _rect_size(locator: Locator) -> tuple[float, float]:
@@ -1887,7 +1887,7 @@ def container_header(editor: Editor, namespace: str) -> Locator:
     site stays clickable for the racks inside it — pressing its centre goes
     through to whatever is under it, by design.
     """
-    return editor.page.locator(f'.ng-container-header[data-container="{namespace}"]').first
+    return editor.page.locator(f'.nv-container-header[data-container="{namespace}"]').first
 
 
 def test_each_namespace_is_drawn_as_a_container_with_a_header(
@@ -1901,7 +1901,7 @@ def test_each_namespace_is_drawn_as_a_container_with_a_header(
     expect(container(editor, "racks/r1")).to_be_attached()
     # The header states the name and the count, which is the one fact an open
     # container cannot say for itself.
-    caption = editor.page.locator('.ng-container-label[data-container="hosts"]')
+    caption = editor.page.locator('.nv-container-label[data-container="hosts"]')
     expect(caption).to_have_text(re.compile(r"^hosts\s+·\s+\d+ elements$"))
     expect(editor.page.locator('[data-toggle="racks/r1"]')).to_be_attached()
 
@@ -2012,7 +2012,7 @@ def test_resizing_a_container_writes_its_box_to_disk(open_editor: OpenEditor) ->
     editor = open_editor(writable=True, extra={"layout.yaml": ARRANGED_LAYOUT})
     editor.page.select_option("#layer", ARRANGED_LAYER)
     editor.page.check("#group")
-    expect(editor.page.locator(".ng-container").first).to_be_attached(timeout=TIMEOUT_MS)
+    expect(editor.page.locator(".nv-container").first).to_be_attached(timeout=TIMEOUT_MS)
     assert editor.session is not None
     before = editor.session.revision
 
@@ -2021,7 +2021,7 @@ def test_resizing_a_container_writes_its_box_to_disk(open_editor: OpenEditor) ->
     # pane, and a test that presses one is testing the layout of the window.
     drawn = _rect_size(container(editor, "switches"))
     press_on(editor, container_header(editor, "switches"))
-    handle = editor.page.locator('.ng-container-handle[data-which="se"]').first
+    handle = editor.page.locator('.nv-container-handle[data-which="se"]').first
     expect(handle).to_be_attached(timeout=TIMEOUT_MS)
     start = _centre(handle)
     mouse = editor.page.mouse
@@ -3221,8 +3221,8 @@ def test_zooming_out_drops_the_detail_and_frames_the_namespaces(
     expect(page.locator("#canvas.coarse")).to_be_attached(timeout=TIMEOUT_MS)
     # One frame per namespace with more than one member: the crowd, and the
     # home lab's own folders.
-    assert page.locator("#viewport svg .ng-lod-frame").count() > 0
-    assert page.locator("#viewport svg .ng-lod-label").count() > 0
+    assert page.locator("#viewport svg .nv-lod-frame").count() > 0
+    assert page.locator("#viewport svg .nv-lod-label").count() > 0
     # A node's label is in the DOM and not rendered, which is the point: the
     # text is what a repaint at this scale was spending itself on.
     hidden = page.evaluate(
@@ -3238,7 +3238,7 @@ def test_zooming_out_drops_the_detail_and_frames_the_namespaces(
     # starts at a thirtieth of life size, so the ceiling is a long way up.
     zoom(editor, 60)
     page.wait_for_function("() => !netvizCull.stats().coarse", timeout=TIMEOUT_MS)
-    expect(page.locator("#viewport svg .ng-lod-frame")).to_have_count(0, timeout=TIMEOUT_MS)
+    expect(page.locator("#viewport svg .nv-lod-frame")).to_have_count(0, timeout=TIMEOUT_MS)
 
 
 @requires_dot
@@ -4182,7 +4182,7 @@ def selected(editor: Editor) -> list[str]:
 def halos(editor: Editor) -> int:
     """How many selection rings are drawn. Not the same as the count above: a
     ring is only drawn for an element that is on screen."""
-    return int(editor.page.locator("#viewport svg .ng-halo").count())
+    return int(editor.page.locator("#viewport svg .nv-halo").count())
 
 
 def sweep(editor: Editor, *, over: Sequence[str]) -> None:
@@ -4595,7 +4595,7 @@ def test_reset_unsets_the_field_rather_than_writing_the_inherited_value(
 
     expect(editor.page.locator("#style-toggle")).to_have_attribute("aria-expanded", "true")
     # The whole block goes with its last field: an empty `style:` mapping is
-    # NG-Z002, so the write path cannot leave one behind.
+    # NV-Z002, so the write path cannot leave one behind.
     expect_style(editor, "switches/sw-home", {})
     expect(style_from(editor, "fill")).to_have_text("the built-in palette")
 

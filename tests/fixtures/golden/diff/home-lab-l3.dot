@@ -14,7 +14,7 @@ graph netviz {
   node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
   edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
 
-  "hosts/adp-usb-eth" [shape=ellipse, fillcolor="#fafafa", color="#d4d4d8", style="filled,dashed", penwidth=0.7, fontcolor="#a1a1aa", tooltip="adp-usb-eth [adapter]\nnamespace: hosts\nUSB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the laptop - there is deliberately no cable between the two (NG-X005).\nlabels: asset=A-0001, site=home\nvlans: 10\ninterfaces (1):\n  enx001122334455  ethernet  192.168.10.30/24, 2001:db8:10::30/64  00:11:22:33:44:55\nlinks (2):\n  enx001122334455 — subnet:192.168.10.0/24  (subnet)\n  enx001122334455 — subnet:2001:db8:10::/64  (subnet)", label=<
+  "hosts/adp-usb-eth" [shape=ellipse, fillcolor="#fafafa", color="#d4d4d8", style="filled,dashed", penwidth=0.7, fontcolor="#a1a1aa", tooltip="adp-usb-eth [adapter]\nnamespace: hosts\nUSB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the laptop - there is deliberately no cable between the two (NV-X005).\nlabels: asset=A-0001, site=home\nvlans: 10\ninterfaces (1):\n  enx001122334455  ethernet  192.168.10.30/24, 2001:db8:10::30/64  00:11:22:33:44:55\nlinks (2):\n  enx001122334455 — subnet:192.168.10.0/24  (subnet)\n  enx001122334455 — subnet:2001:db8:10::/64  (subnet)", label=<
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
       <TR><TD COLSPAN="3" ALIGN="CENTER"><B>adp-usb-eth</B></TD></TR>
       <TR><TD COLSPAN="3" ALIGN="CENTER">[adapter]</TD></TR>

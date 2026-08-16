@@ -1,4 +1,4 @@
-# W150 (NG-B010) - a declared zone that holds no interface.
+# W150 (NV-B010) - a declared zone that holds no interface.
 #
 # A zone is a partition of the device's interfaces. One holding none is empty in
 # the strongest sense: no packet can ever be in it, so the rule below -- however

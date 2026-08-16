@@ -2,13 +2,13 @@
 
 Implements the discovery rules of ``docs/schema.md`` §2.1:
 
-* ``NG-L001`` — only ``*.yaml`` / ``*.yml`` (case-insensitive) are loaded.
-* ``NG-L002`` — path components starting with ``.`` or ``_`` are skipped, plus
+* ``NV-L001`` — only ``*.yaml`` / ``*.yml`` (case-insensitive) are loaded.
+* ``NV-L002`` — path components starting with ``.`` or ``_`` are skipped, plus
   anything matched by a ``.netvizignore`` (see :mod:`netviz.loader.ignore`).
-* ``NG-L003`` — symlinks are followed, but one that leaves the root or revisits
+* ``NV-L003`` — symlinks are followed, but one that leaves the root or revisits
   a directory is an error.
-* ``NG-L004`` — a file may hold several documents; empty ones are skipped.
-* ``NG-L005`` — files are loaded in byte-wise order of their relative POSIX
+* ``NV-L004`` — a file may hold several documents; empty ones are skipped.
+* ``NV-L005`` — files are loaded in byte-wise order of their relative POSIX
   path, documents in file order, which makes every later stage deterministic.
 
 The walk itself is iterative: an inventory nested a thousand directories deep
@@ -78,10 +78,10 @@ __all__ = [
     "load_tree",
 ]
 
-#: ``NG-L001`` — the suffixes a document may use, compared case-insensitively.
+#: ``NV-L001`` — the suffixes a document may use, compared case-insensitively.
 YAML_SUFFIXES: tuple[str, ...] = (".yaml", ".yml")
 
-#: ``NG-L002`` — a path component starting with one of these is not descended into.
+#: ``NV-L002`` — a path component starting with one of these is not descended into.
 _SKIPPED_PREFIXES: tuple[str, ...] = (".", "_")
 
 
@@ -102,7 +102,7 @@ class InventoryFile:
 
     @property
     def sort_key(self) -> bytes:
-        """``NG-L005`` — byte-wise order of the relative POSIX path."""
+        """``NV-L005`` — byte-wise order of the relative POSIX path."""
         return self.relative.as_posix().encode("utf-8", "surrogatepass")
 
 
@@ -120,7 +120,7 @@ class Overlay:
     ``files`` maps a POSIX path relative to the inventory root to the text that
     file should be taken to hold, or to ``None`` when it should be taken not to
     exist. A path the walk never reaches is *added* to it, in the position
-    ``NG-L005`` puts it, so a document written into a new folder is loaded into
+    ``NV-L005`` puts it, so a document written into a new folder is loaded into
     the namespace that folder names.
     """
 
@@ -241,7 +241,7 @@ def load_stream(text: str, *, name: str = STREAM_NAME, keep_provenance: bool = F
     One stream is one file's worth of documents, so every element lands in the
     root namespace and references resolve globally. Apart from that the rules
     are the ones :func:`load_tree` applies -- the same strict parser, the same
-    schema validation, the same ``NG-N002`` duplicate check -- because the
+    schema validation, the same ``NV-N002`` duplicate check -- because the
     interactive front ends exist to tell a user what ``netviz validate``
     would say about the very same text.
 
@@ -421,7 +421,7 @@ def _classify(
 ) -> InventoryFile | _Pending | None:
     """Decide what a directory entry is: a file to load, a directory, or noise."""
     name = entry.name
-    if name.startswith(_SKIPPED_PREFIXES):  # NG-L002
+    if name.startswith(_SKIPPED_PREFIXES):  # NV-L002
         return None
 
     relative = pending.relative / name
@@ -444,7 +444,7 @@ def _classify(
     if ignores.is_ignored(relative.as_posix(), is_dir=is_dir):
         return None
     if not is_dir:
-        if not _is_yaml_name(name):  # NG-L001
+        if not _is_yaml_name(name):  # NV-L001
             return None
         if entry.is_symlink() and not _within_root(path, real_root, relative, problems):
             return None
@@ -453,7 +453,7 @@ def _classify(
     real = _real_path(path)
     if real is None or not _within_root(path, real_root, relative, problems, real=real):
         return None
-    if real in pending.chain:  # NG-L003
+    if real in pending.chain:  # NV-L003
         problems.append(
             LoadError(
                 message=f"symbolic link forms a cycle: {relative.as_posix()} -> {real}",
@@ -500,7 +500,7 @@ def _within_root(
     *,
     real: Path | None = None,
 ) -> bool:
-    """``NG-L003`` — refuse a link that points outside the inventory root."""
+    """``NV-L003`` — refuse a link that points outside the inventory root."""
     resolved = real if real is not None else _real_path(path)
     if resolved is None:  # pragma: no cover - the link broke between stat and resolve
         return False
@@ -520,7 +520,7 @@ def _within_root(
 
 
 def _is_yaml_name(name: str) -> bool:
-    """``NG-L001`` — case-insensitive suffix test."""
+    """``NV-L001`` — case-insensitive suffix test."""
     return name.lower().endswith(YAML_SUFFIXES)
 
 
@@ -700,7 +700,7 @@ class _Builder:
 
     def feed(self, document: RawDocument, *, entry: InventoryFile) -> None:
         """Take one parsed document."""
-        if document.data is None:  # NG-L004: an empty document is not an error.
+        if document.data is None:  # NV-L004: an empty document is not an error.
             return
         kind = _kind_of(document.data)
         if kind == TEMPLATE_KIND:
@@ -726,14 +726,14 @@ class _Builder:
             self._slots.append(_Deferred(document=document, entry=entry, reference=reference))
         else:
             self._slots.append(
-                _rejected(  # NG-M006
+                _rejected(  # NV-M006
                     document,
                     path=("spec", INHERIT_KEY),
                     message=(
                         "'from' inherits a device template and is only supported by "
                         f"{', '.join(DEVICE_KINDS)}"
                     ),
-                    rule="NG-M006",
+                    rule="NV-M006",
                 )
             )
 
@@ -758,7 +758,7 @@ class _Builder:
                         message=(
                             f"duplicate template name {fqn!r}{where}; this document is ignored"
                         ),
-                        rule="NG-M002",
+                        rule="NV-M002",
                     ),
                 )
             )
@@ -772,7 +772,7 @@ class _Builder:
         layout inherits nothing and refers to nothing that has to exist yet: a
         key naming an element declared in a file that sorts later is normal, and
         whether it names anything at all is the validator's question
-        (``NG-Y001``), not the loader's.
+        (``NV-Y001``), not the loader's.
         """
         self._layouts_seen += 1
         try:
@@ -799,7 +799,7 @@ class _Builder:
                     line=source.line,
                     index=source.index,
                     field_path=("metadata", "name"),
-                    rule="NG-Y002",
+                    rule="NV-Y002",
                 )
             )
 
@@ -838,7 +838,7 @@ class _Builder:
                     line=source.line,
                     index=source.index,
                     field_path=("metadata", "name"),
-                    rule="NG-K001",
+                    rule="NV-K001",
                 )
             )
 
@@ -877,7 +877,7 @@ class _Builder:
                     line=source.line,
                     index=source.index,
                     field_path=("metadata", "name"),
-                    rule="NG-Z004",
+                    rule="NV-Z004",
                 )
             )
 
@@ -887,7 +887,7 @@ class _Builder:
         Indexed as it is read, like a layout and for the same reason: an
         annotation names elements that may be declared in a file sorting later,
         and whether it names anything at all is the validator's question
-        (``NG-G001``) rather than the loader's.
+        (``NV-G001``) rather than the loader's.
 
         Its provenance carries the field-level redirect table unconditionally,
         like a test suite's: the editor writes annotations back field by field —
@@ -923,7 +923,7 @@ class _Builder:
                 line=source.line,
                 index=source.index,
                 field_path=("metadata", "name"),
-                rule="NG-G002",
+                rule="NV-G002",
             )
         )
 
@@ -1051,7 +1051,7 @@ class _Builder:
                 line=slot.source.line,
                 index=slot.source.index,
                 field_path=("metadata", "name"),
-                rule="NG-N002",
+                rule="NV-N002",
             )
         )
 

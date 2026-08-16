@@ -174,7 +174,7 @@ class DraftDevice:
     #: The network namespaces observed on this device (§23.1), in the order they
     #: were seen: ``name -> parent``, the empty string being the machine's
     #: initial namespace. Written out as ``spec.netns`` so a port naming one does
-    #: not trip ``NG-N022``.
+    #: not trip ``NV-N022``.
     netns: dict[str, str] = field(default_factory=dict)
     #: Lines emitted above ``apiVersion``, under the generated header.
     comments: list[str] = field(default_factory=list)

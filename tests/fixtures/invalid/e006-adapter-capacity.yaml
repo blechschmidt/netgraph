@@ -1,4 +1,4 @@
-# E006 (NG-X008) - an adapter declares more downstream interfaces than ports.
+# E006 (NV-X008) - an adapter declares more downstream interfaces than ports.
 #
 # The hardware has one port; the document describes two. Each address sits in its
 # own point-to-point prefix: W105 exempts those, and W111 has no overlap to find.

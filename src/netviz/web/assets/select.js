@@ -302,14 +302,14 @@ window.netvizSelect = (function () {
     // the zoom when a view is switched back to -- leaves the previous overlay
     // in the SVG, and each repaint would otherwise add another.
     if (root) {
-      Array.prototype.forEach.call(root.querySelectorAll("g.ng-selection"), function (stale) {
+      Array.prototype.forEach.call(root.querySelectorAll("g.nv-selection"), function (stale) {
         stale.remove();
       });
     }
     if (!root || !picked.length) { return; }
     var window_ = window.netvizCull.viewportBox();
     var group = document.createElementNS(SVG_NS, "g");
-    group.setAttribute("class", "ng-selection");
+    group.setAttribute("class", "nv-selection");
     group.setAttribute("aria-hidden", "true");
     var count = 0;
     for (var i = 0; i < picked.length && count < MAX_HALOS; i++) {
@@ -336,7 +336,7 @@ window.netvizSelect = (function () {
 
   function halo(box) {
     var rect = document.createElementNS(SVG_NS, "rect");
-    rect.setAttribute("class", "ng-halo");
+    rect.setAttribute("class", "nv-halo");
     rect.setAttribute("x", String(box.x - PADDING));
     rect.setAttribute("y", String(box.y - PADDING));
     rect.setAttribute("width", String(Math.max(box.w + 2 * PADDING, 1)));
@@ -392,7 +392,7 @@ window.netvizSelect = (function () {
   /** Does this press start a band? Called before the pan arms itself. */
   function grab(event) {
     if (!el || event.button !== 0) { return false; }
-    if (event.target.closest && event.target.closest("g.node, g.edge, .ng-handle, .ng-link-hit")) {
+    if (event.target.closest && event.target.closest("g.node, g.edge, .nv-handle, .nv-link-hit")) {
       return false;
     }
     band = {

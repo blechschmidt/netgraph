@@ -6,14 +6,14 @@ inventory without one behaves exactly as if it declared the defaults::
     # netviz.toml
     [validate]
     strict = false
-    ignore = ["W103", "NG-C010"]
+    ignore = ["W103", "NV-C010"]
 
     [validate.severity]
     E004 = "warning"
 
 ``ignore`` silences rules outright, ``severity`` re-grades them, and ``strict``
 promotes every surviving warning to an error. Rules may be named by their short
-id (``E004``) or by the ``NG-*`` id used in ``docs/schema.md`` §10; the two are
+id (``E004``) or by the ``NV-*`` id used in ``docs/schema.md`` §10; the two are
 interchangeable (see :mod:`netviz.rules`).
 
 The other half of the file says how this inventory is *drawn* — a ``[render]``
@@ -615,7 +615,7 @@ def _resolve_id(token: str, *, where: str) -> str:
     except KeyError:
         raise ConfigurationError(
             f"{where}: {token!r} is not a known rule id; expected one of "
-            f"{', '.join(RULE_IDS)}, an NG-* alias from docs/schema.md §10, or '{WILDCARD}'"
+            f"{', '.join(RULE_IDS)}, an NV-* alias from docs/schema.md §10, or '{WILDCARD}'"
         ) from None
 
 

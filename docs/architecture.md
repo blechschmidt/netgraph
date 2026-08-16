@@ -87,7 +87,7 @@ namespace-first then global. *Shorthands are already gone*: `interfaces[].range`
 expanded and `spec.from` merged against its template during the load, so no later stage
 re-parses YAML or re-expands anything — an inventory written with templates renders byte
 for byte like the same inventory written out longhand. *Order is deterministic* — files in
-byte-wise order of their relative POSIX path, documents in file order (`NG-L005`) — which
+byte-wise order of their relative POSIX path, documents in file order (`NV-L005`) — which
 is what makes every rendering and every golden file stable. And loading is *total*, a
 syntax error, schema violation, unreadable file or duplicate name being recorded on
 `inventory.errors` as a `LoadError` while the walk continues, and *safe*, because only
@@ -291,7 +291,7 @@ then the selected profile, then `[render]`, then the Click default. Each result 
 
 **`rules.py` — the single rule catalogue.** Every rule the validator can report is declared
 here exactly once, with a permanent short id (`E###`, `W###`, `I###`), a default severity,
-a one-line summary, its `NG-*` schema aliases and the `title` that `Rule.anchor` and
+a one-line summary, its `NV-*` schema aliases and the `title` that `Rule.anchor` and
 `Rule.help_uri` derive a deep link into [validation-rules.md](validation-rules.md) from.
 Ids are permanent: once assigned, one is never reused, so a suppression in somebody's
 inventory keeps meaning what it meant. Keeping the catalogue in its own module is what
@@ -415,7 +415,7 @@ whatever resolved still drawn.
 Each is load-bearing somewhere else in the tree, and a test names most of them.
 
 1. **Models forbid unknown keys.** `NetvizModel` sets `extra="forbid"` (`models/base.py`,
-   `NG-D005`): silently ignoring a misspelt key would produce a diagram that disagrees with
+   `NV-D005`): silently ignoring a misspelt key would produce a diagram that disagrees with
    the file, which is the failure mode this tool exists to prevent. It is also what puts
    `additionalProperties: false` into the JSON Schema.
 2. **The loader normalises so that no later stage re-parses.** Ranges are expanded and

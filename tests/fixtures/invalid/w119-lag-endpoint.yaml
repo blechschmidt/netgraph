@@ -1,4 +1,4 @@
-# W119 (NG-C012) - the cable terminates on a bundle rather than on a lane.
+# W119 (NV-C012) - the cable terminates on a bundle rather than on a lane.
 #
 # 'bond0' is logical: the wires land on 'eth0' and 'eth1'. Cabling the aggregate
 # draws one link where the inventory means two. The members are marked spare so

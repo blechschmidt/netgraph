@@ -1,4 +1,4 @@
-# E024 (NG-P005) - a run leaves a pair of panels and is patched back into them.
+# E024 (NV-P005) - a run leaves a pair of panels and is patched back into them.
 #
 # 'cbl-front' joins the two front positions and 'cbl-rear' the two rear ones,
 # so the couplers close the circle: the run never reaches anything that can

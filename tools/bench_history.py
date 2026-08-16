@@ -283,7 +283,7 @@ def _repository(args: argparse.Namespace) -> Iterator[Path]:
     if args.inventory:
         yield Path(args.inventory).resolve()
         return
-    target = Path(args.keep).resolve() if args.keep else Path(tempfile.mkdtemp(prefix="ng-hist-"))
+    target = Path(args.keep).resolve() if args.keep else Path(tempfile.mkdtemp(prefix="nv-hist-"))
     if args.keep and target.exists():
         shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=True)

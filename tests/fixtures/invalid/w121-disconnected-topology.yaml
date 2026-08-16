@@ -1,4 +1,4 @@
-# W121 (NG-C014) - the topology falls into two islands.
+# W121 (NV-C014) - the topology falls into two islands.
 #
 # 'pc-a'/'pc-b' and 'pc-c'/'pc-d' are each cabled internally and never meet, so
 # every device looks connected while the inventory describes two networks.

@@ -1,4 +1,4 @@
-# E010 (NG-I009) - a MAC address with the multicast bit set.
+# E010 (NV-I009) - a MAC address with the multicast bit set.
 #
 # The first octet of 01:00:5e:00:00:01 is odd, which marks a group address
 # (IEEE 802-2014 section 8.2). No interface can own one: it is only ever a

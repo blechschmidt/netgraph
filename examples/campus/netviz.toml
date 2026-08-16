@@ -8,8 +8,8 @@
 # inventory is clean, so it stays clean.
 strict = false
 
-# Rules never to report at all. Accepts short ids ("W103") and the NG-* ids of
-# docs/schema.md §10 ("NG-C016") interchangeably. An unknown id here is an
+# Rules never to report at all. Accepts short ids ("W103") and the NV-* ids of
+# docs/schema.md §10 ("NV-C016") interchangeably. An unknown id here is an
 # error: a suppression that silently matches nothing is worse than a failed run.
 ignore = []
 

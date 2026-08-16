@@ -131,7 +131,7 @@ main {
  * nothing itself; this only makes sure it occupies nothing either. It is
  * deliberately not display:none, which some engines treat as licence to stop
  * resolving references into it. */
-.ng-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.nv-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 
 .view svg {
   width: 100%;
@@ -149,11 +149,11 @@ main {
  * pointer must not promise otherwise. */
 .view svg a { cursor: inherit; }
 
-.view svg g.ng-dim { opacity: .16; }
-.view svg g.ng-match > * { stroke-width: 2.2; }
-.view svg g.ng-match { filter: drop-shadow(0 0 2px currentColor); }
-.view svg g.ng-selected > * { stroke-width: 3; }
-.view svg g.ng-selected { filter: drop-shadow(0 0 4px var(--accent)); }
+.view svg g.nv-dim { opacity: .16; }
+.view svg g.nv-match > * { stroke-width: 2.2; }
+.view svg g.nv-match { filter: drop-shadow(0 0 2px currentColor); }
+.view svg g.nv-selected > * { stroke-width: 3; }
+.view svg g.nv-selected { filter: drop-shadow(0 0 4px var(--accent)); }
 
 .hint {
   position: absolute;
@@ -352,5 +352,5 @@ main {
   .viewport { position: static; transform: none !important; }
   .view { position: static; }
   .view svg { height: auto; }
-  .view svg g.ng-dim { opacity: 1; }
+  .view svg g.nv-dim { opacity: 1; }
 }

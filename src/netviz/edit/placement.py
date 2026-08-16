@@ -125,12 +125,12 @@ def check_file(requested: str) -> str:
     if not path.name.lower().endswith(YAML_SUFFIXES):
         raise PlacementError(
             f"{requested!r} is not a file the inventory would read; it has to end in "
-            f"{' or '.join(YAML_SUFFIXES)} (NG-L001)"
+            f"{' or '.join(YAML_SUFFIXES)} (NV-L001)"
         )
     if any(part.startswith((".", "_")) for part in path.parts):
         raise PlacementError(
             f"{requested!r} sits under a path component starting with '.' or '_', which the "
-            f"loader skips (NG-L002), so nothing written there would be part of the inventory"
+            f"loader skips (NV-L002), so nothing written there would be part of the inventory"
         )
     return path.as_posix()
 

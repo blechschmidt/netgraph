@@ -9,7 +9,7 @@
       "name": "adp-usb-eth",
       "kind": "adapter",
       "namespace": "hosts",
-      "description": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n",
+      "description": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NV-X005).\n",
       "labels": {
         "asset": "A-0001",
         "site": "home"

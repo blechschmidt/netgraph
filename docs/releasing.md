@@ -71,7 +71,7 @@ shape: a shell script, a pipeline, an editor, a pinned schema, a colleague's inv
    `--check` differences, no path found), `2` usage error, `130` interrupted. A command that
    started returning `1` where it used to return `0` is a breaking change even if nothing
    else about it moved.
-5. **The rule ids and their `NG-*` aliases.** They appear in `--disable` lists, in
+5. **The rule ids and their `NV-*` aliases.** They appear in `--disable` lists, in
    `netviz.toml`, in suppression comments inside inventories and in code-scanning alert
    history. A rule may be added; an id may not be reused for a different rule, and a rule's
    severity may only be *raised* in a minor release.

@@ -1,4 +1,4 @@
-# E017 (NG-T003) - a tunnel endpoint is not an interface of type 'tunnel'.
+# E017 (NV-T003) - a tunnel endpoint is not an interface of type 'tunnel'.
 #
 # 'pc-b:eth0' is the physical port the outer packets leave by, not the virtual
 # interface the tunnel presents. Only one of the two ends is wrong, so exactly

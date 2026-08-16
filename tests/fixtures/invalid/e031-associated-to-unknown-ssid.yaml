@@ -1,4 +1,4 @@
-# E031 (NG-W010) - a client joins an SSID its access point does not advertise.
+# E031 (NV-W010) - a client joins an SSID its access point does not advertise.
 #
 # The laptop is associated to 'labb'; the access point beacons 'lab'. The
 # association recorded here cannot happen.

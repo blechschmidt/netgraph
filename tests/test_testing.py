@@ -166,12 +166,12 @@ def test_two_suites_of_one_name_are_ng_k001() -> None:
         "spec: {assertions: [{assert: count, select: kind=switch, equals: 1}]}\n"
     )
     inventory = load_stream(document + "---\n" + document)
-    assert [error.rule for error in inventory.errors] == ["NG-K001"]
+    assert [error.rule for error in inventory.errors] == ["NV-K001"]
     assert "duplicate test suite name" in inventory.errors[0].message
 
 
 def test_a_suite_must_assert_something() -> None:
-    """``NG-K002`` — a suite that checked nothing would report a green run."""
+    """``NV-K002`` — a suite that checked nothing would report a green run."""
     inventory = load_stream(
         "apiVersion: netviz.dev/v1alpha1\n"
         "kind: testsuite\n"

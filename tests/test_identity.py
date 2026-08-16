@@ -111,19 +111,19 @@ def test_a_login_may_be_a_user_principal_name() -> None:
 @pytest.mark.parametrize("login", ["-ana", "ana brandt", "ana/brandt", "ana!", "a" * 65])
 def test_a_login_outside_the_account_alphabet_is_refused(login: str) -> None:
     error = refusal("user", "ana", {"login": login})
-    assert any(issue.rule == "NG-S001" for issue in error.issues), error.issues
+    assert any(issue.rule == "NV-S001" for issue in error.issues), error.issues
 
 
 @pytest.mark.parametrize("email", ["ana", "ana@example", "ana@ex ample.invalid", "@invalid.test"])
 def test_an_address_that_is_not_one_is_refused(email: str) -> None:
     error = refusal("user", "ana", {"email": email})
-    assert any(issue.rule == "NG-S001" for issue in error.issues), error.issues
+    assert any(issue.rule == "NV-S001" for issue in error.issues), error.issues
 
 
 @pytest.mark.parametrize("uid", [-1, 2**32 - 1, 2**32])
 def test_a_uid_outside_the_assignable_range_is_refused(uid: int) -> None:
     error = refusal("user", "ana", {"uid": uid})
-    assert any(issue.rule == "NG-S001" for issue in error.issues), error.issues
+    assert any(issue.rule == "NV-S001" for issue in error.issues), error.issues
 
 
 def test_the_largest_assignable_uid_is_accepted() -> None:
@@ -141,13 +141,13 @@ def test_a_private_key_is_refused_with_the_reason() -> None:
     """The mistake this check exists for: the wrong half of the pair, committed."""
     error = refusal("user", "ana", {"ssh_keys": ["-----BEGIN OPENSSH PRIVATE KEY-----\nb3Bl"]})
     (issue,) = error.issues
-    assert issue.rule == "NG-S002"
+    assert issue.rule == "NV-S002"
     assert "private key" in issue.message
 
 
 def test_a_key_that_is_not_a_key_is_refused() -> None:
     error = refusal("user", "ana", {"ssh_keys": ["hunter2"]})
-    assert any(issue.rule == "NG-S002" for issue in error.issues), error.issues
+    assert any(issue.rule == "NV-S002" for issue in error.issues), error.issues
 
 
 def test_one_key_twice_is_refused_even_with_a_different_comment() -> None:
@@ -155,7 +155,7 @@ def test_one_key_twice_is_refused_even_with_a_different_comment() -> None:
     other = f"{KEY.rsplit(' ', 1)[0]} ana@desktop"
     error = refusal("user", "ana", {"ssh_keys": [KEY, other]})
     (issue,) = error.issues
-    assert issue.rule == "NG-S002"
+    assert issue.rule == "NV-S002"
     assert issue.path == ("spec", "ssh_keys", 1)
 
 
@@ -186,15 +186,15 @@ def test_a_group_may_be_empty_and_says_so() -> None:
 def test_one_member_twice_is_refused_at_the_position_of_the_second() -> None:
     error = refusal("group", "admins", {"members": ["ana", "kit", "ana"]})
     (issue,) = error.issues
-    assert issue.rule == "NG-S003"
+    assert issue.rule == "NV-S003"
     assert issue.path == ("spec", "members", 2)
 
 
 def test_a_group_that_names_itself_is_refused_without_an_inventory() -> None:
-    """The one loop a single document can see; the longer ones are ``NG-S012``."""
+    """The one loop a single document can see; the longer ones are ``NV-S012``."""
     error = refusal("group", "admins", {"members": ["ana", "admins"]})
     (issue,) = error.issues
-    assert issue.rule == "NG-S003"
+    assert issue.rule == "NV-S003"
     assert issue.path == ("spec", "members", 1)
 
 
@@ -252,7 +252,7 @@ def test_expansion_walks_the_nesting_and_names_the_groups_it_crossed(tmp_path: P
 
 
 def test_expansion_terminates_on_an_inventory_with_a_cycle(tmp_path: Path) -> None:
-    """A cycle is ``NG-S012``, an error — and a listing still has to run on it."""
+    """A cycle is ``NV-S012``, an error — and a listing still has to run on it."""
     inventory = tree(
         tmp_path,
         """
@@ -274,7 +274,7 @@ spec: {members: [a]}
 
 
 def test_a_member_that_resolves_to_a_device_is_not_indexed(tmp_path: Path) -> None:
-    """``NG-S011`` reports it; the indexes must not carry it into a diagram."""
+    """``NV-S011`` reports it; the indexes must not carry it into a diagram."""
     inventory = tree(
         tmp_path,
         """
@@ -358,7 +358,7 @@ def test_the_view_and_the_plan_cannot_disagree(tmp_path: Path) -> None:
 
 
 def test_an_unresolved_member_is_drawn_as_nothing(tmp_path: Path) -> None:
-    """``--force`` must still produce a picture; ``NG-S010`` is what says so."""
+    """``--force`` must still produce a picture; ``NV-S010`` is what says so."""
     inventory = tree(
         tmp_path,
         """

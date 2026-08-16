@@ -1,4 +1,4 @@
-# W138 (NG-Y001) - a layout document places something the inventory has not got.
+# W138 (NV-Y001) - a layout document places something the inventory has not got.
 #
 # The arrangement still holds a position for 'sw-gone', a switch that was
 # deleted. It draws nothing -- geometry for a node that is not in the diagram

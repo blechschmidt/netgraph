@@ -1,4 +1,4 @@
-# W131 (NG-A011) - a nested prefix lives in a different broadcast domain.
+# W131 (NV-A011) - a nested prefix lives in a different broadcast domain.
 #
 # The VLAN 10 hosts were given a /16 where a /24 was meant, so they treat every
 # address of the VLAN 20 prefix 10.0.5.0/24 as on-link and ARP for it instead

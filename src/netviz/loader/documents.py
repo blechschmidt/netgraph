@@ -319,13 +319,13 @@ StrictSafeLoader: Final[type[NodeLoader]] = select_loader(
 class RawDocument:
     """One YAML document, with the node tree it was constructed from."""
 
-    #: The constructed Python object; ``None`` for an empty document (``NG-L004``).
+    #: The constructed Python object; ``None`` for an empty document (``NV-L004``).
     data: Any
     #: Absolute path of the file the document came from.
     path: Path
     #: The same file relative to the inventory root, POSIX style.
     relative: PurePosixPath
-    #: 0-based position of the document within its file (``NG-L005``).
+    #: 0-based position of the document within its file (``NV-L005``).
     index: int
     #: Root node, kept so field paths can be mapped back onto line numbers.
     node: yaml.Node | None = None
@@ -386,7 +386,7 @@ def read_documents(path: Path, *, relative: PurePosixPath) -> Generator[RawDocum
 
     Documents are yielded lazily in file order, empty ones included so that the
     document index keeps matching the ``---`` separators; callers skip them
-    (``NG-L004``). It is a generator rather than a plain iterator on purpose:
+    (``NV-L004``). It is a generator rather than a plain iterator on purpose:
     abandoning it part-way -- ``close()``, or simply letting it fall out of
     scope -- still disposes the parser.
 

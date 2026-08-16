@@ -1,4 +1,4 @@
-# W109 (NG-I012) - a device declares no ethernet, wifi or lag interface.
+# W109 (NV-I012) - a device declares no ethernet, wifi or lag interface.
 #
 # 'pc-a' owns nothing but a loopback, so no cable can ever reach it. It escapes
 # W103 because the adapter's 'attached_to' is itself a graph edge (schema

@@ -413,7 +413,7 @@ window.netvizCull = (function () {
     var unit = 1 / (scale || 1);
     var pad = LABEL_PX * unit;
     var layer = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    layer.setAttribute("class", "ng-lod");
+    layer.setAttribute("class", "nv-lod");
     layer.setAttribute("aria-hidden", "true");
     names.forEach(function (name) {
       var region = regions[name];
@@ -422,14 +422,14 @@ window.netvizCull = (function () {
       rect.setAttribute("y", region.y - pad);
       rect.setAttribute("width", (region.right - region.x) + 2 * pad);
       rect.setAttribute("height", (region.bottom - region.y) + 2 * pad);
-      rect.setAttribute("class", "ng-lod-frame");
+      rect.setAttribute("class", "nv-lod-frame");
       rect.setAttribute("stroke-width", 1.5 * unit);
       rect.setAttribute("stroke-dasharray", (6 * unit) + " " + (4 * unit));
       layer.appendChild(rect);
       var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
       label.setAttribute("x", region.x - pad);
       label.setAttribute("y", region.y - pad - 4 * unit);
-      label.setAttribute("class", "ng-lod-label");
+      label.setAttribute("class", "nv-lod-label");
       label.setAttribute("font-size", LABEL_PX * unit);
       label.textContent = name + " (" + region.members + ")";
       layer.appendChild(label);

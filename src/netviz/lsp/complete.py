@@ -10,7 +10,7 @@ enums, their documentation. It is generated from the models
 resolve to, and the interfaces those elements actually declare. A cable endpoint
 whose completion list came from the schema alone would offer a regular
 expression; what a user wants is ``sw-home:port3``, and specifically not
-``sw-home:port9``, which is the mistake ``NG-C003`` exists to catch. Offering
+``sw-home:port9``, which is the mistake ``NV-C003`` exists to catch. Offering
 only what exists is the same check, moved from after the save to before it.
 
 Reference fields are not detected by looking for a colon. They are the six
@@ -321,7 +321,7 @@ def _spelling(fqn: str, namespace: str, inventory: Inventory) -> str:
 
     The short name when it resolves to this element and nothing else, which is
     what a person would type; the fully-qualified name when it would not, which
-    is what ``NG-N002`` makes necessary.
+    is what ``NV-N002`` makes necessary.
     """
     short = short_name(fqn)
     resolution = inventory.resolve_fqn(short, namespace=namespace)

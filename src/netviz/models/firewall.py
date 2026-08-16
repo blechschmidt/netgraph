@@ -31,7 +31,7 @@ Three blocks, in the order a device declares them:
 Zones, and the one that is not declared
 ---------------------------------------
 
-Every interface is in at most one zone (``NG-B003``). That is not a
+Every interface is in at most one zone (``NV-B003``). That is not a
 simplification: it is the defining property of a zone in every zone-based
 firewall there is, and it is what makes ``from lan to wan`` a statement about a
 packet rather than a question. An interface in no zone is not an error — plenty
@@ -40,7 +40,7 @@ all it is worth a second look, which is ``W151``.
 
 :data:`LOCAL_ZONE` is the device itself: the traffic that terminates on the box
 rather than passing through it. It is nameable without being declared and cannot
-be declared (``NG-B001``), because the machine is not one of the things the
+be declared (``NV-B001``), because the machine is not one of the things the
 machine's interfaces are divided into. It is also what turns the two zone fields
 into a hook: ``to: local`` is the input hook, ``from: local`` is output, and two
 real zones are forward. So the schema never asks which chain a rule is in — the
@@ -97,7 +97,7 @@ __all__ = [
 
 #: The zone a packet is in when it is *for this machine* rather than passing
 #: through it. Nameable in ``src_zone`` and ``dst_zone`` without being declared,
-#: and refused as a declared zone name (``NG-B001``): the box is not one of the
+#: and refused as a declared zone name (``NV-B001``): the box is not one of the
 #: parts the box's interfaces are divided into.
 LOCAL_ZONE: Final = "local"
 
@@ -116,7 +116,7 @@ _PORT_RANGE_RE: Final[re.Pattern[str]] = re.compile(r"^\s*(\d+)\s*(?:-\s*(\d+)\s
 
 
 def normalise_port_range(value: Any) -> Any:
-    """Normalise a port selector to ``443`` or ``1000-2000`` (``NG-B005``).
+    """Normalise a port selector to ``443`` or ``1000-2000`` (``NV-B005``).
 
     An integer and the string spelling it are the same selector and are stored
     the same way, because two documents that write one port differently have to
@@ -240,7 +240,7 @@ class Protocol(str, Enum):
     policy is ever written about and a bare protocol number in a firewall rule is
     almost always a typo for one of them. ``icmp`` and ``icmpv6`` are separate
     protocols carried by separate families, which is a fact the schema can check
-    (``NG-B005``) only because they are not one entry called "icmp".
+    (``NV-B005``) only because they are not one entry called "icmp".
     """
 
     TCP = "tcp"
@@ -318,13 +318,13 @@ class Zone(NetvizModel):
     fact about the device rather than a label: policy is written between zones,
     and which zone a packet is in is decided by the interface it crossed.
 
-    An interface belongs to at most one zone (``NG-B003``), and a zone holding no
+    An interface belongs to at most one zone (``NV-B003``), and a zone holding no
     interface at all is inert (``W150``) — nothing can be in it, so no rule
     naming it can ever match.
     """
 
     name: ElementName
-    #: ``NG-B002``: each names an interface of this device. ``NG-B003``: no
+    #: ``NV-B002``: each names an interface of this device. ``NV-B003``: no
     #: interface is in two zones.
     interfaces: list[IfName] = Field(default_factory=list)
     description: str | None = None
@@ -350,16 +350,16 @@ class FirewallRule(NetvizModel):
     ``W154``.
     """
 
-    #: ``NG-B008``: unique within the device, per family. The chain is walked
+    #: ``NV-B008``: unique within the device, per family. The chain is walked
     #: from the lowest upwards, and a tie would leave the document unable to say
     #: which of two rules decides.
     priority: RulePriority
     #: Optional label, for the diagram and for a diagnostic to name the rule by.
     name: ElementName | None = None
     #: The zone the packet came from: a declared zone, or :data:`LOCAL_ZONE` for
-    #: traffic this machine generated. Unset matches any zone (``NG-B004``).
+    #: traffic this machine generated. Unset matches any zone (``NV-B004``).
     src_zone: ElementName | None = None
-    #: The zone the packet is going to, on the same terms (``NG-B004``).
+    #: The zone the packet is going to, on the same terms (``NV-B004``).
     dst_zone: ElementName | None = None
     #: Which family's chain the rule is in. Derived from ``src``, ``dst`` and
     #: ``protocol`` when they say so, and both families when nothing does.
@@ -369,7 +369,7 @@ class FirewallRule(NetvizModel):
     #: Destination prefix.
     dst: IPPrefix | None = None
     #: The IP protocol. Required by ``src_ports`` and ``dst_ports``, which no
-    #: other protocol has (``NG-B005``).
+    #: other protocol has (``NV-B005``).
     protocol: Protocol | None = None
     #: Source ports: single ports and closed ranges, matched as a set.
     src_ports: list[PortRange] = Field(default_factory=list)
@@ -378,20 +378,20 @@ class FirewallRule(NetvizModel):
     dst_ports: list[PortRange] = Field(default_factory=list)
     #: Connection-tracking states, matched as a set. Empty matches any state.
     ct_state: list[ConnState] = Field(default_factory=list)
-    #: The ingress interface, when a zone is too coarse (``NG-B009``). Rare: the
+    #: The ingress interface, when a zone is too coarse (``NV-B009``). Rare: the
     #: point of a zone is not needing this.
     iif: IfName | None = None
-    #: The egress interface, on the same terms (``NG-B009``).
+    #: The egress interface, on the same terms (``NV-B009``).
     oif: IfName | None = None
     #: Match everything the selectors do *not*. Meaningless without a selector
-    #: to invert, which is ``NG-B005``.
+    #: to invert, which is ``NV-B005``.
     invert: Boolean = False
     #: Stated, never defaulted: a rule whose action nobody wrote down is a rule
     #: nobody finished writing, and guessing at it would be guessing about
     #: whether traffic flows.
     action: FirewallAction
     #: The mark to write, required by ``action: mark`` and refused by everything
-    #: else (``NG-B005``). Read by ``spec.routing_policy[].fwmark`` (§16.4).
+    #: else (``NV-B005``). Read by ``spec.routing_policy[].fwmark`` (§16.4).
     mark: Fwmark | None = None
     #: The tag put in front of a logged packet, for ``action: log`` only.
     log_prefix: str | None = Field(default=None, max_length=64)
@@ -399,38 +399,38 @@ class FirewallRule(NetvizModel):
 
     @model_validator(mode="after")
     def _check_action(self) -> FirewallRule:
-        """``NG-B005``: the action and the thing it acts on agree."""
+        """``NV-B005``: the action and the thing it acts on agree."""
         if self.action is FirewallAction.MARK and self.mark is None:
             raise field_error(
                 "a 'mark' rule needs the mark to write; name one in 'mark', or choose an "
                 "action that decides the packet ('accept', 'drop', 'reject')",
-                rule="NG-B005",
+                rule="NV-B005",
                 path=("mark",),
             )
         if self.action is not FirewallAction.MARK and self.mark is not None:
             raise field_error(
                 f"a {self.action.value!r} rule does not write a mark, so it must not name one",
-                rule="NG-B005",
+                rule="NV-B005",
                 path=("mark",),
             )
         if self.action is not FirewallAction.LOG and self.log_prefix is not None:
             raise field_error(
                 f"'log_prefix' is the tag on a logged packet; this rule is "
                 f"{self.action.value!r} and logs nothing",
-                rule="NG-B005",
+                rule="NV-B005",
                 path=("log_prefix",),
             )
         return self
 
     @model_validator(mode="after")
     def _check_selectors(self) -> FirewallRule:
-        """``NG-B005``: the selectors agree with each other and with the family."""
+        """``NV-B005``: the selectors agree with each other and with the family."""
         if self.src is not None and self.dst is not None and self.src.version != self.dst.version:
             raise field_error(
                 f"'src' is {self.src} and 'dst' is {self.dst}; one rule matches one address "
                 f"family, so the two prefixes cannot be IPv{self.src.version} and "
                 f"IPv{self.dst.version}",
-                rule="NG-B005",
+                rule="NV-B005",
                 path=("dst",),
             )
         if self.family is not None:
@@ -440,7 +440,7 @@ class FirewallRule(NetvizModel):
                     raise field_error(
                         f"the rule is declared {self.family.value} but {key!r} is {prefix}, "
                         f"which is IPv{prefix.version}",
-                        rule="NG-B005",
+                        rule="NV-B005",
                         path=(key,),
                     )
         self._check_protocol()
@@ -449,7 +449,7 @@ class FirewallRule(NetvizModel):
             raise field_error(
                 "'invert' matches everything the selectors do not, and this rule has no "
                 "selector to invert, so it would match nothing at all",
-                rule="NG-B005",
+                rule="NV-B005",
                 path=("invert",),
             )
         if self.src_zone is not None and self.src_zone == self.dst_zone:
@@ -457,13 +457,13 @@ class FirewallRule(NetvizModel):
                 f"the rule is from {self.src_zone!r} to {self.src_zone!r}; traffic that "
                 f"stays inside one zone does not cross the firewall, so name two zones or "
                 f"leave one unset",
-                rule="NG-B004",
+                rule="NV-B004",
                 path=("dst_zone",),
             )
         return self
 
     def _check_protocol(self) -> None:
-        """``NG-B005``: a protocol that lives in one family, against the rule's."""
+        """``NV-B005``: a protocol that lives in one family, against the rule's."""
         if self.protocol is None:
             return
         only = self.protocol.family
@@ -478,12 +478,12 @@ class FirewallRule(NetvizModel):
                 raise field_error(
                     f"{self.protocol.value!r} is carried by {only.value} only, and the rule "
                     f"is {stated.value} by its {key!r}",
-                    rule="NG-B005",
+                    rule="NV-B005",
                     path=("protocol",),
                 )
 
     def _check_ports(self) -> None:
-        """``NG-B005``: ports belong to a protocol that has them, and repeat never."""
+        """``NV-B005``: ports belong to a protocol that has them, and repeat never."""
         for key in ("src_ports", "dst_ports"):
             ports: list[str] = getattr(self, key)
             if not ports:
@@ -492,14 +492,14 @@ class FirewallRule(NetvizModel):
                 raise field_error(
                     f"{key!r} selects on a port and the rule states no 'protocol'; a port "
                     f"number means nothing without one — name 'tcp', 'udp' or 'sctp'",
-                    rule="NG-B005",
+                    rule="NV-B005",
                     path=(key,),
                 )
             if not self.protocol.has_ports:
                 raise field_error(
                     f"{key!r} selects on a port and {self.protocol.value!r} has none; ports "
                     f"belong to 'tcp', 'udp' and 'sctp'",
-                    rule="NG-B005",
+                    rule="NV-B005",
                     path=(key,),
                 )
             for index, port in enumerate(ports):
@@ -507,14 +507,14 @@ class FirewallRule(NetvizModel):
                     raise field_error(
                         f"port selector {port!r} is listed twice; the list is matched as a "
                         f"set, so the repeat adds nothing",
-                        rule="NG-B005",
+                        rule="NV-B005",
                         path=(key, index),
                     )
         for index, state in enumerate(self.ct_state):
             if state in self.ct_state[:index]:
                 raise field_error(
                     f"connection state {state.value!r} is listed twice",
-                    rule="NG-B005",
+                    rule="NV-B005",
                     path=("ct_state", index),
                 )
 
@@ -634,37 +634,37 @@ class NatRule(NetvizModel):
 
     name: ElementName | None = None
     type: NatType
-    #: The zone the packet came from (``NG-B004``). The usual selector for a
+    #: The zone the packet came from (``NV-B004``). The usual selector for a
     #: source translation: *everything leaving towards the wan is masqueraded*.
     src_zone: ElementName | None = None
-    #: The zone it is going to (``NG-B004``).
+    #: The zone it is going to (``NV-B004``).
     dst_zone: ElementName | None = None
     family: AddressFamily | None = None
     src: IPPrefix | None = None
     dst: IPPrefix | None = None
     protocol: Protocol | None = None
     #: Destination ports, for a translation that picks one service out of an
-    #: address (``NG-B006``). The published port, not the internal one.
+    #: address (``NV-B006``). The published port, not the internal one.
     dst_ports: list[PortRange] = Field(default_factory=list)
     #: What the address becomes: required by ``snat`` and ``dnat``, refused by
     #: ``masquerade`` (whose address is the egress interface's, unknown here)
-    #: and by ``redirect`` (whose address is this machine) — ``NG-B006``. An
+    #: and by ``redirect`` (whose address is this machine) — ``NV-B006``. An
     #: address rather than a prefix, because a translation rewrites to one.
     to_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
     #: What the port becomes. Optional everywhere but ``redirect``, which is a
-    #: translation of the port and nothing else (``NG-B006``).
+    #: translation of the port and nothing else (``NV-B006``).
     to_port: Port | None = None
     description: str | None = None
 
     @model_validator(mode="after")
     def _check_translation(self) -> NatRule:
-        """``NG-B006``: the translation states what its type needs and no more."""
+        """``NV-B006``: the translation states what its type needs and no more."""
         if self.type.needs_address and self.to_address is None:
             raise field_error(
                 f"a {self.type.value!r} rule rewrites the "
                 f"{'source' if self.type.is_source else 'destination'} to a stated address; "
                 f"name one in 'to_address'",
-                rule="NG-B006",
+                rule="NV-B006",
                 path=("to_address",),
             )
         if not self.type.needs_address and self.to_address is not None:
@@ -676,13 +676,13 @@ class NatRule(NetvizModel):
             raise field_error(
                 f"a {self.type.value!r} rule translates to {reason}, so it must not name "
                 f"'to_address'",
-                rule="NG-B006",
+                rule="NV-B006",
                 path=("to_address",),
             )
         if self.type is NatType.REDIRECT and self.to_port is None:
             raise field_error(
                 "a 'redirect' rule translates the port and nothing else; name one in 'to_port'",
-                rule="NG-B006",
+                rule="NV-B006",
                 path=("to_port",),
             )
         self._check_families()
@@ -691,7 +691,7 @@ class NatRule(NetvizModel):
             raise field_error(
                 f"'dst_ports' selects on a port and the rule states {named}; ports belong "
                 f"to 'tcp', 'udp' and 'sctp'",
-                rule="NG-B006",
+                rule="NV-B006",
                 path=("dst_ports",),
             )
         if self.to_port is not None and self.type.is_source and not self.dst_ports:
@@ -699,13 +699,13 @@ class NatRule(NetvizModel):
                 f"a {self.type.value!r} rule with a 'to_port' rewrites the source port of "
                 f"every packet it matches; that is a port range, not a port, and netviz "
                 f"has no way to say which — leave 'to_port' unset",
-                rule="NG-B006",
+                rule="NV-B006",
                 path=("to_port",),
             )
         return self
 
     def _check_families(self) -> None:
-        """``NG-B006``: every address the rule names is of one family."""
+        """``NV-B006``: every address the rule names is of one family."""
         stated: list[tuple[str, AddressFamily]] = []
         if self.family is not None:
             stated.append(("family", self.family))
@@ -718,7 +718,7 @@ class NatRule(NetvizModel):
                 raise field_error(
                     f"{key!r} is {family.value} and {stated[0][0]!r} is {stated[0][1].value}; "
                     f"one translation rewrites one address family",
-                    rule="NG-B006",
+                    rule="NV-B006",
                     path=(key,),
                 )
 
@@ -787,7 +787,7 @@ class FirewallConfig(NetvizModel):
 
     @model_validator(mode="after")
     def _check_defaults(self) -> FirewallConfig:
-        """``NG-B007``: a default decides the packet, so it is one of the three."""
+        """``NV-B007``: a default decides the packet, so it is one of the three."""
         for key in ("default_input", "default_forward", "default_output"):
             action: FirewallAction = getattr(self, key)
             if not action.is_terminal:
@@ -795,7 +795,7 @@ class FirewallConfig(NetvizModel):
                     f"{key!r} is {action.value!r}, which does not decide the packet — the "
                     f"walk would carry on past the end of the chain, and there is nothing "
                     f"there; a default is 'accept', 'drop' or 'reject'",
-                    rule="NG-B007",
+                    rule="NV-B007",
                     path=(key,),
                 )
         return self
@@ -816,7 +816,7 @@ class FirewallConfig(NetvizModel):
         Sorted rather than kept in declaration order, because that *is* the
         chain: two rules in the document are a set, and the order they are
         consulted in is the number on them. Ties cannot happen within one family
-        (``NG-B008``), so the sort is total and the result is what the device
+        (``NV-B008``), so the sort is total and the result is what the device
         would do.
         """
         selected = [

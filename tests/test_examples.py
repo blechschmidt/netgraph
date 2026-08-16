@@ -163,7 +163,7 @@ def test_the_home_lab_puts_two_ssids_on_one_access_point() -> None:
     assert radio.wireless.role.is_ap
     assert radio.wireless.channel_text == "36/5GHz"
     assert radio.wireless.ssids == ("home", "home-guest")
-    # Each SSID lands in a VLAN the uplink trunk carries, which is NG-W009.
+    # Each SSID lands in a VLAN the uplink trunk carries, which is NV-W009.
     assert [entry.vlan for entry in radio.wireless.bss] == [10, 20]
 
     phone = inventory.devices["hosts/phone"].spec.interface("en0")
@@ -180,7 +180,7 @@ def test_the_home_lab_joins_the_laptop_through_the_adapter() -> None:
     assert inventory.resolve_fqn("laptop", namespace="hosts") == "hosts/laptop"
 
     cabled = {ref.device for cable in inventory.cables.values() for ref in cable.endpoints}
-    assert "laptop" not in cabled, "an attached_to host must not also be cabled (NG-X005)"
+    assert "laptop" not in cabled, "an attached_to host must not also be cabled (NV-X005)"
 
 
 def test_the_campus_nests_namespaces_three_deep_across_three_sites() -> None:

@@ -183,7 +183,7 @@ COLOUR_PATTERN: Final = _COLOUR_RE.pattern
 
 #: The rule every *value* problem is reported under: a colour that is not a
 #: colour, a view no layer draws, a text that is empty.
-VALUE_RULE: Final = "NG-G003"
+VALUE_RULE: Final = "NV-G003"
 
 #: The rule every *cross-field* problem is reported under: an ``x`` with no
 #: ``y``, a note that is neither anchored nor placed, an area that encloses
@@ -197,7 +197,7 @@ VALUE_RULE: Final = "NG-G003"
 #: So :mod:`netviz.edit.apply` refuses a write that trips :data:`VALUE_RULE`
 #: immediately and lets one that trips this pass, leaving it to the commit gate,
 #: which sees the finished batch. See ``docs/schema.md`` §21.4.
-COHERENCE_RULE: Final = "NG-G005"
+COHERENCE_RULE: Final = "NV-G005"
 
 
 def _colour(value: Any) -> Any:

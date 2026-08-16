@@ -82,7 +82,7 @@ _CONFIG: Final = f"""\
 #
 # Everything here is optional, and what is commented out below is exactly what
 # netviz does without it; the file is generated fully commented on purpose.
-# Rules are named by their short id (E001, W103, I002), by the NG-* alias from
+# Rules are named by their short id (E001, W103, I002), by the NV-* alias from
 # the specification, or by "*" for all of them. Run 'netviz rules' for the
 # catalogue, and 'netviz config show' for the settings as netviz resolves
 # them, each with the place it came from.
@@ -97,7 +97,7 @@ _CONFIG: Final = f"""\
 # Never report these rules at all. 'netviz validate --disable RULE' adds to
 # the list for a single run; a 'netviz/ignore' annotation on an element
 # silences a rule for that element alone.
-# ignore = ["W103", "NG-C010"]
+# ignore = ["W103", "NV-C010"]
 
 # Re-grade a rule instead of silencing it: "error", "warning" or "info".
 # [validate.severity]
@@ -172,7 +172,7 @@ metadata:
     # wan0 faces the ISP, which is not an element of this inventory, so it
     # terminates no cable on purpose. Saying so is what an exception looks
     # like; deleting the rule for everybody would not be.
-    netviz/ignore: NG-C015
+    netviz/ignore: NV-C015
 spec:
   vendor: MikroTik
   vlans:

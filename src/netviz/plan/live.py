@@ -586,7 +586,7 @@ def _adopt_vlan(entry: dict[str, Any], seen: DraftInterface) -> bool:
     (:meth:`~netviz.drift.coverage.Coverage.observes_trunk_vlans`), so an
     observed trunk list is evidence that a VLAN *is* carried and never evidence
     that another one is not: it is merged in, never substituted. That is also
-    what keeps the adoption valid — ``NG-V002`` requires a trunk port to name
+    what keeps the adoption valid — ``NV-V002`` requires a trunk port to name
     the VLANs it carries, and a mode taken from the capture without them would
     produce a document the schema refuses.
     """

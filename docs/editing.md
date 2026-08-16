@@ -457,17 +457,17 @@ beside them. What goes is what two elements in one inventory cannot both have:
 | `metadata.location.position` | — | two things cannot be bolted into the same rack unit |
 | `spec.serial` | — | a serial number names one physical unit |
 | `spec.label` | — | the identifier printed on a cable is on exactly one cable |
-| `spec.login` | `NG-S013` | two accounts cannot share a login |
-| `spec.uid` | `NG-S013` | two users cannot share a uid |
-| `spec.gid` | `NG-S013` | two groups cannot share a gid |
+| `spec.login` | `NV-S013` | two accounts cannot share a login |
+| `spec.uid` | `NV-S013` | two users cannot share a uid |
+| `spec.gid` | `NV-S013` | two groups cannot share a gid |
 | `spec.bridge.address` | — | a bridge address is one bridge component's own MAC address |
-| `spec.interfaces[].mac` | `NG-I008` | a MAC address is unique across the inventory |
-| `spec.interfaces[].ipv4.addresses` | `NG-A004` | a fixed address is claimed by one interface in its subnet |
-| `spec.interfaces[].ipv6.addresses` | `NG-A004` | a fixed address is claimed by one interface in its subnet |
-| `spec.interfaces[].wireless.bss[].bssid` | `NG-W008` | a BSSID is one radio's own MAC address |
-| `spec.power.inputs` | `NG-E010` | one PDU outlet feeds one power supply |
-| `spec.routing.ospf.router_id` | `NG-F012` | two routers cannot share a router id |
-| `spec.routing.bgp.router_id` | `NG-F012` | two routers cannot share a router id |
+| `spec.interfaces[].mac` | `NV-I008` | a MAC address is unique across the inventory |
+| `spec.interfaces[].ipv4.addresses` | `NV-A004` | a fixed address is claimed by one interface in its subnet |
+| `spec.interfaces[].ipv6.addresses` | `NV-A004` | a fixed address is claimed by one interface in its subnet |
+| `spec.interfaces[].wireless.bss[].bssid` | `NV-W008` | a BSSID is one radio's own MAC address |
+| `spec.power.inputs` | `NV-E010` | one PDU outlet feeds one power supply |
+| `spec.routing.ospf.router_id` | `NV-F012` | two routers cannot share a router id |
+| `spec.routing.bgp.router_id` | `NV-F012` | two routers cannot share a router id |
 <!-- /generated -->
 
 Stripping a field tidies up after it: `spec.power` loses `redundant` with its
@@ -487,7 +487,7 @@ A cable is not a property of a switch; it is an element joining two of them. So:
 * a cable with only **one** end in the set is dropped, and named. A cable joining
   a clone to an original is a claim about the network nobody made;
 * copying a cable **on its own** is refused, because the copy would land a second
-  cable on interfaces that already have one (`NG-C001`).
+  cable on interfaces that already have one (`NV-C001`).
 
 Copying a **namespace** copies its subtree: every element below it lands under
 `--to` with the same shape, and the same link rule applies across the whole set.
@@ -662,7 +662,7 @@ sides rather than a half-applied batch and a validator's complaint:
 
 A namespace the loader would skip is refused for the same reason: a folder whose
 name starts with `.` or `_` is not read
-([`NG-L002`](validation-rules.md)), so a document moved there would silently
+([`NV-L002`](validation-rules.md)), so a document moved there would silently
 leave the inventory.
 
 ### What travels with the document
@@ -733,7 +733,7 @@ Four things about it are decisions rather than details.
 
 **An unplaced annotation gets its whole `geometry` block in one write.** A note
 anchored to a switch pins no point, and `spec.geometry.x` written onto it would
-leave a position with no `y` — which §21 refuses under `NG-G005`. So the first
+leave a position with no `y` — which §21 refuses under `NV-G005`. So the first
 drag of an unplaced note sends `spec.geometry` as a mapping, and every drag after
 that sends a field at a time, which is what a reviewer wants to read in the
 changes drawer. It is the same rule

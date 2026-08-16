@@ -193,7 +193,7 @@ adapter hosts/adp-usb-eth
 | Qualified name | hosts/adp-usb-eth |
 | Kind | adapter |
 | Site | [(inventory root)](../sites/root.md) |
-| Description | USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the laptop - there is deliberately no cable between the two (NG-X005). |
+| Description | USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the laptop - there is deliberately no cable between the two (NV-X005). |
 | Vendor | Anker |
 | Model | A83130A1 |
 | Serial | AK2231007744 |
@@ -798,7 +798,7 @@ router routers/rtr-home
 
 | KEY | VALUE |
 |:---|:---|
-| netviz/ignore | NG-C015 |
+| netviz/ignore | NV-C015 |
 
 
 <a id="placement"></a>

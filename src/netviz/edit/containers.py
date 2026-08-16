@@ -97,7 +97,7 @@ def check_namespace(namespace: str) -> str:
     if any(part.startswith((".", "_")) for part in path.parts):
         raise PlacementError(
             f"{namespace!r} starts a path component with '.' or '_', which the loader skips "
-            f"(NG-L002); nothing moved there would be part of the inventory"
+            f"(NV-L002); nothing moved there would be part of the inventory"
         )
     # The same rules as the file that will land in it, so a namespace and the
     # document in it can never disagree about what is legal. Asked of a name the

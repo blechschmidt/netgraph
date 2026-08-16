@@ -118,7 +118,7 @@ window.netvizContainers = (function () {
     var graph = root && root.querySelector("g.graph");
     if (graph) {
       Array.prototype.forEach.call(
-        graph.querySelectorAll("g.ng-containers, g.ng-container-tools"),
+        graph.querySelectorAll("g.nv-containers, g.nv-container-tools"),
         function (stale) { stale.remove(); }
       );
     }
@@ -138,7 +138,7 @@ window.netvizContainers = (function () {
     if (!graph || !frame.grouped) { picked = null; return; }
     frame.offset = measureOffset(graph, geometry, details || {});
     host = document.createElementNS(SVG_NS, "g");
-    host.setAttribute("class", "ng-containers");
+    host.setAttribute("class", "nv-containers");
     // Furniture, not content: every name and count the overlay shows is in the
     // element list a screen reader already walks. See a11y.js.
     host.setAttribute("aria-hidden", "true");
@@ -151,7 +151,7 @@ window.netvizContainers = (function () {
     var first = graph.querySelector("g");
     if (first) { graph.insertBefore(host, first); } else { graph.appendChild(host); }
     tools = document.createElementNS(SVG_NS, "g");
-    tools.setAttribute("class", "ng-container-tools");
+    tools.setAttribute("class", "nv-container-tools");
     tools.setAttribute("aria-hidden", "true");
     graph.appendChild(tools);
     if (picked && !frame.byNs[picked]) { picked = null; }
@@ -322,7 +322,7 @@ window.netvizContainers = (function () {
   function rectangle(entry, box) {
     var node = document.createElementNS(SVG_NS, "rect");
     node.setAttribute("class",
-      "ng-container" + (entry.namespace === picked ? " ng-container-picked" : ""));
+      "nv-container" + (entry.namespace === picked ? " nv-container-picked" : ""));
     node.setAttribute("x", String(round(box.x)));
     node.setAttribute("y", String(round(box.y)));
     node.setAttribute("width", String(Math.max(round(box.w), 1)));
@@ -341,7 +341,7 @@ window.netvizContainers = (function () {
    */
   function header(entry, box) {
     var band = document.createElementNS(SVG_NS, "rect");
-    band.setAttribute("class", "ng-container-header");
+    band.setAttribute("class", "nv-container-header");
     band.setAttribute("x", String(round(box.x)));
     band.setAttribute("y", String(round(box.y - HEADER)));
     band.setAttribute("width", String(Math.max(round(box.w), 1)));
@@ -349,7 +349,7 @@ window.netvizContainers = (function () {
     band.setAttribute("data-container", entry.namespace);
 
     var toggle = document.createElementNS(SVG_NS, "text");
-    toggle.setAttribute("class", "ng-container-toggle");
+    toggle.setAttribute("class", "nv-container-toggle");
     toggle.setAttribute("x", String(round(box.x + 5)));
     toggle.setAttribute("y", String(round(box.y - 4)));
     toggle.setAttribute("font-size", String(CAPTION));
@@ -359,7 +359,7 @@ window.netvizContainers = (function () {
     toggle.textContent = entry.collapsed ? "▸" : "▾";
 
     var caption = document.createElementNS(SVG_NS, "text");
-    caption.setAttribute("class", "ng-container-label");
+    caption.setAttribute("class", "nv-container-label");
     caption.setAttribute("x", String(round(box.x + 16)));
     caption.setAttribute("y", String(round(box.y - 4)));
     caption.setAttribute("font-size", String(CAPTION));
@@ -374,7 +374,7 @@ window.netvizContainers = (function () {
 
   function highlight(box) {
     var node = document.createElementNS(SVG_NS, "rect");
-    node.setAttribute("class", "ng-container-drop");
+    node.setAttribute("class", "nv-container-drop");
     node.setAttribute("x", String(round(box.x)));
     node.setAttribute("y", String(round(box.y)));
     node.setAttribute("width", String(Math.max(round(box.w), 1)));
@@ -385,7 +385,7 @@ window.netvizContainers = (function () {
   function corners(box) {
     return ["nw", "ne", "se", "sw"].map(function (which) {
       var node = document.createElementNS(SVG_NS, "circle");
-      node.setAttribute("class", "ng-container-handle");
+      node.setAttribute("class", "nv-container-handle");
       node.setAttribute("cx", String(round(
         which === "ne" || which === "se" ? box.x + box.w : box.x)));
       node.setAttribute("cy", String(round(
@@ -511,7 +511,7 @@ window.netvizContainers = (function () {
   function grab(event) {
     if (!ctx || !ctx.writable() || !frame.grouped || !host) { return false; }
     var target = event.target;
-    if (target && target.classList && target.classList.contains("ng-container-handle")) {
+    if (target && target.classList && target.classList.contains("nv-container-handle")) {
       var chosen = selection();
       if (!chosen) { return false; }
       beginResize(chosen, target.getAttribute("data-which"), event);

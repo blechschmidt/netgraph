@@ -282,7 +282,7 @@ python -m http.server -d site 8000
 
 The build fails if any example stops rendering or any link points at nothing
 published; `tests/test_site.py` asserts the same things, plus that the anchors it
-derives are the ones every `NG-*` help URL promises.
+derives are the ones every `NV-*` help URL promises.
 
 ## Documentation conventions
 
@@ -340,13 +340,13 @@ Rule(
     "W133",
     Severity.WARNING,
     "A cabled patch-panel position is coupled to one nothing is patched into.",
-    ("NG-P002",),
+    ("NV-P002",),
     title="patch run stops inside the panel",
 )
 ```
 
 The letter is the *default* severity — `E` error, `W` warning, `I` info — and the
-rule keeps its id when an inventory re-grades it. The tuple is the `NG-*` alias
+rule keeps its id when an inventory re-grades it. The tuple is the `NV-*` alias
 from `docs/schema.md` §10, which keeps the published specification and the
 implementation from drifting apart; both spellings are accepted everywhere a rule
 can be named. `title` is what `Rule.anchor` and `Rule.help_uri` build the deep
@@ -387,14 +387,14 @@ heading, in id order, with the shape every other rule uses:
 ```markdown
 #### `W133` — patch run stops inside the panel
 
-*Alias: `NG-P002`. Severity: warning.*
+*Alias: `NV-P002`. Severity: warning.*
 
 A patch-panel position terminates a cable, and the position its coupler leads
 to terminates none.
 
 **Why it matters.** …
 
-**Suppress with** `W133` / `NG-P002`, or an annotation on the cable or the
+**Suppress with** `W133` / `NV-P002`, or an annotation on the cable or the
 panel. …
 ```
 

@@ -70,26 +70,26 @@ class Template(NetvizModel):
     @model_validator(mode="before")
     @classmethod
     def _reject_non_mapping_spec(cls, value: Any) -> Any:
-        """``NG-M005`` — say "spec must be a mapping", not "not a valid dict"."""
+        """``NV-M005`` — say "spec must be a mapping", not "not a valid dict"."""
         if isinstance(value, dict) and "spec" in value and not isinstance(value["spec"], dict):
             raise field_error(
                 "a template 'spec' must be a mapping of device-spec keys, got "
                 f"{type(value['spec']).__name__}",
-                rule="NG-M005",
+                rule="NV-M005",
                 path=("spec",),
             )
         return value
 
     @model_validator(mode="after")
     def _check_spec_keys(self) -> Template:
-        """``NG-M005`` — a template may only carry keys a device ``spec`` has."""
+        """``NV-M005`` — a template may only carry keys a device ``spec`` has."""
         for key in self.spec:
             if key not in TEMPLATE_SPEC_KEYS:
                 permitted = ", ".join(sorted(TEMPLATE_SPEC_KEYS))
                 raise field_error(
                     f"unknown key {echo_value(key)} in a template spec; "
                     f"expected one of {permitted}",
-                    rule="NG-M005",
+                    rule="NV-M005",
                     path=("spec", key),
                 )
         return self

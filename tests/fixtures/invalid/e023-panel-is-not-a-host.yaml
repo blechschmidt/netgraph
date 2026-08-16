@@ -1,4 +1,4 @@
-# E023 (NG-P004) - an adapter is plugged into a patch panel.
+# E023 (NV-P004) - an adapter is plugged into a patch panel.
 #
 # A panel is passive: it has no host bus for a dongle to hang off. The run this
 # was meant to describe is a cable into one of the panel's positions.

@@ -112,7 +112,7 @@ DEFAULT_LEGEND_FILL: Final = "#ffffff"
 _STROKE_FACTOR: Final = 0.55
 
 #: A colour any backend may interpolate. The model already refuses anything else
-#: (``NG-G003``), but the renderers write colours into DOT attributes, HTML-like
+#: (``NV-G003``), but the renderers write colours into DOT attributes, HTML-like
 #: label attributes, Mermaid ``classDef`` rules and mxGraph styles, and a value
 #: that reaches four parsers should be re-checked at the boundary rather than
 #: trusted because something upstream promised.

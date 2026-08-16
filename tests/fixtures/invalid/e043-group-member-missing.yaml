@@ -1,4 +1,4 @@
-# E043 (NG-S010) - a group names a member the inventory has not got.
+# E043 (NV-S010) - a group names a member the inventory has not got.
 #
 # 'engineering' lists 'ghost', which no document declares. The group still
 # renders, still has a member, and still looks like a list of two people --

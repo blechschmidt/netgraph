@@ -1,4 +1,4 @@
-# W105 (NG-A008) - a subnet holds exactly one element.
+# W105 (NV-A008) - a subnet holds exactly one element.
 #
 # 'pc-a:eth1' is the only interface in 192.168.99.0/24: the mask was meant to be
 # /16, or the device the port faces was never written down. Everything else here

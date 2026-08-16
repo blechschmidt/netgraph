@@ -172,7 +172,7 @@ def _temporary_for(path: Path) -> Path:
     Three things are true of the name at once, and each is load-bearing:
 
     * It **starts with a dot**, which is the loader's own rule for "do not read
-      this" (``NG-L002``), so a leftover from a killed process is inert rather
+      this" (``NV-L002``), so a leftover from a killed process is inert rather
       than a phantom element with a syntax error.
     * It **ends in .tmp**, for a human looking at the directory.
     * It is **unique to this writer**. Two processes filling one parse cache aim

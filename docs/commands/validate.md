@@ -105,7 +105,7 @@ errors (1):
 it the default for a tree and no command-line flag undoes that.
 
 `--disable RULE` silences a rule by id. It is repeatable, accepts the short id or
-either `NG-*` alias, and accepts `*` for all of them. It **adds** to whatever
+either `NV-*` alias, and accepts `*` for all of them. It **adds** to whatever
 `netviz.toml` already ignores and cannot re-enable a rule the file disabled. The
 two flags combine in the obvious way — be strict about everything except the
 exceptions you have decided are exceptions:
@@ -122,8 +122,8 @@ what you could have meant instead:
 
 <!-- run: rc=2 -->
 ```console
-$ netviz -i examples/quickstart validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
+$ netviz -i examples/quickstart validate --disable NV-D005
+error: --disable: 'NV-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NV-* alias from docs/schema.md §10, or '*'
 ```
 
 A suppression that belongs to the inventory rather than to one command line
@@ -283,7 +283,7 @@ composite GitHub Action and the pre-commit hook this repository ships.
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
 | `--strict` | — | off | Promote every warning to an error, so any finding fails the run. |
-| `--disable` | `RULE` | — | Silence a rule by id (E001, NG-C002, ...). Repeatable. |
+| `--disable` | `RULE` | — | Silence a rule by id (E001, NV-C002, ...). Repeatable. |
 | `-F`, `--output-format` | `[text\|json\|sarif\|github]` | `text` | text is for reading; json, sarif and github are for CI. |
 | `--fix` | — | off | Repair every problem that has one unambiguous mechanical fix, then report what is left. A fix that would introduce a new finding is undone and reported instead. |
 | `-n`, `--dry-run` | — | off | With --fix: print the unified diff the repairs would apply, and write nothing. |

@@ -1,4 +1,4 @@
-# W114 (NG-V006) - the native VLAN is missing from 'trunk_vlans'.
+# W114 (NV-V006) - the native VLAN is missing from 'trunk_vlans'.
 #
 # VLAN 20 is carried untagged on the port whether or not it is listed, so the
 # document reads as one VLAN narrower than the port actually is. Only 'sw-a' is

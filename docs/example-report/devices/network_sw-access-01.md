@@ -14,7 +14,7 @@ switch network/sw-access-01
 | Qualified name | network/sw-access-01 |
 | Kind | switch |
 | Site | [(inventory root)](../sites/root.md) |
-| Description | PoE access switch in rack r2. Its uplink leaves the rack through the panel above it, exactly as the server links do; its two PoE ports feed a ceiling access point and a lobby camera, neither of which has a power cord. The switch itself is dual-corded: 'psu1' to the A-side strip, 'psu2' to the B-side one. Both strips are in this rack, and they are on different input feeds, which is what makes 'redundant: true' true (NG-E015). |
+| Description | PoE access switch in rack r2. Its uplink leaves the rack through the panel above it, exactly as the server links do; its two PoE ports feed a ceiling access point and a lobby camera, neither of which has a power cord. The switch itself is dual-corded: 'psu1' to the A-side strip, 'psu2' to the B-side one. Both strips are in this rack, and they are on different input feeds, which is what makes 'redundant: true' true (NV-E015). |
 | Vendor | Cisco |
 | Model | C9300-24P |
 | Serial | — |

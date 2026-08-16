@@ -16,7 +16,7 @@ metadata:
     # for exactly this reason - but the schema has no type that says "macvlan
     # slave" or "tap", so nothing here distinguishes them from a spare port.
     # See follow-up 26 in docs/follow-ups.md.
-    netviz/ignore: NG-C015
+    netviz/ignore: NV-C015
 spec:
   vendor: Supermicro
   model: SYS-5019C-MR

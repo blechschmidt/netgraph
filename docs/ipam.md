@@ -235,12 +235,12 @@ inventory is reported at the severity the inventory chose.
 
 | Conflict | Rule | Reimplemented? |
 |---|---|---|
-| A duplicate host address within a prefix, in one broadcast domain | [`E004`](validation-rules.md#e004--duplicate-ip-address) (`NG-A004`) | No — the existing rule is called. |
-| The same address claimed twice within a prefix, across broadcast domains | [`W106`](validation-rules.md#w106--one-address-claimed-twice-in-a-subnet) (`NG-A009`) | No — the existing rule is called. |
-| Prefixes that overlap but are not nested | [`W130`](validation-rules.md#w130--prefix-claimed-by-two-broadcast-domains) (`NG-A010`) | New rule. |
-| A nested prefix whose parent is declared in a different VLAN | [`W131`](validation-rules.md#w131--nested-prefix-in-a-different-broadcast-domain) (`NG-A011`) | New rule. |
-| An address configured outside every prefix on its link | [`W132`](validation-rules.md#w132--address-outside-every-prefix-on-its-link) (`NG-A012`) | New rule. |
-| A gateway / first hop outside its own subnet | [`E020`](validation-rules.md#e020--first-hop-is-not-on-link) (`NG-A013`) | New rule. |
+| A duplicate host address within a prefix, in one broadcast domain | [`E004`](validation-rules.md#e004--duplicate-ip-address) (`NV-A004`) | No — the existing rule is called. |
+| The same address claimed twice within a prefix, across broadcast domains | [`W106`](validation-rules.md#w106--one-address-claimed-twice-in-a-subnet) (`NV-A009`) | No — the existing rule is called. |
+| Prefixes that overlap but are not nested | [`W130`](validation-rules.md#w130--prefix-claimed-by-two-broadcast-domains) (`NV-A010`) | New rule. |
+| A nested prefix whose parent is declared in a different VLAN | [`W131`](validation-rules.md#w131--nested-prefix-in-a-different-broadcast-domain) (`NV-A011`) | New rule. |
+| An address configured outside every prefix on its link | [`W132`](validation-rules.md#w132--address-outside-every-prefix-on-its-link) (`NV-A012`) | New rule. |
+| A gateway / first hop outside its own subnet | [`E020`](validation-rules.md#e020--first-hop-is-not-on-link) (`NV-A013`) | New rule. |
 
 The first two rows are the "duplicate host addresses within a prefix" check.
 The validator already distinguishes a clash inside one broadcast domain — an

@@ -1,4 +1,4 @@
-# W146 (NG-N026) - a declared network namespace nothing is in.
+# W146 (NV-N026) - a declared network namespace nothing is in.
 #
 # A namespace is a stack, and a stack with no interface holds no address, has no
 # route and has no way in or out. The isolation the document declares does not

@@ -32,7 +32,7 @@ that is already there and leaves the rest unapplied). A VRF becomes ``vrf
 
 ``ip rule`` has no ``replace``, so a policy rule is written as a ``del`` of
 whatever sits at its priority followed by an ``add`` — which is the same
-guarantee by other means, since a priority holds one rule (``NG-F020``) and the
+guarantee by other means, since a priority holds one rule (``NV-F020``) and the
 ``del`` is allowed to fail. A declared table is written as its **number**, with
 its name in a trailing comment: a name works only if somebody has put it in
 ``/etc/iproute2/rt_tables``, and a script that edits that file is a script that
@@ -221,7 +221,7 @@ def _rule_commands(spec: DeviceSpec) -> Iterator[str]:
 
     Each rule is a ``del`` of the priority followed by an ``add`` of the rule,
     which is how ``ip rule`` is made idempotent: it has no ``replace``, a
-    priority holds one rule (``NG-F020``), and a ``del`` that matches nothing is
+    priority holds one rule (``NV-F020``), and a ``del`` that matches nothing is
     the normal case on a first run rather than a failure. ``|| :`` is what says
     so to the ``set -e`` at the top of the file.
 
@@ -273,7 +273,7 @@ def _selector_words(rule: PolicyRule) -> Iterator[str]:
 def _target_words(spec: DeviceSpec, rule: PolicyRule) -> tuple[list[str], str]:
     """What the rule does, and the comment naming the table it does it to."""
     if rule.action is PolicyAction.LOOKUP:
-        assert rule.table is not None  # NG-F016: a lookup always names one
+        assert rule.table is not None  # NV-F016: a lookup always names one
         table, comment = _table_words(spec, rule.table, keyword="lookup")
         return table, comment
     if rule.action is PolicyAction.GOTO:

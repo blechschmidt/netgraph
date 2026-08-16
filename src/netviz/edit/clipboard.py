@@ -116,7 +116,7 @@ class UniqueField:
 
     #: The field path, ``*`` meaning every entry of a sequence.
     path: tuple[str, ...]
-    #: The ``NG-*`` rule a copy that kept it would break, or ``""`` when the
+    #: The ``NV-*`` rule a copy that kept it would break, or ``""`` when the
     #: reason is physical rather than checkable.
     rule: str
     #: Why it cannot be shared, in one clause.
@@ -156,11 +156,11 @@ UNIQUE_FIELDS: Final[tuple[UniqueField, ...]] = (
     ),
     UniqueField(
         path=("spec", "login"),
-        rule="NG-S013",
+        rule="NV-S013",
         why="two accounts cannot share a login",
     ),
-    UniqueField(path=("spec", "uid"), rule="NG-S013", why="two users cannot share a uid"),
-    UniqueField(path=("spec", "gid"), rule="NG-S013", why="two groups cannot share a gid"),
+    UniqueField(path=("spec", "uid"), rule="NV-S013", why="two users cannot share a uid"),
+    UniqueField(path=("spec", "gid"), rule="NV-S013", why="two groups cannot share a gid"),
     UniqueField(
         path=("spec", "bridge", "address"),
         rule="",
@@ -168,37 +168,37 @@ UNIQUE_FIELDS: Final[tuple[UniqueField, ...]] = (
     ),
     UniqueField(
         path=("spec", "interfaces", "*", "mac"),
-        rule="NG-I008",
+        rule="NV-I008",
         why="a MAC address is unique across the inventory",
     ),
     UniqueField(
         path=("spec", "interfaces", "*", "ipv4", "addresses"),
-        rule="NG-A004",
+        rule="NV-A004",
         why="a fixed address is claimed by one interface in its subnet",
     ),
     UniqueField(
         path=("spec", "interfaces", "*", "ipv6", "addresses"),
-        rule="NG-A004",
+        rule="NV-A004",
         why="a fixed address is claimed by one interface in its subnet",
     ),
     UniqueField(
         path=("spec", "interfaces", "*", "wireless", "bss", "*", "bssid"),
-        rule="NG-W008",
+        rule="NV-W008",
         why="a BSSID is one radio's own MAC address",
     ),
     UniqueField(
         path=("spec", "power", "inputs"),
-        rule="NG-E010",
+        rule="NV-E010",
         why="one PDU outlet feeds one power supply",
     ),
     UniqueField(
         path=("spec", "routing", "ospf", "router_id"),
-        rule="NG-F012",
+        rule="NV-F012",
         why="two routers cannot share a router id",
     ),
     UniqueField(
         path=("spec", "routing", "bgp", "router_id"),
-        rule="NG-F012",
+        rule="NV-F012",
         why="two routers cannot share a router id",
     ),
 )
@@ -261,7 +261,7 @@ def _tidy(document: MutableMapping[str, Any], removed: set[str]) -> None:
     copy no longer supports, and the validator says so:
 
     * ``spec.power.redundant`` claims the device survives losing a feed, which
-      is an assertion about feeds that are no longer written (``NG-E002``);
+      is an assertion about feeds that are no longer written (``NV-E002``);
     * ``ipv4.gateway`` is a first hop, and a first hop is resolved by neighbour
       discovery — with no address on the interface there is no on-link prefix
       for it to be in, which is ``E020``;
@@ -647,7 +647,7 @@ def _choose_names(
             if qualify(target_namespace, chosen_name) in taken:
                 raise EditError(
                     f"{qualify(target_namespace, chosen_name)} already exists; "
-                    f"a name is unique within its namespace (NG-N002)"
+                    f"a name is unique within its namespace (NV-N002)"
                 )
         else:
             here = short_name(source.fqn)

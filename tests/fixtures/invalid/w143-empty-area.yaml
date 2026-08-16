@@ -1,4 +1,4 @@
-# W143 (NG-G004) - an area selects nothing.
+# W143 (NV-G004) - an area selects nothing.
 #
 # The zone asks for everything labelled 'zone: dmz' and no element carries that
 # label, so the box encloses nothing and is not drawn. An empty box on a diagram

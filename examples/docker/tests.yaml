@@ -15,7 +15,7 @@ spec:
       name: every declared namespace holds at least one interface
       description: |
         `ip netns add` makes an empty one, so this is legal - and far more often
-        it is isolation somebody declared and never wired up. NG-N026 says the
+        it is isolation somebody declared and never wired up. NV-N026 says the
         same thing; this says it in the language a reader can extend.
       query: netns[not has interface]
 

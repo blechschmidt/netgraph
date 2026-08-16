@@ -210,7 +210,7 @@ metadata:
   annotations:
     # wan0 faces the ISP, which is not an element of this inventory, so it
     # terminates no cable on purpose.
-    netviz/ignore: NG-C015
+    netviz/ignore: NV-C015
 spec:
   vendor: MikroTik
   interfaces:
@@ -244,7 +244,7 @@ normalise to the same value.
 The `netviz/ignore` annotation is the one line here that is about the
 *validator* rather than about the network. `wan0` faces an ISP that this
 inventory does not model, so it terminates no cable, and netviz would otherwise
-mention it as `I002` (`NG-C015`, "enabled but terminates no cable"). Annotating
+mention it as `I002` (`NV-C015`, "enabled but terminates no cable"). Annotating
 the one element that has a reason is what an exception should look like; turning
 the rule off for the whole tree would not be. See
 [`docs/validation.md`](validation.md).

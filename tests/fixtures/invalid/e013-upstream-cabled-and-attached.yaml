@@ -1,4 +1,4 @@
-# E013 (NG-X005) - the host attachment is declared twice.
+# E013 (NV-X005) - the host attachment is declared twice.
 #
 # 'adp-a' says it is plugged into 'laptop' with 'attached_to', and a cable says
 # the same thing again. The hardware has one plug; the two spellings can drift.

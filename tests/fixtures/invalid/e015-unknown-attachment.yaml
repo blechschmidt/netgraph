@@ -1,4 +1,4 @@
-# E015 (NG-X001) - 'attached_to' names an element that is not declared.
+# E015 (NV-X001) - 'attached_to' names an element that is not declared.
 #
 # Nothing called 'ghost-host' exists, so the renderer drops the attachment edge
 # and the dongle is drawn floating. One element means no W121 island to report.

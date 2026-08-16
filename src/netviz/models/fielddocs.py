@@ -188,7 +188,7 @@ KIND_NOTES: Final[dict[str, str]] = {
     "user": "One identity: a person, a service account or a shared login. Owns no interfaces "
     "and terminates no cable; it is drawn only in the `identity` view.",
     "group": "A named set of identities. `members` may name a `user` or another `group`, which "
-    "is what makes a hierarchy expressible; the nesting must not loop (`NG-S012`).",
+    "is what makes a hierarchy expressible; the nesting must not loop (`NV-S012`).",
     "template": "A named partial device spec, merged into every device that names it in "
     "`spec.from`. Not an element: never drawn, never listed, never validated on its own.",
     "layout": "Diagram geometry for elements declared elsewhere, scoped by view. Not an "
@@ -213,7 +213,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     # -- envelope ----------------------------------------------------------
     ("ElementBase", "api_version"): Doc(
         "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this "
-        "release; an unknown value is `NG-D002`."
+        "release; an unknown value is `NV-D002`."
     ),
     ("ElementBase", "kind"): Doc(
         "Which element this document declares. Selects the shape of `spec`, and is the "
@@ -222,7 +222,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("ElementBase", "metadata"): Doc("Identity, description, labels and annotations."),
     # -- metadata ----------------------------------------------------------
     ("Metadata", "name"): Doc(
-        "Element name, unique within its namespace across all kinds (`NG-N002`). The namespace "
+        "Element name, unique within its namespace across all kinds (`NV-N002`). The namespace "
         "is the directory the document was found in."
     ),
     ("Metadata", "description"): Doc(
@@ -230,7 +230,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("Metadata", "location"): Doc(
         "Where the hardware physically is: site, room, rack and the rack units it occupies. "
-        "Drives `--layer rack` and the placement rules `NG-U001` to `NG-U004`."
+        "Drives `--layer rack` and the placement rules `NV-U001` to `NV-U004`."
     ),
     ("Metadata", "labels"): Doc(
         "Selector-friendly key/value pairs. Keys follow the Kubernetes label grammar; the "
@@ -245,18 +245,18 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("Location", "room"): Doc("Room or floor within the site, free text."),
     ("Location", "rack"): Doc(
         "Rack identifier, unique within its room. Naming one is what puts the element on an "
-        "elevation; site, room and rack together identify the rack (`NG-U001`)."
+        "elevation; site, room and rack together identify the rack (`NV-U001`)."
     ),
     ("Location", "position"): Doc(
         "Lowest rack unit the element occupies, counted from 1 at the bottom of the rack. "
-        "Requires `rack` (`NG-U004`)."
+        "Requires `rack` (`NV-U004`)."
     ),
     ("Location", "height"): Doc(
         "How many rack units the element occupies, upwards from `position`."
     ),
     ("Location", "rack_height"): Doc(
         "How tall the rack itself is. Any element in the rack may declare it; two that "
-        "disagree are `NG-U003`, and nothing may extend past it (`NG-U002`)."
+        "disagree are `NV-U003`, and nothing may extend past it (`NV-U002`)."
     ),
     # -- device spec -------------------------------------------------------
     ("DeviceSpec", "vendor"): Doc("Hardware vendor, free text. Documentation only."),
@@ -285,11 +285,11 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("NetnsDefinition", "name"): Doc(
         "Name of the namespace, as `ip netns` spells it. Unique within the device "
-        "(`NG-N020`), and what `interfaces[].netns` and another entry's `parent` refer to.",
+        "(`NV-N020`), and what `interfaces[].netns` and another entry's `parent` refer to.",
         NONE,
     ),
     ("NetnsDefinition", "parent"): Doc(
-        "The namespace this one was created inside (`NG-N021`). Unset means the machine's "
+        "The namespace this one was created inside (`NV-N021`). Unset means the machine's "
         "initial namespace. This is the whole of the hierarchy: a namespace has exactly one "
         "creator, so nesting is a tree.",
         NONE,
@@ -326,7 +326,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("DeviceSpec", "zones"): Doc(
         "The security zones the device divides its interfaces into (§24.1). Policy is written "
         "*between* zones rather than between interfaces, so a rule survives a port being "
-        "renamed, doubled or moved to a LAG. An interface is in at most one zone (`NG-B003`).",
+        "renamed, doubled or moved to a LAG. An interface is in at most one zone (`NV-B003`).",
         NONE,
     ),
     ("DeviceSpec", "firewall"): Doc(
@@ -368,7 +368,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     # -- VLAN database -----------------------------------------------------
     ("VlanDefinition", "id"): Doc(
-        "VLAN identifier. Unique within the device (`NG-V001`).",
+        "VLAN identifier. Unique within the device (`NV-V001`).",
         "…/dot1q:bridge-vlan/dot1q:vlan/dot1q:vid",
     ),
     ("VlanDefinition", "name"): Doc(
@@ -378,7 +378,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("VlanDefinition", "description"): Doc("Free text. netviz-only; 802.1Q has no such node."),
     # -- routing (§16) -----------------------------------------------------
     ("VrfDefinition", "name"): Doc(
-        "Name of the routing instance. Unique within the device (`NG-F001`), and what an "
+        "Name of the routing instance. Unique within the device (`NV-F001`), and what an "
         "interface's `vrf` and a route's `vrf` refer to. Two devices using one name mean one VRF.",
         "/ni:network-instances/ni:network-instance/ni:name",
     ),
@@ -393,12 +393,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("RouteTable", "name"): Doc(
         "Name of the routing table. Unique within the device, and not one of the reserved "
-        "`main`, `local` or `default`, which exist without being declared (`NG-F015`).",
+        "`main`, `local` or `default`, which exist without being declared (`NV-F015`).",
         NONE,
     ),
     ("RouteTable", "id"): Doc(
         "The number the table is known by, 1-4294967295. Unique within the device, and not "
-        "253, 254 or 255 — those are the reserved three under another name (`NG-F015`).",
+        "253, 254 or 255 — those are the reserved three under another name (`NV-F015`).",
         NONE,
     ),
     ("RouteTable", "description"): Doc("Free text: what the table is for."),
@@ -408,24 +408,24 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "…/rt:static-routes/v4ur:ipv4/v4ur:route/v4ur:destination-prefix",
     ),
     ("StaticRoute", "via"): Doc(
-        "Next-hop address. Same family as `prefix` (`NG-F003`), and on a prefix the device "
-        "configures (`NG-F008`).",
+        "Next-hop address. Same family as `prefix` (`NV-F003`), and on a prefix the device "
+        "configures (`NV-F008`).",
         "…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address",
     ),
     ("StaticRoute", "dev"): Doc(
         "Egress interface, for an unnumbered next hop or a route pointed at an interface. Names "
-        "an interface of this device (`NG-F009`).",
+        "an interface of this device (`NV-F009`).",
         "…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface",
     ),
     ("StaticRoute", "vrf"): Doc(
-        "The routing instance holding the route. Names an entry of `spec.vrfs` (`NG-F005`); "
+        "The routing instance holding the route. Names an entry of `spec.vrfs` (`NV-F005`); "
         "unset means the global instance.",
         "/ni:network-instances/ni:network-instance/ni:name",
     ),
     ("StaticRoute", "table"): Doc(
         "The routing table holding the route; `main` when unset. Names an entry of "
-        "`spec.route_tables` or a reserved table (`NG-F019`). A VRF is a table of its own, so "
-        "`vrf` and `table` are alternatives, not a pair (`NG-F018`).",
+        "`spec.route_tables` or a reserved table (`NV-F019`). A VRF is a table of its own, so "
+        "`vrf` and `table` are alternatives, not a pair (`NV-F018`).",
         NONE,
     ),
     ("StaticRoute", "metric"): Doc(
@@ -434,13 +434,13 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         NONE,
     ),
     ("StaticRoute", "blackhole"): Doc(
-        "Discard matching packets. Excludes `via` and `dev` (`NG-F004`).",
+        "Discard matching packets. Excludes `via` and `dev` (`NV-F004`).",
         "…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop",
     ),
     ("PolicyRule", "priority"): Doc(
         "Where the rule sits in the policy database, 0-4294967295. The database is walked "
         "from the lowest priority upwards and the first match decides, so this is the rule's "
-        "position and its identity: unique within the device per family (`NG-F020`).",
+        "position and its identity: unique within the device per family (`NV-F020`).",
         NONE,
     ),
     ("PolicyRule", "family"): Doc(
@@ -462,12 +462,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("PolicyRule", "iif"): Doc(
         "Match packets that arrived on this interface. Names an interface of this device "
-        "(`NG-F021`).",
+        "(`NV-F021`).",
         NONE,
     ),
     ("PolicyRule", "oif"): Doc(
         "Match packets that would leave by this interface — locally originated traffic from a "
-        "socket bound to it. Names an interface of this device (`NG-F021`).",
+        "socket bound to it. Names an interface of this device (`NV-F021`).",
         NONE,
     ),
     ("PolicyRule", "dscp"): Doc(
@@ -475,7 +475,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         NONE,
     ),
     ("PolicyRule", "invert"): Doc(
-        "Match everything the selectors do *not*. Needs a selector to invert (`NG-F017`).",
+        "Match everything the selectors do *not*. Needs a selector to invert (`NV-F017`).",
         NONE,
     ),
     ("PolicyRule", "action"): Doc(
@@ -486,31 +486,31 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("PolicyRule", "table"): Doc(
         "The table to route by. Required by `lookup` and refused by every other action "
-        "(`NG-F016`); names an entry of `spec.route_tables`, a VRF, or a reserved table "
-        "(`NG-F019`).",
+        "(`NV-F016`); names an entry of `spec.route_tables`, a VRF, or a reserved table "
+        "(`NV-F019`).",
         NONE,
     ),
     ("PolicyRule", "goto"): Doc(
         "The priority to jump to. Required by `goto` and refused by every other action "
-        "(`NG-F016`), and strictly greater than this rule's own — the database is walked "
+        "(`NV-F016`), and strictly greater than this rule's own — the database is walked "
         "upwards, so a backwards jump is a loop.",
         NONE,
     ),
     ("PolicyRule", "description"): Doc("Free text: what the rule is for."),
     ("Zone", "name"): Doc(
         "Name of the zone. Unique within the device, and not `local`, which is the machine "
-        "itself and is nameable in a rule without being declared (`NG-B001`).",
+        "itself and is nameable in a rule without being declared (`NV-B001`).",
         NONE,
     ),
     ("Zone", "interfaces"): Doc(
-        "The interfaces in this zone. Each names an interface of this device (`NG-B002`), and "
-        "no interface is in two zones (`NG-B003`). A zone holding none is inert (`W150`).",
+        "The interfaces in this zone. Each names an interface of this device (`NV-B002`), and "
+        "no interface is in two zones (`NV-B003`). A zone holding none is inert (`W150`).",
         NONE,
     ),
     ("Zone", "description"): Doc("Free text: what the zone is for."),
     ("FirewallConfig", "default_input"): Doc(
         "What a packet *for this machine* gets when no rule decides. One of `accept`, `drop` "
-        "and `reject` — a default has to decide (`NG-B007`). Defaults to `drop`.",
+        "and `reject` — a default has to decide (`NV-B007`). Defaults to `drop`.",
         NONE,
     ),
     ("FirewallConfig", "default_forward"): Doc(
@@ -536,7 +536,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("FirewallConfig", "description"): Doc("Free text: what the policy as a whole is for."),
     ("FirewallRule", "priority"): Doc(
-        "Unique within the device, per family (`NG-B008`). The chain is walked from the lowest "
+        "Unique within the device, per family (`NV-B008`). The chain is walked from the lowest "
         "priority upwards; the first rule whose action is terminal decides, and nothing after "
         "it is consulted.",
         NONE,
@@ -547,25 +547,25 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("FirewallRule", "src_zone"): Doc(
         "The zone the packet came from: a declared zone, or `local` for traffic this machine "
-        "generated (`NG-B004`). Unset matches any zone.",
+        "generated (`NV-B004`). Unset matches any zone.",
         NONE,
     ),
     ("FirewallRule", "dst_zone"): Doc(
-        "The zone the packet is going to, on the same terms (`NG-B004`). Together with "
+        "The zone the packet is going to, on the same terms (`NV-B004`). Together with "
         "`src_zone` this decides the hook: `to: local` is input, `from: local` is output, two "
         "real zones are forward.",
         NONE,
     ),
     ("FirewallRule", "family"): Doc(
         "Which family's chain the rule is in. Omit to install in both, and derive from `src`, "
-        "`dst` or `protocol` when possible (`NG-B005`); `ipv4` and `ipv6` are explicit.",
+        "`dst` or `protocol` when possible (`NV-B005`); `ipv4` and `ipv6` are explicit.",
         NONE,
     ),
     ("FirewallRule", "src"): Doc("Source prefix selector. Either family; optional.", NONE),
     ("FirewallRule", "dst"): Doc("Destination prefix selector, on the same terms.", NONE),
     ("FirewallRule", "protocol"): Doc(
         "The IP protocol. Required by `src_ports` and `dst_ports`, which only `tcp`, `udp` and "
-        "`sctp` have (`NG-B005`). `icmp` is IPv4 and `icmpv6` is IPv6, and stating one against "
+        "`sctp` have (`NV-B005`). `icmp` is IPv4 and `icmpv6` is IPv6, and stating one against "
         "the other family is refused.",
         NONE,
     ),
@@ -584,14 +584,14 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         NONE,
     ),
     ("FirewallRule", "iif"): Doc(
-        "Ingress interface selector (`NG-B009`), for when a zone is too coarse. Rare: the "
+        "Ingress interface selector (`NV-B009`), for when a zone is too coarse. Rare: the "
         "point of a zone is not needing this.",
         NONE,
     ),
-    ("FirewallRule", "oif"): Doc("Egress interface selector, on the same terms (`NG-B009`).", NONE),
+    ("FirewallRule", "oif"): Doc("Egress interface selector, on the same terms (`NV-B009`).", NONE),
     ("FirewallRule", "invert"): Doc(
         "Match everything the selectors do not. Meaningless without a selector to invert "
-        "(`NG-B005`).",
+        "(`NV-B005`).",
         NONE,
     ),
     ("FirewallRule", "action"): Doc(
@@ -602,12 +602,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("FirewallRule", "mark"): Doc(
         "The mark to write, hexadecimal, optionally masked. Required by `action: mark` and "
-        "refused by everything else (`NG-B005`). This is what `spec.routing_policy[].fwmark` "
+        "refused by everything else (`NV-B005`). This is what `spec.routing_policy[].fwmark` "
         "reads — see §16.9 and §24.3.",
         NONE,
     ),
     ("FirewallRule", "log_prefix"): Doc(
-        "The tag put in front of a logged packet. For `action: log` only (`NG-B005`).",
+        "The tag put in front of a logged packet. For `action: log` only (`NV-B005`).",
         NONE,
     ),
     ("FirewallRule", "description"): Doc("Free text: what the rule is for."),
@@ -615,22 +615,22 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("NatRule", "type"): Doc(
         "`snat` and `masquerade` rewrite the source on the way out; `dnat` and `redirect` "
         "rewrite the destination on the way in. Which of the two fields below are required "
-        "follows from this (`NG-B006`).",
+        "follows from this (`NV-B006`).",
         NONE,
     ),
-    ("NatRule", "src_zone"): Doc("The zone the packet came from (`NG-B004`).", NONE),
+    ("NatRule", "src_zone"): Doc("The zone the packet came from (`NV-B004`).", NONE),
     ("NatRule", "dst_zone"): Doc(
-        "The zone it is going to (`NG-B004`). The usual selector for a source translation: "
+        "The zone it is going to (`NV-B004`). The usual selector for a source translation: "
         "*everything leaving towards the wan is masqueraded*.",
         NONE,
     ),
     ("NatRule", "family"): Doc(
-        "Which family the translation is in. Derived from any address it names (`NG-B006`).",
+        "Which family the translation is in. Derived from any address it names (`NV-B006`).",
         NONE,
     ),
     ("NatRule", "src"): Doc("Source prefix selector.", NONE),
     ("NatRule", "dst"): Doc("Destination prefix selector.", NONE),
-    ("NatRule", "protocol"): Doc("The IP protocol. Required by `dst_ports` (`NG-B006`).", NONE),
+    ("NatRule", "protocol"): Doc("The IP protocol. Required by `dst_ports` (`NV-B006`).", NONE),
     ("NatRule", "dst_ports"): Doc(
         "Destination ports: the *published* port, not the internal one, which is `to_port`.",
         NONE,
@@ -638,12 +638,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("NatRule", "to_address"): Doc(
         "What the address becomes. Required by `snat` and `dnat`; refused by `masquerade` "
         "(whose address is the egress interface's, unknown here) and by `redirect` (whose "
-        "address is this machine) — `NG-B006`.",
+        "address is this machine) — `NV-B006`.",
         NONE,
     ),
     ("NatRule", "to_port"): Doc(
         "What the port becomes. Required by `redirect`, which translates the port and nothing "
-        "else; on a source translation it needs a `dst_ports` to be about (`NG-B006`).",
+        "else; on a source translation it needs a `dst_ports` to be about (`NV-B006`).",
         NONE,
     ),
     ("NatRule", "description"): Doc("Free text: what the translation is for."),
@@ -662,12 +662,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("OspfConfig", "router_id"): Doc(
         "Router identifier — a dotted quad even in an IPv6-only network. Unique across the "
-        "inventory (`NG-F012`).",
+        "inventory (`NV-F012`).",
         NONE,
     ),
     ("OspfConfig", "interfaces"): Doc(
-        "The interfaces OSPF runs on. Non-empty, free of duplicates (`NG-F006`), and each one an "
-        "interface of this device (`NG-F010`).",
+        "The interfaces OSPF runs on. Non-empty, free of duplicates (`NV-F006`), and each one an "
+        "interface of this device (`NV-F010`).",
         "/if:interfaces/if:interface/if:name",
     ),
     ("BgpConfig", "asn"): Doc(
@@ -675,7 +675,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         NONE,
     ),
     ("BgpConfig", "router_id"): Doc(
-        "BGP identifier — a dotted quad. Unique across the inventory (`NG-F012`); commonly the "
+        "BGP identifier — a dotted quad. Unique across the inventory (`NV-F012`); commonly the "
         "same value as the OSPF router id, which is one identity rather than a duplicate.",
         NONE,
     ),
@@ -685,24 +685,24 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("BgpNeighbor", "address"): Doc(
         "Peer address. Resolved against every address the inventory configures; a peer that "
-        "resolves to nothing is `NG-F013`, a warning, because an eBGP peer may be external.",
+        "resolves to nothing is `NV-F013`, a warning, because an eBGP peer may be external.",
         NONE,
     ),
     ("BgpNeighbor", "remote_asn"): Doc(
         "The AS the peer is in. Checked against the peer's own `asn` when the address resolves "
-        "(`NG-F011`).",
+        "(`NV-F011`).",
         NONE,
     ),
     ("BgpNeighbor", "description"): Doc("Free text: what the session is for."),
     # -- interface ---------------------------------------------------------
     ("Interface", "name"): Doc(
         "Interface name as the device itself spells it (`eth0`, `GigabitEthernet0/2`). Unique "
-        "within the element (`NG-I001`), and the target of a cable endpoint.",
+        "within the element (`NV-I001`), and the target of a cable endpoint.",
         "/if:interfaces/if:interface/if:name",
     ),
     ("Interface", "type"): Doc(
         "What kind of interface this is. Decides which other fields are allowed and whether a "
-        "cable may terminate here (`NG-C009`).",
+        "cable may terminate here (`NV-C009`).",
         "…/if:type",
     ),
     ("Interface", "description"): Doc(
@@ -736,34 +736,34 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("Interface", "vrf"): Doc(
         "The routing instance this interface is in. Names an entry of the device's `spec.vrfs` "
-        "(`NG-F002`); unset means the global instance. An address only collides with another "
+        "(`NV-F002`); unset means the global instance. An address only collides with another "
         "address in the same VRF.",
         "/ni:network-instances/ni:network-instance/ni:name",
     ),
     ("Interface", "poe"): Doc(
         "This port is power sourcing equipment: it hands power down the cable (§17.3). Only on "
-        "a type a cable terminates on — `ethernet` or `lag` (`NG-E006`).",
+        "a type a cable terminates on — `ethernet` or `lag` (`NV-E006`).",
         "/power-ethernet-mib:pethPsePortTable/pethPsePortEntry",
     ),
     ("Interface", "wireless"): Doc(
         "Radio configuration of a `type: wifi` interface: which side of the association it is, "
         "which frequency it uses and which BSSs it beacons or joins. Forbidden on every other "
-        "type (`NG-W002`).",
+        "type (`NV-W002`).",
         "…/dot11:wireless-interface",
     ),
     ("Interface", "parent"): Doc(
         "The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise "
-        "(`NG-I002`).",
+        "(`NV-I002`).",
         "…/if:lower-layer-if",
     ),
     ("Interface", "members"): Doc(
         "The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, "
-        "forbidden otherwise (`NG-I003`).",
+        "forbidden otherwise (`NV-I003`).",
         "…/if:lower-layer-if",
     ),
     ("Interface", "netns"): Doc(
         "The network namespace this interface lives in (§23.1). Names an entry of the "
-        "device's `spec.netns` (`NG-N022`); unset means the machine's initial namespace. "
+        "device's `spec.netns` (`NV-N022`); unset means the machine's initial namespace. "
         "Unlike `vrf`, which partitions one stack's routing table, this places the interface "
         "in a different stack entirely — its addresses do not collide with the same "
         "addresses elsewhere on the machine.",
@@ -772,9 +772,9 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("Interface", "peer"): Doc(
         "The other end of the veth pair this interface is one end of (§23.2). Names another "
         "`type: ethernet` interface of the same element, which must name this one back "
-        "(`NG-N023`). A veth end is `ianaift:ethernetCsmacd` like any other port; what it "
+        "(`NV-N023`). A veth end is `ianaift:ethernetCsmacd` like any other port; what it "
         "has instead of a socket is this peer, so a cable must not terminate on it "
-        "(`NG-N024`).",
+        "(`NV-N024`).",
         "…/if:lower-layer-if",
     ),
     # -- address families --------------------------------------------------
@@ -797,7 +797,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("IPv4Config", "gateway"): Doc(
         "First hop for off-link IPv4 traffic, as a bare address without a prefix length. It "
-        "must lie inside one of this interface's own prefixes (`NG-A013`).",
+        "must lie inside one of this interface's own prefixes (`NV-A013`).",
         "rt:routing/…/static-routes/v4ur:ipv4/v4ur:route/…/next-hop-address",
     ),
     ("IPv4Address", "ip"): Doc(
@@ -806,7 +806,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("IPv4Address", "prefix_length"): Doc(
         "Prefix length. May be written as a dotted-quad `netmask` instead, which is normalised "
-        "to a prefix length on load; a non-contiguous mask is rejected (`NG-A003`).",
+        "to a prefix length on load; a non-contiguous mask is rejected (`NV-A003`).",
         "…/ip:ipv4/ip:address/ip:prefix-length",
     ),
     ("IPv6Config", "enabled"): Doc(
@@ -827,7 +827,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("IPv6Config", "gateway"): Doc(
         "First hop for off-link IPv6 traffic, as a bare address without a prefix length. It "
-        "must lie inside one of this interface's own prefixes (`NG-A013`), unless it is "
+        "must lie inside one of this interface's own prefixes (`NV-A013`), unless it is "
         "link-local: `fe80::1` is on-link by definition and is exempt.",
         "rt:routing/…/static-routes/v6ur:ipv6/v6ur:route/…/next-hop-address",
     ),
@@ -847,7 +847,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("VlanConfig", "access_vlan"): Doc(
         "The VLAN an access port belongs to, and the encapsulation VID of a `type: vlan` "
         "sub-interface. Required in access mode — it defaults to 1 — and forbidden in trunk "
-        "mode (`NG-V002`).",
+        "mode (`NV-V002`).",
         "…/dot1q:bridge-port/dot1q:pvid",
     ),
     ("VlanConfig", "trunk_vlans"): Doc(
@@ -855,7 +855,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "…/dot1q:vlan/dot1q:egress-ports (tagged)",
     ),
     ("VlanConfig", "native_vlan"): Doc(
-        "The untagged VLAN on a trunk. Trunk mode only (`NG-V003`); it is implicitly a member of "
+        "The untagged VLAN on a trunk. Trunk mode only (`NV-V003`); it is implicitly a member of "
         "the port's VLAN set.",
         "…/dot1q:bridge-port/dot1q:pvid",
     ),
@@ -871,7 +871,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("WirelessConfig", "role"): Doc(
         "Which side of the association this radio is: `ap` beacons the SSIDs, `station` and "
         "`mesh` associate to one. A wireless link joins exactly one `ap` to one client "
-        "(`NG-W007`).",
+        "(`NV-W007`).",
         "…/dot11:station-config/dot11:desired-bss-type",
     ),
     ("WirelessConfig", "band"): Doc(
@@ -880,12 +880,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "…/dot11:phy/dot11:channel-starting-factor",
     ),
     ("WirelessConfig", "channel"): Doc(
-        "The primary 20 MHz channel, as the band numbers it (`NG-W003`).",
+        "The primary 20 MHz channel, as the band numbers it (`NV-W003`).",
         "…/dot11:phy/dot11:current-channel-number",
     ),
     ("WirelessConfig", "width_mhz"): Doc(
         "Total channel width in MHz. 40 is the most 2.4 GHz can bond and 320 is 6 GHz only "
-        "(`NG-W004`).",
+        "(`NV-W004`).",
         "…/dot11:phy/dot11:current-channel-width",
     ),
     ("WirelessConfig", "tx_power_dbm"): Doc(
@@ -895,23 +895,23 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("WirelessConfig", "bss"): Doc(
         "The basic service sets this radio beacons (`ap`) or is associated to (`station`, "
-        "`mesh`, at most one — `NG-W006`).",
+        "`mesh`, at most one — `NV-W006`).",
         "…/dot11:bss",
     ),
     ("Bss", "ssid"): Doc(
-        "The network name, 1 to 32 octets. Unique within one radio (`NG-W005`), and on a client "
-        "radio it must be one the AP at the far end advertises (`NG-W010`).",
+        "The network name, 1 to 32 octets. Unique within one radio (`NV-W005`), and on a client "
+        "radio it must be one the AP at the far end advertises (`NV-W010`).",
         "…/dot11:bss/dot11:ssid",
     ),
     ("Bss", "bssid"): Doc(
         "MAC address of this BSS — usually the radio's own for the first SSID and a derived one "
-        "for each further SSID. Unique across the inventory (`NG-W008`).",
+        "for each further SSID. Unique across the inventory (`NV-W008`).",
         "…/dot11:bss/dot11:bssid",
     ),
     ("Bss", "vlan"): Doc(
         "The VLAN this SSID's traffic is bridged into. Absent means the radio's untagged "
         "domain. Checked against the device's VLAN database (`W113`) and against the VLANs the "
-        "access point actually carries (`NG-W009`).",
+        "access point actually carries (`NV-W009`).",
         NONE,
     ),
     ("Bss", "security"): Doc(
@@ -926,13 +926,13 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     # -- cable -------------------------------------------------------------
     ("CableSpec", "endpoints"): Doc(
-        "Exactly two `device:interface` references (`NG-C001`). The link is undirected, so the "
+        "Exactly two `device:interface` references (`NV-C001`). The link is undirected, so the "
         "pair is sorted on load and the order carries no meaning.",
         NONE,
     ),
     ("CableSpec", "medium"): Doc(
         "What the link physically is. `wireless` requires both endpoints to be `type: wifi` and "
-        "forbids `length_m` and `category` (`NG-C006`, `NG-C007`).",
+        "forbids `length_m` and `category` (`NV-C006`, `NV-C007`).",
         NONE,
     ),
     ("CableSpec", "speed"): Doc(
@@ -940,7 +940,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "`if:speed` of both endpoints, which is `config false`.",
         "…/if:speed (on both endpoints)",
     ),
-    ("CableSpec", "duplex"): Doc("Duplex of the link. `half` outside a hub link is `NG-C013`."),
+    ("CableSpec", "duplex"): Doc("Duplex of the link. `half` outside a hub link is `NV-C013`."),
     ("CableSpec", "length_m"): Doc("Physical length in metres. Documentation only."),
     ("CableSpec", "category"): Doc("Cable category, free text (`cat6`, `cat6a`, `om4`)."),
     ("CableSpec", "connector"): Doc("Connector type, free text (`rj45`, `lc`, `sc`)."),
@@ -949,10 +949,10 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("InterfaceRef", "device"): Doc(
         "Name of the element the port belongs to. Resolved in the cable's own namespace first, "
-        "then upwards (`NG-C002`)."
+        "then upwards (`NV-C002`)."
     ),
     ("InterfaceRef", "interface"): Doc(
-        "Name of the interface on that element. An adapter's `upstream.name` counts (`NG-C003`)."
+        "Name of the interface on that element. An adapter's `upstream.name` counts (`NV-C003`)."
     ),
     # -- adapter -----------------------------------------------------------
     ("AdapterSpec", "vendor"): Doc("Hardware vendor, free text."),
@@ -974,11 +974,11 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("AdapterSpec", "upstream"): Doc("The host-facing port: the bus the adapter plugs into."),
     ("AdapterSpec", "interfaces"): Doc(
         "The network ports the adapter presents downstream. Only `ethernet`, `wifi` and `lag` "
-        "are allowed (`NG-X003`).",
+        "are allowed (`NV-X003`).",
         "/if:interfaces/if:interface",
     ),
     ("UpstreamPort", "name"): Doc(
-        "Name of the host-side port. Shares the interface namespace of the adapter (`NG-X004`) "
+        "Name of the host-side port. Shares the interface namespace of the adapter (`NV-X004`) "
         "and may be named by a cable endpoint.",
         "/if:interfaces/if:interface/if:name",
     ),
@@ -993,7 +993,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("UpstreamPort", "attached_to"): Doc(
         "The host the adapter is plugged into. A bare device name, never a `device:interface` "
-        "reference (`NG-X001`). This is what joins the adapter to the graph when no cable does.",
+        "reference (`NV-X001`). This is what joins the adapter to the graph when no cable does.",
         NONE,
     ),
     # -- tunnel ------------------------------------------------------------
@@ -1005,35 +1005,35 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("TunnelSpec", "endpoints"): Doc(
         "Two or more `device:interface` references, each naming an interface of `type: tunnel` "
-        "(`NG-T001`, `NG-T003`). The link is undirected, so the list is sorted on load. Three or "
+        "(`NV-T001`, `NV-T003`). The link is undirected, so the list is sorted on load. Three or "
         "more endpoints make it multipoint, and it is then drawn as a node rather than a line.",
         NONE,
     ),
     ("TunnelSpec", "over"): Doc(
         "The tunnel this one is encapsulated in — `vxlan` over `ipsec` is written by naming the "
-        "IPsec tunnel here (`NG-T004`). Absent means the tunnel runs directly over the physical "
-        "topology. The chain must not loop (`NG-T005`).",
+        "IPsec tunnel here (`NV-T004`). Absent means the tunnel runs directly over the physical "
+        "topology. The chain must not loop (`NV-T005`).",
         NONE,
     ),
     ("TunnelSpec", "mode"): Doc(
         "IPsec's encapsulation mode, `tunnel` or `transport` (RFC 4301). Defaults to `tunnel`; "
-        "every other type has only one mode and must not declare it (`NG-T008`).",
+        "every other type has only one mode and must not declare it (`NV-T008`).",
         NONE,
     ),
     ("TunnelSpec", "vni"): Doc(
         "The 24-bit VXLAN/Geneve virtual network identifier. Required for those two types and "
-        "rejected for every other (`NG-T007`).",
+        "rejected for every other (`NV-T007`).",
         NONE,
     ),
     ("TunnelSpec", "port"): Doc(
         "Outer UDP/TCP port. Defaults to the registered port of the type (WireGuard 51820, "
         "OpenVPN 1194, L2TP 1701, VXLAN 4789, Geneve 6081) and is rejected for GRE and IPsec, "
-        "which run directly over IP (`NG-T008`).",
+        "which run directly over IP (`NV-T008`).",
         NONE,
     ),
     ("TunnelSpec", "mtu"): Doc(
         "MTU of the tunnel interface. Compared with what the underlay leaves after the "
-        "encapsulation overhead of the whole stack (`NG-T011`).",
+        "encapsulation overhead of the whole stack (`NV-T011`).",
         NONE,
     ),
     ("TunnelSpec", "encrypted"): Doc(
@@ -1045,12 +1045,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("TunnelSpec", "cipher"): Doc(
         "Negotiated cipher suite, free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a "
-        "tunnel that encrypts (`NG-T009`).",
+        "tunnel that encrypts (`NV-T009`).",
         NONE,
     ),
     ("TunnelSpec", "auth"): Doc(
         "How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or "
-        "`password`. The *method*, never the material — netviz stores no secrets (`NG-T010`).",
+        "`password`. The *method*, never the material — netviz stores no secrets (`NV-T010`).",
         NONE,
     ),
     ("TunnelSpec", "label"): Doc(
@@ -1065,12 +1065,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("PatchPanelSpec", "ports"): Doc(
         "The positions the panel has, as a count (`24`) or as spans (`1-12,17-24`). Each one "
-        "becomes a `front/<n>` and a `rear/<n>` interface (`NG-P006`).",
+        "becomes a `front/<n>` and a `rear/<n>` interface (`NV-P006`).",
         "/if:interfaces/if:interface",
     ),
     ("PatchPanelSpec", "couplers"): Doc(
         "Front position to rear position, for a panel that is not wired straight through. "
-        "Absent means the identity mapping (`NG-P007`).",
+        "Absent means the identity mapping (`NV-P007`).",
         NONE,
     ),
     # -- power distribution unit -------------------------------------------
@@ -1082,23 +1082,23 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("PduSpec", "outlets"): Doc(
         "The outlets the unit has, as a count (`24`) or as spans (`1-12,17-24`). Referred to by "
-        "number from a device's `power.inputs`; at most 512, no repeats (`NG-E001`).",
+        "number from a device's `power.inputs`; at most 512, no repeats (`NV-E001`).",
         "/entity-mib:entPhysicalTable/entPhysicalEntry",
     ),
     ("PduSpec", "capacity_watts"): Doc(
-        "How many watts may be drawn through the unit in total. `NG-E012` sums the declared "
+        "How many watts may be drawn through the unit in total. `NV-E012` sums the declared "
         "loads against it; absent means the rating is not recorded, and nothing is graded.",
         "/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate",
     ),
     ("PduSpec", "input_feed"): Doc(
         "Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only "
-        "for equality: two PDUs on one feed do not make a device redundant (`NG-E015`).",
+        "for equality: two PDUs on one feed do not make a device redundant (`NV-E015`).",
         "/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry",
     ),
     # -- identity ----------------------------------------------------------
     ("UserSpec", "login"): Doc(
         "The account name, when it differs from `metadata.name`; absent means the two are the "
-        "same. Estate-wide, so two users claiming one login is `NG-S013`.",
+        "same. Estate-wide, so two users claiming one login is `NV-S013`.",
         "/ietf-system:system/authentication/user/name",
     ),
     ("UserSpec", "full_name"): Doc(
@@ -1110,30 +1110,30 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("UserSpec", "uid"): Doc(
         "POSIX user id, when the estate assigns one. 0 to 4294967294; two users claiming one "
-        "is `NG-S013`.",
+        "is `NV-S013`.",
         "/ietf-system:system/authentication/user",
     ),
     ("UserSpec", "type"): Doc(
-        "`person`, `service` or `shared`. Decides whether `NG-S015` and `NG-S016` have "
+        "`person`, `service` or `shared`. Decides whether `NV-S015` and `NV-S016` have "
         "anything to say: only a person can depart, and only a person is expected in a group."
     ),
     ("UserSpec", "status"): Doc(
         "`active`, `suspended` or `departed`. A departed account is kept rather than deleted "
-        "so the memberships still to be revoked stay visible (`NG-S015`)."
+        "so the memberships still to be revoked stay visible (`NV-S015`)."
     ),
     ("UserSpec", "ssh_keys"): Doc(
         "Public keys the account authenticates with, `<algorithm> <base64> [comment]`. "
-        "Normalised to single spaces; a private key is refused (`NG-S002`).",
+        "Normalised to single spaces; a private key is refused (`NV-S002`).",
         "/ietf-system:system/authentication/user/authorized-key",
     ),
     ("GroupSpec", "members"): Doc(
         "The users and nested groups in this group, as element references resolved outwards "
-        "from the group's own namespace. Must resolve (`NG-S010`), must be an identity "
-        "(`NG-S011`), and the nesting must not loop (`NG-S012`)."
+        "from the group's own namespace. Must resolve (`NV-S010`), must be an identity "
+        "(`NV-S011`), and the nesting must not loop (`NV-S012`)."
     ),
     ("GroupSpec", "gid"): Doc(
         "POSIX group id, when the estate assigns one. 0 to 4294967294; two groups claiming one "
-        "is `NG-S013`."
+        "is `NV-S013`."
     ),
     ("GroupSpec", "email"): Doc(
         "Where mail to the whole group goes, when the group is also a distribution list."
@@ -1146,22 +1146,22 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("PowerConfig", "inputs"): Doc(
         "One entry per power supply, naming the PDU outlet feeding it. At most 8. Empty for a "
-        "device fed over PoE, or one whose feed is not recorded yet (`NG-E016`).",
+        "device fed over PoE, or one whose feed is not recorded yet (`NV-E016`).",
         "/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry",
     ),
     ("PowerConfig", "redundant"): Doc(
         "The feeds are meant to be independent: losing one must not lose the device. Needs at "
-        "least two `inputs` (`NG-E002`) that land on different units and different feeds "
-        "(`NG-E015`).",
+        "least two `inputs` (`NV-E002`) that land on different units and different feeds "
+        "(`NV-E015`).",
         NONE,
     ),
     ("PowerConfig", "powered_by"): Doc(
         "Where the device's own power comes from: `outlet` (the default) or `poe`, meaning it "
-        "takes power over its uplink and declares no `inputs` (`NG-E005`, `NG-E014`).",
+        "takes power over its uplink and declares no `inputs` (`NV-E005`, `NV-E014`).",
         NONE,
     ),
     ("PowerConfig", "poe_budget_watts"): Doc(
-        "The PoE power this device can hand out across every PSE port together. `NG-E013` "
+        "The PoE power this device can hand out across every PSE port together. `NV-E013` "
         "checks the ports that hold budget fit inside it.",
         "/power-ethernet-mib:pethMainPseTable/pethMainPseEntry/pethMainPsePower",
     ),
@@ -1171,17 +1171,17 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("PowerDraw", "maximum"): Doc(
         "Nameplate or PSU rating, in watts — what a breaker has to survive. Must not be below "
-        "`typical` (`NG-E003`).",
+        "`typical` (`NV-E003`).",
         "/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate",
     ),
     ("PowerInput", "pdu"): Doc(
         "The PDU feeding this supply. An element reference, so it may be written fully "
-        "qualified to pick one of several PDUs sharing a short name (`NG-E011`).",
+        "qualified to pick one of several PDUs sharing a short name (`NV-E011`).",
         NONE,
     ),
     ("PowerInput", "outlet"): Doc(
-        "The outlet on it, as the PDU numbers it. Must exist (`NG-E011`) and must not already "
-        "feed something else (`NG-E010`). Writable as the shorthand `pdu-r1-a:7`.",
+        "The outlet on it, as the PDU numbers it. Must exist (`NV-E011`) and must not already "
+        "feed something else (`NV-E010`). Writable as the shorthand `pdu-r1-a:7`.",
         NONE,
     ),
     ("PowerInput", "psu"): Doc(
@@ -1197,7 +1197,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("PoeConfig", "pse_class"): Doc(
         "The IEEE classification, 0 to 8, written `class` in YAML. Fixes the reservation; "
         "refused above the standard's own ceiling, and exclusive with `budget_watts` "
-        "(`NG-E004`).",
+        "(`NV-E004`).",
         "…/pethPsePortEntry/pethPsePortPowerClassifications",
     ),
     ("PoeConfig", "budget_watts"): Doc(
@@ -1207,7 +1207,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("PoeConfig", "enabled"): Doc(
         "Is the port administratively allowed to source power? A disabled PSE port reserves "
-        "nothing and powers nothing, which is what `NG-E014` reports it for.",
+        "nothing and powers nothing, which is what `NV-E014` reports it for.",
         "…/pethPsePortEntry/pethPsePortAdminEnable",
     ),
     # -- layout geometry (§18) --------------------------------------------

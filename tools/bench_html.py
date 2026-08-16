@@ -235,10 +235,10 @@ const files = process.argv.slice(3);
       return nav ? { ms: nav.loadEventEnd, kind: 'load' } : null;
     });
     const switched = await page.evaluate(() => {
-      const select = document.getElementById('ng-layer');
+      const select = document.getElementById('nv-layer');
       if (!select) { return null; }
       const shown = () => {
-        const pane = document.querySelector('#ng-viewport .view:not([hidden]) svg');
+        const pane = document.querySelector('#nv-viewport .view:not([hidden]) svg');
         return pane ? pane.getBoundingClientRect().width : 0;
       };
       const values = Array.from(select.options).map((o) => o.value);

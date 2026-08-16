@@ -1,4 +1,4 @@
-# E049 (NG-N024) - a cable terminates on one end of a veth pair.
+# E049 (NV-N024) - a cable terminates on one end of a veth pair.
 #
 # A veth end is 'ethernet' by type, so the type check of E012 waves it through;
 # what it does not have is a socket, because its far side is the peer it names.

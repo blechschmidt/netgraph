@@ -1,7 +1,7 @@
-# E007 (NG-I004) - interface stacking contains a cycle.
+# E007 (NV-I004) - interface stacking contains a cycle.
 #
 # 'vlan-a' is a sub-interface of 'vlan-b' and 'vlan-b' is a sub-interface of
-# 'vlan-a'. Each document is legal on its own: NG-I002 only rejects an interface
+# 'vlan-a'. Each document is legal on its own: NV-I002 only rejects an interface
 # that is its own parent, so nothing shorter than the whole element sees it.
 # Both encapsulate VLAN 10, so E009 (the VID the parent carries) stays quiet.
 apiVersion: netviz.dev/v1alpha1

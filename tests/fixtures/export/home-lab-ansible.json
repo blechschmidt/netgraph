@@ -7,7 +7,7 @@
         "netviz_name": "adp-usb-eth",
         "netviz_kind": "adapter",
         "netviz_namespace": "hosts",
-        "netviz_description": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n",
+        "netviz_description": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NV-X005).\n",
         "netviz_vendor": "Anker",
         "netviz_model": "A83130A1",
         "netviz_serial": "AK2231007744",

@@ -1,4 +1,4 @@
-# I003 (NG-T015) - a tunnel listens on a port other than the registered one.
+# I003 (NV-T015) - a tunnel listens on a port other than the registered one.
 #
 # WireGuard's registered port is 51820. Moving it is a normal thing to do, which
 # is why this is information rather than a complaint - but the port is what a

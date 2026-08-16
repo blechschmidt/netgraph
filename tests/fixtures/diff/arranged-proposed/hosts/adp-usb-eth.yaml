@@ -4,7 +4,7 @@ metadata:
   name: adp-usb-eth
   description: |
     USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the
-    laptop - there is deliberately no cable between the two (NG-X005).
+    laptop - there is deliberately no cable between the two (NV-X005).
   labels:
     site: home
     asset: A-0001

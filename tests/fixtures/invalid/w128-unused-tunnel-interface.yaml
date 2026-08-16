@@ -1,4 +1,4 @@
-# W128 (NG-T013) - a 'tunnel' interface is named by no tunnel document.
+# W128 (NV-T013) - a 'tunnel' interface is named by no tunnel document.
 #
 # 'pc-a:wg0' is configured and up, but the inventory never says what is at the
 # far end. The inventory declares no tunnel at all, so nothing else fires.

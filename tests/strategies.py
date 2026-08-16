@@ -305,7 +305,7 @@ def labels() -> st.SearchStrategy[dict[str, str]]:
 # Interfaces
 # --------------------------------------------------------------------------- #
 
-#: Interface types that may terminate a cable (``NG-C009``).
+#: Interface types that may terminate a cable (``NV-C009``).
 CABLEABLE: Final[frozenset[str]] = frozenset({"ethernet", "wifi", "lag"})
 
 
@@ -347,7 +347,7 @@ def interfaces(
 
     The list is built in dependency order — the physical ports first, then the
     stacked types that reference them — because ``parent`` and ``members`` have
-    to name an interface of the same element (``NG-I002``, ``NG-I003``) and a
+    to name an interface of the same element (``NV-I002``, ``NV-I003``) and a
     strategy that drew them independently would spend its time being filtered.
     """
     taken = set(reserved)
@@ -403,7 +403,7 @@ def interfaces(
         wants_ipv6 = layer3 and draw(st.booleans())
         if draw(st.booleans()):
             # An interface carrying IPv6 needs at least the v6 minimum MTU
-            # (``NG-I011``), so the bound depends on what is configured.
+            # (``NV-I011``), so the bound depends on what is configured.
             entry["mtu"] = draw(st.integers(min_value=1280 if wants_ipv6 else 68, max_value=9216))
         if layer3 and draw(st.booleans()):
             entry["ipv4"] = draw(_ipv4_block(index=position))
@@ -731,7 +731,7 @@ def pdu_documents(draw: st.DrawFn, *, name: str, namespace: str) -> PlannedDocum
 
     Nothing is plugged into it. A generated ``power.inputs`` would have to name
     an outlet that exists on a PDU that resolves, which is the *validator's*
-    business (``NG-E011``) rather than the loader's — and these plans exist to be
+    business (``NV-E011``) rather than the loader's — and these plans exist to be
     accepted by the loader.
     """
     count = draw(st.integers(min_value=1, max_value=8))
@@ -755,7 +755,7 @@ def user_documents(draw: st.DrawFn, *, name: str, namespace: str) -> PlannedDocu
 
     No ``login`` is generated. ``metadata.name`` is already the account name by
     default, and a second generated identifier would collide across the plan for
-    reasons ``NG-S013`` is right about but that have nothing to do with the
+    reasons ``NV-S013`` is right about but that have nothing to do with the
     loader, which is what these plans exist to exercise.
     """
     spec: dict[str, Any] = {}
@@ -782,11 +782,11 @@ def group_documents(
 
     Members are drawn from names the plan has already placed, so every reference
     resolves by construction. A plan that placed no user produces an empty group,
-    which is a legal document — ``NG-S014`` is a warning, not a refusal — and
+    which is a legal document — ``NV-S014`` is a warning, not a refusal — and
     exactly the state a group created before its people is in — the same contract every other generated reference
     here honours. Nesting is not generated: a nested group would have to be one
     the plan has *and* one that cannot reach back, and proving that is
-    ``NG-S012``'s job rather than a generator's.
+    ``NV-S012``'s job rather than a generator's.
     """
     pool = list(members)
     chosen = draw(st.lists(st.sampled_from(pool), max_size=len(pool), unique=True)) if pool else []
@@ -812,7 +812,7 @@ class _Port:
 
 
 def _cableable_ports(document: PlannedDocument) -> Iterator[_Port]:
-    """Every interface of ``document`` a cable may terminate on (``NG-C009``)."""
+    """Every interface of ``document`` a cable may terminate on (``NV-C009``)."""
     spec = document.data.get("spec", {})
     if document.kind == "patchpanel":
         raw = spec.get("ports")
@@ -827,7 +827,7 @@ def _cableable_ports(document: PlannedDocument) -> Iterator[_Port]:
 
 
 def _tunnel_ports(document: PlannedDocument) -> Iterator[_Port]:
-    """Every ``tunnel`` interface of ``document`` (``NG-T003``)."""
+    """Every ``tunnel`` interface of ``document`` (``NV-T003``)."""
     for entry in document.data.get("spec", {}).get("interfaces", []):
         if entry.get("type") == "tunnel":
             yield _Port(document.name, entry["name"])

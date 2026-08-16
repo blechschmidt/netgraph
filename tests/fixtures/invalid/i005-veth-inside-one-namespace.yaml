@@ -1,4 +1,4 @@
-# I005 (NG-N027) - both ends of a veth pair are in one network namespace.
+# I005 (NV-N027) - both ends of a veth pair are in one network namespace.
 #
 # Legal - it is how two bridges inside one stack are joined - but far more often
 # 'netns' was written on one end and forgotten on the other. Both ends here are

@@ -1,4 +1,4 @@
-# W110 (NG-A005) - the network address of the prefix is assigned to a port.
+# W110 (NV-A005) - the network address of the prefix is assigned to a port.
 #
 # 10.0.0.0 identifies 10.0.0.0/24 itself; it is not an address a host answers
 # on. 'pc-b' shares the prefix so that W105 has two elements and stays quiet.

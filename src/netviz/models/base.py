@@ -1,6 +1,6 @@
 """Common pydantic configuration for every netviz model.
 
-All models reject unknown keys (``NG-D005`` in :doc:`docs/schema.md`): silently
+All models reject unknown keys (``NV-D005`` in :doc:`docs/schema.md`): silently
 ignoring a misspelt key would produce a diagram that disagrees with the file,
 which is the exact failure mode this tool exists to prevent.
 """

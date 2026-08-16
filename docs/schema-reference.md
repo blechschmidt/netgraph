@@ -35,7 +35,7 @@ the field maps to, with `…` standing for
 | `patchpanel` | [PatchPanelSpec](#spec--patchpanel) | A passive cross-connect. Its `front/<n>` and `rear/<n>` ports are derived from `ports`, and a coupler joins each front port to one rear port; it is not a hop. |
 | `pdu` | [PduSpec](#spec--pdu) | A power distribution unit. Its numbered outlets are derived from `outlets`; they are not interfaces, and a device names one in `power.inputs` rather than being cabled to it. Placed on a rack elevation like any other hardware. |
 | `user` | [UserSpec](#spec-of-a-user-document) | One identity: a person, a service account or a shared login. Owns no interfaces and terminates no cable; it is drawn only in the `identity` view. |
-| `group` | [GroupSpec](#spec-of-a-group-document) | A named set of identities. `members` may name a `user` or another `group`, which is what makes a hierarchy expressible; the nesting must not loop (`NG-S012`). |
+| `group` | [GroupSpec](#spec-of-a-group-document) | A named set of identities. `members` may name a `user` or another `group`, which is what makes a hierarchy expressible; the nesting must not loop (`NV-S012`). |
 | `template` | partial [DeviceSpec](#spec--switch-router-firewall-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
 | `layout` | [LayoutSpec](#spec-of-a-layout-document) | Diagram geometry for elements declared elsewhere, scoped by view. Not an element: it carries no network facts and is never drawn as a node. See `netviz layout`. |
 | `testsuite` | [TestSuiteSpec](#spec-of-a-testsuite-document) | Named assertions about the network the other documents describe, graded by `netviz test`. Not an element: it declares no device and is never drawn. |
@@ -49,12 +49,12 @@ Every document, whatever its kind, carries these three keys plus a `spec` whose 
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `apiVersion` | `netviz.dev/v1alpha1` | **yes** | — | Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`. | — |
+| `apiVersion` | `netviz.dev/v1alpha1` | **yes** | — | Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`. | — |
 | `kind` | string | **yes** | — | Which element this document declares. Selects the shape of `spec`, and is the discriminator of the model union. | — |
 | `metadata` | [Metadata](#metadata) | **yes** | — | Identity, description, labels and annotations. | — |
 
 * `spec` is required and its model is listed in the kind table above.
-* Unknown keys are rejected anywhere in the document (`NG-D005`). A misspelt key that was silently ignored would produce a diagram disagreeing with the file, which is the one failure mode this tool exists to prevent.
+* Unknown keys are rejected anywhere in the document (`NV-D005`). A misspelt key that was silently ignored would produce a diagram disagreeing with the file, which is the one failure mode this tool exists to prevent.
 
 ## `metadata`
 
@@ -62,9 +62,9 @@ Identity and free-form annotation, shared by every kind.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `name` | element name | **yes** | — | Element name, unique within its namespace across all kinds (`NG-N002`). The namespace is the directory the document was found in. | — |
+| `name` | element name | **yes** | — | Element name, unique within its namespace across all kinds (`NV-N002`). The namespace is the directory the document was found in. | — |
 | `description` | string | no | *unset* | Free text, may be multi-line. Rendered as the node's tooltip in SVG output. | — |
-| `location` | [Location](#metadatalocation) | no | *unset* | Where the hardware physically is: site, room, rack and the rack units it occupies. Drives `--layer rack` and the placement rules `NG-U001` to `NG-U004`. | — |
+| `location` | [Location](#metadatalocation) | no | *unset* | Where the hardware physically is: site, room, rack and the rack units it occupies. Drives `--layer rack` and the placement rules `NV-U001` to `NV-U004`. | — |
 | `labels` | map string → string | no | `{}` | Selector-friendly key/value pairs. Keys follow the Kubernetes label grammar; the `netviz.dev/` prefix is reserved for the tool. | — |
 | `annotations` | map string → string | no | `{}` | Per-element input to the tooling, not selectable. `netviz/ignore` suppresses validation rules on this element. | — |
 
@@ -76,13 +76,13 @@ Where the hardware physically is. Optional, and shared by every kind: a patch pa
 |---|---|---|---|---|---|
 | `site` | string | no | *unset* | Site the element is installed at, free text. | — |
 | `room` | string | no | *unset* | Room or floor within the site, free text. | — |
-| `rack` | string | no | *unset* | Rack identifier, unique within its room. Naming one is what puts the element on an elevation; site, room and rack together identify the rack (`NG-U001`). | — |
-| `position` | integer, 1–100 | no | *unset* | Lowest rack unit the element occupies, counted from 1 at the bottom of the rack. Requires `rack` (`NG-U004`). | — |
+| `rack` | string | no | *unset* | Rack identifier, unique within its room. Naming one is what puts the element on an elevation; site, room and rack together identify the rack (`NV-U001`). | — |
+| `position` | integer, 1–100 | no | *unset* | Lowest rack unit the element occupies, counted from 1 at the bottom of the rack. Requires `rack` (`NV-U004`). | — |
 | `height` | integer, 1–100 | no | `1` | How many rack units the element occupies, upwards from `position`. | — |
-| `rack_height` | integer, 1–100 | no | *unset* | How tall the rack itself is. Any element in the rack may declare it; two that disagree are `NG-U003`, and nothing may extend past it (`NG-U002`). | — |
+| `rack_height` | integer, 1–100 | no | *unset* | How tall the rack itself is. Any element in the rack may declare it; two that disagree are `NV-U003`, and nothing may extend past it (`NV-U002`). | — |
 
 * `position` is the **lowest** rack unit the element occupies and `height` how many it takes, counting upwards; units are numbered from 1 at the bottom of the cabinet, which is how a rack is labelled.
-* `site`, `room` and `rack` together identify a rack (`NG-U001`). Two elements that name the same three share a cabinet and may not overlap; naming `position` or `rack_height` without `rack` is `NG-U004`.
+* `site`, `room` and `rack` together identify a rack (`NV-U001`). Two elements that name the same three share a cabinet and may not overlap; naming `position` or `rack_height` without `rack` is `NV-U004`.
 * `netviz render --layer rack` draws one front elevation per rack, empty units included.
 
 ## `spec` — switch, router, firewall, hub, computer, server
@@ -105,7 +105,7 @@ The six device kinds share one spec shape. They differ in which fields they perm
 | `routes` | [StaticRoute](#specroutes) list | no | `[]` | Configured static routes, in the order the device holds them. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes` |
 | `routing_policy` | [PolicyRule](#specrouting_policy) list | no | `[]` | The routing policy database: the ordered rules deciding which *table* a packet is routed by, from its source, its firewall mark, its ingress interface or its DSCP. This is policy-based routing (§16.4). | — |
 | `routing` | [RoutingConfig](#specrouting) | no | *unset* | The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol` |
-| `zones` | [Zone](#speczones) list | no | `[]` | The security zones the device divides its interfaces into (§24.1). Policy is written *between* zones rather than between interfaces, so a rule survives a port being renamed, doubled or moved to a LAG. An interface is in at most one zone (`NG-B003`). | — |
+| `zones` | [Zone](#speczones) list | no | `[]` | The security zones the device divides its interfaces into (§24.1). Policy is written *between* zones rather than between interfaces, so a rule survives a port being renamed, doubled or moved to a LAG. An interface is in at most one zone (`NV-B003`). | — |
 | `firewall` | [FirewallConfig](#specfirewall) | no | *unset* | What the device does to the packets it sees: the filter policy and the address translations (§24.2). Absent records nothing about its filtering, which is not the same as saying it filters nothing. | — |
 | `power` | [PowerConfig](#specpower) | no | *unset* | What the device draws, which PDU outlets feed it, and how much PoE it hands out (§17.2). Absent means the inventory records nothing about its power. | `/eo-mib:eoPowerTable/eoPowerEntry` |
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
@@ -134,11 +134,11 @@ The 802.1Q bridge component the device implements.
 
 ## `spec.vlans[]`
 
-The device VLAN database. A port may reference a VLAN this list does not declare; that is `NG-V004`, not an error.
+The device VLAN database. A port may reference a VLAN this list does not declare; that is `NV-V004`, not an error.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `id` | integer, 1–4094 | **yes** | — | VLAN identifier. Unique within the device (`NG-V001`). | `…/dot1q:bridge-vlan/dot1q:vlan/dot1q:vid` |
+| `id` | integer, 1–4094 | **yes** | — | VLAN identifier. Unique within the device (`NV-V001`). | `…/dot1q:bridge-vlan/dot1q:vlan/dot1q:vid` |
 | `name` | string, ≤ 32 characters | no | *unset* | Human name of the VLAN. 802.1Q caps it at 32 characters. | `…/dot1q:bridge-vlan/dot1q:vlan/dot1q:name` |
 | `description` | string | no | *unset* | Free text. netviz-only; 802.1Q has no such node. | — |
 
@@ -148,8 +148,8 @@ One entry per port or logical interface. Used by both devices and adapters.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `name` | interface name | **yes** | — | Interface name as the device itself spells it (`eth0`, `GigabitEthernet0/2`). Unique within the element (`NG-I001`), and the target of a cable endpoint. | `/if:interfaces/if:interface/if:name` |
-| `type` | `ethernet` \| `wifi` \| `loopback` \| `bridge` \| `vlan` \| `lag` \| `tunnel` | **yes** | — | What kind of interface this is. Decides which other fields are allowed and whether a cable may terminate here (`NG-C009`). | `…/if:type` |
+| `name` | interface name | **yes** | — | Interface name as the device itself spells it (`eth0`, `GigabitEthernet0/2`). Unique within the element (`NV-I001`), and the target of a cable endpoint. | `/if:interfaces/if:interface/if:name` |
+| `type` | `ethernet` \| `wifi` \| `loopback` \| `bridge` \| `vlan` \| `lag` \| `tunnel` | **yes** | — | What kind of interface this is. Decides which other fields are allowed and whether a cable may terminate here (`NV-C009`). | `…/if:type` |
 | `description` | string | no | *unset* | Free text describing what the port is for. | `…/if:description` |
 | `enabled` | boolean | no | `true` | Intended administrative state. A disabled interface is exempt from `W101`. | `…/if:enabled` |
 | `mac` | MAC address | no | *unset* | Hardware address, EUI-48. Accepted in colon, dash or Cisco dotted form and normalised to lower-case colon form. `if:phys-address` is `config false` in RFC 8343, so an exporter must not write it to a live datastore. | `…/if:phys-address` |
@@ -157,20 +157,20 @@ One entry per port or logical interface. Used by both devices and adapters.
 | `ipv4` | [IPv4Config](#specinterfacesipv4) | no | *unset* | IPv4 configuration. Absent means the interface has no IPv4 stack. | `…/ip:ipv4` |
 | `ipv6` | [IPv6Config](#specinterfacesipv6) | no | *unset* | IPv6 configuration. Absent means the interface has no IPv6 stack. | `…/ip:ipv6` |
 | `vlan` | [VlanConfig](#specinterfacesvlan) | no | *unset* | 802.1Q bridge-port configuration. Absent means the port is not VLAN-aware; a host port facing an access port normally omits it. | `…/dot1q:bridge-port` |
-| `vrf` | element name | no | *unset* | The routing instance this interface is in. Names an entry of the device's `spec.vrfs` (`NG-F002`); unset means the global instance. An address only collides with another address in the same VRF. | `/ni:network-instances/ni:network-instance/ni:name` |
-| `wireless` | [WirelessConfig](#specinterfaceswireless) | no | *unset* | Radio configuration of a `type: wifi` interface: which side of the association it is, which frequency it uses and which BSSs it beacons or joins. Forbidden on every other type (`NG-W002`). | `…/dot11:wireless-interface` |
-| `poe` | [PoeConfig](#interfacespoe) | no | *unset* | This port is power sourcing equipment: it hands power down the cable (§17.3). Only on a type a cable terminates on — `ethernet` or `lag` (`NG-E006`). | `/power-ethernet-mib:pethPsePortTable/pethPsePortEntry` |
-| `parent` | interface name | no | *unset* | The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NG-I002`). | `…/if:lower-layer-if` |
-| `members` | interface name list | no | *unset* | The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`). | `…/if:lower-layer-if` |
-| `netns` | element name | no | *unset* | The network namespace this interface lives in (§23.1). Names an entry of the device's `spec.netns` (`NG-N022`); unset means the machine's initial namespace. Unlike `vrf`, which partitions one stack's routing table, this places the interface in a different stack entirely — its addresses do not collide with the same addresses elsewhere on the machine. | — |
-| `peer` | interface name | no | *unset* | The other end of the veth pair this interface is one end of (§23.2). Names another `type: ethernet` interface of the same element, which must name this one back (`NG-N023`). A veth end is `ianaift:ethernetCsmacd` like any other port; what it has instead of a socket is this peer, so a cable must not terminate on it (`NG-N024`). | `…/if:lower-layer-if` |
+| `vrf` | element name | no | *unset* | The routing instance this interface is in. Names an entry of the device's `spec.vrfs` (`NV-F002`); unset means the global instance. An address only collides with another address in the same VRF. | `/ni:network-instances/ni:network-instance/ni:name` |
+| `wireless` | [WirelessConfig](#specinterfaceswireless) | no | *unset* | Radio configuration of a `type: wifi` interface: which side of the association it is, which frequency it uses and which BSSs it beacons or joins. Forbidden on every other type (`NV-W002`). | `…/dot11:wireless-interface` |
+| `poe` | [PoeConfig](#interfacespoe) | no | *unset* | This port is power sourcing equipment: it hands power down the cable (§17.3). Only on a type a cable terminates on — `ethernet` or `lag` (`NV-E006`). | `/power-ethernet-mib:pethPsePortTable/pethPsePortEntry` |
+| `parent` | interface name | no | *unset* | The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NV-I002`). | `…/if:lower-layer-if` |
+| `members` | interface name list | no | *unset* | The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NV-I003`). | `…/if:lower-layer-if` |
+| `netns` | element name | no | *unset* | The network namespace this interface lives in (§23.1). Names an entry of the device's `spec.netns` (`NV-N022`); unset means the machine's initial namespace. Unlike `vrf`, which partitions one stack's routing table, this places the interface in a different stack entirely — its addresses do not collide with the same addresses elsewhere on the machine. | — |
+| `peer` | interface name | no | *unset* | The other end of the veth pair this interface is one end of (§23.2). Names another `type: ethernet` interface of the same element, which must name this one back (`NV-N023`). A veth end is `ianaift:ethernetCsmacd` like any other port; what it has instead of a socket is this peer, so a cable must not terminate on it (`NV-N024`). | `…/if:lower-layer-if` |
 | `range` | string | no | *unset* | Declares many interfaces at once instead of `name`, by bracket expansion over one or more numeric spans (`GigabitEthernet1/0/[1-48]`). Consumed by the loader: the entry is replaced by the interfaces it expands to before anything else sees the document. Exactly one of `name` and `range` is written. | — |
 
 * `range` expands as an odometer, the rightmost span varying fastest, and the width of a span's low bound is its zero padding (`[01-12]` yields `01`…`12`). In `description`, `{}` and `%d` stand for the last span and `{0}`, `{1}`, … for a span by position. See §6.2.5 of [`schema.md`](schema.md).
 * Inside a `spec` that declares `from`, an entry may state only `name` and the fields it overrides; the template supplies `type` and the rest.
 * `type: vlan` requires `parent` and a `vlan` block in access mode carrying the encapsulation VID.
 * `type: lag` and `type: bridge` require `members`, which must be non-empty, free of duplicates, and must not name the interface itself.
-* An interface carrying IPv6 addresses must have an MTU of at least 1280 (`NG-I011`).
+* An interface carrying IPv6 addresses must have an MTU of at least 1280 (`NV-I011`).
 
 ## `spec.interfaces[].ipv4`
 
@@ -182,18 +182,18 @@ RFC 8344's `ip:ipv4` container.
 | `forwarding` | boolean | no | *unset* | Whether the interface forwards IPv4. Left unset in the document, it inherits `spec.forwarding.ipv4`; RFC 8344's own default is false. | `…/ip:ipv4/ip:forwarding` |
 | `mtu` | integer, 68–65535 | no | *unset* | IPv4 MTU. Defaults to `interfaces[].mtu` once the document is loaded. | `…/ip:ipv4/ip:mtu` |
 | `addresses` | [IPv4Address](#specinterfacesipv4addresses) list | no | `[]` | The IPv4 addresses configured on the interface. `10.0.0.1/24` is shorthand for a full entry, and a bare list is shorthand for `{addresses: [...]}`. | `…/ip:ipv4/ip:address` |
-| `gateway` | IPv4 address | no | *unset* | First hop for off-link IPv4 traffic, as a bare address without a prefix length. It must lie inside one of this interface's own prefixes (`NG-A013`). | `rt:routing/…/static-routes/v4ur:ipv4/v4ur:route/…/next-hop-address` |
+| `gateway` | IPv4 address | no | *unset* | First hop for off-link IPv4 traffic, as a bare address without a prefix length. It must lie inside one of this interface's own prefixes (`NV-A013`). | `rt:routing/…/static-routes/v4ur:ipv4/v4ur:route/…/next-hop-address` |
 
 * A bare list is shorthand for the container: `ipv4: [10.0.0.1/24]` means `ipv4: {addresses: [{ip: 10.0.0.1, prefix_length: 24}]}`.
 
 ## `spec.interfaces[].ipv4.addresses[]`
 
-One IPv4 address. Addresses are unique within the interface (`NG-A002`).
+One IPv4 address. Addresses are unique within the interface (`NV-A002`).
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `ip` | IPv4 address | **yes** | — | The address itself, without a prefix and without a zone index. RFC 8344's list key. | `…/ip:ipv4/ip:address/ip:ip` |
-| `prefix_length` | integer, 0–32 | **yes** | — | Prefix length. May be written as a dotted-quad `netmask` instead, which is normalised to a prefix length on load; a non-contiguous mask is rejected (`NG-A003`). | `…/ip:ipv4/ip:address/ip:prefix-length` |
+| `prefix_length` | integer, 0–32 | **yes** | — | Prefix length. May be written as a dotted-quad `netmask` instead, which is normalised to a prefix length on load; a non-contiguous mask is rejected (`NV-A003`). | `…/ip:ipv4/ip:address/ip:prefix-length` |
 
 * `10.0.0.1/24` is shorthand for the mapping form.
 * `netmask: 255.255.255.0` may be written instead of `prefix_length`, but not as well as; it is normalised away on load and never appears in `netviz show` output.
@@ -208,7 +208,7 @@ RFC 8344's `ip:ipv6` container.
 | `forwarding` | boolean | no | *unset* | Whether the interface forwards IPv6. Inherits `spec.forwarding.ipv6` when unset. | `…/ip:ipv6/ip:forwarding` |
 | `mtu` | integer, 1280–4294967295 | no | *unset* | IPv6 MTU. Defaults to `interfaces[].mtu`, but only when that is at least 1280. | `…/ip:ipv6/ip:mtu` |
 | `addresses` | [IPv6Address](#specinterfacesipv6addresses) list | no | `[]` | The IPv6 addresses configured on the interface. Normalised to RFC 5952 lower-case compressed form. | `…/ip:ipv6/ip:address` |
-| `gateway` | IPv6 address | no | *unset* | First hop for off-link IPv6 traffic, as a bare address without a prefix length. It must lie inside one of this interface's own prefixes (`NG-A013`), unless it is link-local: `fe80::1` is on-link by definition and is exempt. | `rt:routing/…/static-routes/v6ur:ipv6/v6ur:route/…/next-hop-address` |
+| `gateway` | IPv6 address | no | *unset* | First hop for off-link IPv6 traffic, as a bare address without a prefix length. It must lie inside one of this interface's own prefixes (`NV-A013`), unless it is link-local: `fe80::1` is on-link by definition and is exempt. | `rt:routing/…/static-routes/v6ur:ipv6/v6ur:route/…/next-hop-address` |
 
 ## `spec.interfaces[].ipv6.addresses[]`
 
@@ -226,13 +226,13 @@ The 802.1Q bridge-port configuration of one interface.
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `mode` | `access` \| `trunk` | **yes** | — | Access or trunk. 802.1Q has neither concept; netviz expands the mode into a PVID, an acceptable-frame filter and VLAN membership (see docs/yang-mapping.md). | — |
-| `access_vlan` | integer, 1–4094 | no | *unset* | The VLAN an access port belongs to, and the encapsulation VID of a `type: vlan` sub-interface. Required in access mode — it defaults to 1 — and forbidden in trunk mode (`NG-V002`). | `…/dot1q:bridge-port/dot1q:pvid` |
+| `access_vlan` | integer, 1–4094 | no | *unset* | The VLAN an access port belongs to, and the encapsulation VID of a `type: vlan` sub-interface. Required in access mode — it defaults to 1 — and forbidden in trunk mode (`NV-V002`). | `…/dot1q:bridge-port/dot1q:pvid` |
 | `trunk_vlans` | VLAN set | no | *unset* | The tagged VLAN set of a trunk port. Required in trunk mode, forbidden in access mode. | `…/dot1q:vlan/dot1q:egress-ports (tagged)` |
-| `native_vlan` | integer, 1–4094 | no | *unset* | The untagged VLAN on a trunk. Trunk mode only (`NG-V003`); it is implicitly a member of the port's VLAN set. | `…/dot1q:bridge-port/dot1q:pvid` |
+| `native_vlan` | integer, 1–4094 | no | *unset* | The untagged VLAN on a trunk. Trunk mode only (`NV-V003`); it is implicitly a member of the port's VLAN set. | `…/dot1q:bridge-port/dot1q:pvid` |
 | `ingress_filtering` | boolean | no | `true` | Drop frames tagged with a VLAN the port is not a member of. | `…/dot1q:bridge-port/dot1q:enable-ingress-filtering` |
 | `acceptable_frames` | `admit-all-frames` \| `admit-only-VLAN-tagged-frames` \| `admit-only-untagged-and-priority-tagged` | no | *unset* | Which frames the port admits. Derived from `mode` and `native_vlan` when not stated. | `…/dot1q:bridge-port/dot1q:acceptable-frame` |
 
-* In `access` mode: `access_vlan` is allowed and defaults to 1; `trunk_vlans` and `native_vlan` are rejected (`NG-V002`, `NG-V003`).
+* In `access` mode: `access_vlan` is allowed and defaults to 1; `trunk_vlans` and `native_vlan` are rejected (`NV-V002`, `NV-V003`).
 * In `trunk` mode: `trunk_vlans` is required and `access_vlan` is rejected.
 * `trunk_vlans` accepts an id, a list, `"10,20,100-110"`, `all` (1–4094) or `none`, and always serialises back to the coalesced string form.
 
@@ -242,15 +242,15 @@ The radio configuration of a `type: wifi` interface: which side of the associati
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `role` | `ap` \| `station` \| `mesh` | **yes** | — | Which side of the association this radio is: `ap` beacons the SSIDs, `station` and `mesh` associate to one. A wireless link joins exactly one `ap` to one client (`NG-W007`). | `…/dot11:station-config/dot11:desired-bss-type` |
+| `role` | `ap` \| `station` \| `mesh` | **yes** | — | Which side of the association this radio is: `ap` beacons the SSIDs, `station` and `mesh` associate to one. A wireless link joins exactly one `ap` to one client (`NV-W007`). | `…/dot11:station-config/dot11:desired-bss-type` |
 | `band` | `2.4GHz` \| `5GHz` \| `6GHz` | no | *unset* | The band the radio operates in: `2.4GHz`, `5GHz` or `6GHz`. Required alongside `channel` and `width_mhz`, because both mean different frequencies in different bands. | `…/dot11:phy/dot11:channel-starting-factor` |
-| `channel` | integer, 1–233 | no | *unset* | The primary 20 MHz channel, as the band numbers it (`NG-W003`). | `…/dot11:phy/dot11:current-channel-number` |
-| `width_mhz` | `20` \| `40` \| `80` \| `160` \| `320` | no | *unset* | Total channel width in MHz. 40 is the most 2.4 GHz can bond and 320 is 6 GHz only (`NG-W004`). | `…/dot11:phy/dot11:current-channel-width` |
+| `channel` | integer, 1–233 | no | *unset* | The primary 20 MHz channel, as the band numbers it (`NV-W003`). | `…/dot11:phy/dot11:current-channel-number` |
+| `width_mhz` | `20` \| `40` \| `80` \| `160` \| `320` | no | *unset* | Total channel width in MHz. 40 is the most 2.4 GHz can bond and 320 is 6 GHz only (`NV-W004`). | `…/dot11:phy/dot11:current-channel-width` |
 | `tx_power_dbm` | number, -30.0–40.0 | no | *unset* | Radiated power in dBm. The MIB counts abstract power *levels* per PHY, so the unit is netviz's own. | `…/dot11:phy/dot11:current-tx-power-level` |
-| `bss` | [Bss](#specinterfaceswirelessbss) list | no | `[]` | The basic service sets this radio beacons (`ap`) or is associated to (`station`, `mesh`, at most one — `NG-W006`). | `…/dot11:bss` |
+| `bss` | [Bss](#specinterfaceswirelessbss) list | no | `[]` | The basic service sets this radio beacons (`ap`) or is associated to (`station`, `mesh`, at most one — `NV-W006`). | `…/dot11:bss` |
 
-* `channel` and `width_mhz` both require `band`: channel numbers repeat between the 2.4 GHz and 6 GHz plans, and 320 MHz exists only at 6 GHz (`NG-W003`, `NG-W004`).
-* A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` radio (`NG-W007`); that association is what the layer-2 view labels with `SSID @ channel/band`.
+* `channel` and `width_mhz` both require `band`: channel numbers repeat between the 2.4 GHz and 6 GHz plans, and 320 MHz exists only at 6 GHz (`NV-W003`, `NV-W004`).
+* A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` radio (`NV-W007`); that association is what the layer-2 view labels with `SSID @ channel/band`.
 
 ## `spec.interfaces[].wireless.bss[]`
 
@@ -258,14 +258,14 @@ One basic service set: an SSID the radio beacons, or — on a client radio — t
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `ssid` | string, 1–32 characters | **yes** | — | The network name, 1 to 32 octets. Unique within one radio (`NG-W005`), and on a client radio it must be one the AP at the far end advertises (`NG-W010`). | `…/dot11:bss/dot11:ssid` |
-| `bssid` | MAC address | no | *unset* | MAC address of this BSS — usually the radio's own for the first SSID and a derived one for each further SSID. Unique across the inventory (`NG-W008`). | `…/dot11:bss/dot11:bssid` |
-| `vlan` | integer, 1–4094 | no | *unset* | The VLAN this SSID's traffic is bridged into. Absent means the radio's untagged domain. Checked against the device's VLAN database (`W113`) and against the VLANs the access point actually carries (`NG-W009`). | — |
+| `ssid` | string, 1–32 characters | **yes** | — | The network name, 1 to 32 octets. Unique within one radio (`NV-W005`), and on a client radio it must be one the AP at the far end advertises (`NV-W010`). | `…/dot11:bss/dot11:ssid` |
+| `bssid` | MAC address | no | *unset* | MAC address of this BSS — usually the radio's own for the first SSID and a derived one for each further SSID. Unique across the inventory (`NV-W008`). | `…/dot11:bss/dot11:bssid` |
+| `vlan` | integer, 1–4094 | no | *unset* | The VLAN this SSID's traffic is bridged into. Absent means the radio's untagged domain. Checked against the device's VLAN database (`W113`) and against the VLANs the access point actually carries (`NV-W009`). | — |
 | `security` | `open` \| `wpa2-psk` \| `wpa2-eap` \| `wpa3-psk` \| `wpa3-eap` | no | *unset* | How the BSS authenticates: `open`, or WPA2/WPA3 with a passphrase (`-psk`) or an authentication server (`-eap`). Absent means nobody recorded it. | `…/dot11:bss/dot11:rsna-enabled` |
 | `hidden` | boolean | no | `false` | The SSID is left out of the beacon. It is still on the air, and still a BSS this radio serves. | — |
 
-* An `ap` radio lists one entry per SSID it serves; a `station` or `mesh` radio lists at most one (`NG-W006`).
-* `vlan` is where the SSID's traffic goes on the wired side. It has to be a VLAN the access point carries somewhere (`NG-W009`), or clients associate and reach nothing.
+* An `ap` radio lists one entry per SSID it serves; a `station` or `mesh` radio lists at most one (`NV-W006`).
+* `vlan` is where the SSID's traffic goes on the wired side. It has to be a VLAN the access point carries somewhere (`NV-W009`), or clients associate and reach nothing.
 
 ## `spec.netns[]`
 
@@ -273,14 +273,14 @@ One network namespace the machine runs (§23.1) — a whole second network stack
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `name` | element name | **yes** | — | Name of the namespace, as `ip netns` spells it. Unique within the device (`NG-N020`), and what `interfaces[].netns` and another entry's `parent` refer to. | — |
-| `parent` | element name | no | *unset* | The namespace this one was created inside (`NG-N021`). Unset means the machine's initial namespace. This is the whole of the hierarchy: a namespace has exactly one creator, so nesting is a tree. | — |
+| `name` | element name | **yes** | — | Name of the namespace, as `ip netns` spells it. Unique within the device (`NV-N020`), and what `interfaces[].netns` and another entry's `parent` refer to. | — |
+| `parent` | element name | no | *unset* | The namespace this one was created inside (`NV-N021`). Unset means the machine's initial namespace. This is the whole of the hierarchy: a namespace has exactly one creator, so nesting is a tree. | — |
 | `description` | string | no | *unset* | Free text: what the namespace is for — a tenant, a container, a test harness. | — |
 
-* `parent` names another entry of the same table, which is how namespaces nest: a namespace is created from inside exactly one other, so the nesting is a tree (`NG-N021`). Unset means the machine's initial namespace, which no document declares.
+* `parent` names another entry of the same table, which is how namespaces nest: a namespace is created from inside exactly one other, so the nesting is a tree (`NV-N021`). Unset means the machine's initial namespace, which no document declares.
 * Not a VRF. A VRF partitions the routing table of one stack; a namespace *is* a second stack, so it partitions the interface names, the addresses and the sockets as well. An interface can be in both.
 * Namespaces are joined by veth pairs, which are ordinary `type: ethernet` interfaces naming each other with `peer` (§23.2).
-* A namespace no interface is in holds nothing, which is `NG-N026`.
+* A namespace no interface is in holds nothing, which is `NV-N026`.
 
 ## `spec.vrfs[]`
 
@@ -288,12 +288,12 @@ One routing instance — a VRF (§16.1). An interface joins it with `vrf`, and t
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `name` | element name | **yes** | — | Name of the routing instance. Unique within the device (`NG-F001`), and what an interface's `vrf` and a route's `vrf` refer to. Two devices using one name mean one VRF. | `/ni:network-instances/ni:network-instance/ni:name` |
+| `name` | element name | **yes** | — | Name of the routing instance. Unique within the device (`NV-F001`), and what an interface's `vrf` and a route's `vrf` refer to. Two devices using one name mean one VRF. | `/ni:network-instances/ni:network-instance/ni:name` |
 | `rd` | route distinguisher | **yes** | — | Route distinguisher, in one of the three RFC 4364 §4.2 encodings: `65000:1`, `192.0.2.1:1` or `4200000000:1`. Quote it — an unquoted `65000:1` is a number to YAML. | — |
 | `description` | string | no | *unset* | Free text: what the instance is for. | `/ni:network-instances/ni:network-instance/ni:description` |
 
 * Two devices that use the same `name` are taken to mean the same VRF; the route distinguisher is recorded because MPLS needs it, not to identify the instance.
-* A VRF no interface binds to holds nothing, which is `NG-F014`.
+* A VRF no interface binds to holds nothing, which is `NV-F014`.
 
 ## `spec.route_tables[]`
 
@@ -301,12 +301,12 @@ One routing table beyond the three every stack has (§16.2). A table is a contai
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `name` | element name | **yes** | — | Name of the routing table. Unique within the device, and not one of the reserved `main`, `local` or `default`, which exist without being declared (`NG-F015`). | — |
-| `id` | integer, 1–4294967295 | **yes** | — | The number the table is known by, 1-4294967295. Unique within the device, and not 253, 254 or 255 — those are the reserved three under another name (`NG-F015`). | — |
+| `name` | element name | **yes** | — | Name of the routing table. Unique within the device, and not one of the reserved `main`, `local` or `default`, which exist without being declared (`NV-F015`). | — |
+| `id` | integer, 1–4294967295 | **yes** | — | The number the table is known by, 1-4294967295. Unique within the device, and not 253, 254 or 255 — those are the reserved three under another name (`NV-F015`). | — |
 | `description` | string | no | *unset* | Free text: what the table is for. | — |
 
-* `main`, `local` and `default` exist without being declared and may not be declared, by either name or number (`NG-F015`).
-* A table nothing looks up is consulted by nothing (`NG-F023`); a rule looking up a table nothing is placed in falls through (`NG-F022`).
+* `main`, `local` and `default` exist without being declared and may not be declared, by either name or number (`NV-F015`).
+* A table nothing looks up is consulted by nothing (`NV-F023`); a rule looking up a table nothing is placed in falls through (`NV-F022`).
 
 ## `spec.routes[]`
 
@@ -315,16 +315,16 @@ One configured static route (§16.3).
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `prefix` | IPv4 prefix \| IPv6 prefix | **yes** | — | Destination prefix, either family, in canonical CIDR form. Host bits are rejected: a destination with them set is a typo or a host route, and netviz will not guess which. | `…/rt:static-routes/v4ur:ipv4/v4ur:route/v4ur:destination-prefix` |
-| `via` | IPv4 address \| IPv6 address | no | *unset* | Next-hop address. Same family as `prefix` (`NG-F003`), and on a prefix the device configures (`NG-F008`). | `…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address` |
-| `dev` | interface name | no | *unset* | Egress interface, for an unnumbered next hop or a route pointed at an interface. Names an interface of this device (`NG-F009`). | `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface` |
-| `vrf` | element name | no | *unset* | The routing instance holding the route. Names an entry of `spec.vrfs` (`NG-F005`); unset means the global instance. | `/ni:network-instances/ni:network-instance/ni:name` |
-| `table` | element name | no | *unset* | The routing table holding the route; `main` when unset. Names an entry of `spec.route_tables` or a reserved table (`NG-F019`). A VRF is a table of its own, so `vrf` and `table` are alternatives, not a pair (`NG-F018`). | — |
+| `via` | IPv4 address \| IPv6 address | no | *unset* | Next-hop address. Same family as `prefix` (`NV-F003`), and on a prefix the device configures (`NV-F008`). | `…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address` |
+| `dev` | interface name | no | *unset* | Egress interface, for an unnumbered next hop or a route pointed at an interface. Names an interface of this device (`NV-F009`). | `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface` |
+| `vrf` | element name | no | *unset* | The routing instance holding the route. Names an entry of `spec.vrfs` (`NV-F005`); unset means the global instance. | `/ni:network-instances/ni:network-instance/ni:name` |
+| `table` | element name | no | *unset* | The routing table holding the route; `main` when unset. Names an entry of `spec.route_tables` or a reserved table (`NV-F019`). A VRF is a table of its own, so `vrf` and `table` are alternatives, not a pair (`NV-F018`). | — |
 | `metric` | integer, 0–4294967295 | no | *unset* | Administrative distance or cost, as this device counts it. Documentation only: netviz does not compute a best path. | — |
-| `blackhole` | boolean | no | `false` | Discard matching packets. Excludes `via` and `dev` (`NG-F004`). | `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop` |
+| `blackhole` | boolean | no | `false` | Discard matching packets. Excludes `via` and `dev` (`NV-F004`). | `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop` |
 
-* At least one of `via`, `dev` and `blackhole` is required, and `blackhole` excludes the other two (`NG-F004`).
-* `via` is of the same family as `prefix` (`NG-F003`) and must be on-link: inside a prefix the device configures, in the same VRF (`NG-F008`).
-* `vrf` and `table` are alternatives, not a pair: a VRF is a routing table of its own (`NG-F018`).
+* At least one of `via`, `dev` and `blackhole` is required, and `blackhole` excludes the other two (`NV-F004`).
+* `via` is of the same family as `prefix` (`NV-F003`) and must be on-link: inside a prefix the device configures, in the same VRF (`NV-F008`).
+* `vrf` and `table` are alternatives, not a pair: a VRF is a routing table of its own (`NV-F018`).
 
 ## `spec.routing_policy[]`
 
@@ -332,22 +332,22 @@ One rule of the routing policy database (§16.4): which *table* a packet is rout
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `priority` | integer, 0–4294967295 | **yes** | — | Where the rule sits in the policy database, 0-4294967295. The database is walked from the lowest priority upwards and the first match decides, so this is the rule's position and its identity: unique within the device per family (`NG-F020`). | — |
+| `priority` | integer, 0–4294967295 | **yes** | — | Where the rule sits in the policy database, 0-4294967295. The database is walked from the lowest priority upwards and the first match decides, so this is the rule's position and its identity: unique within the device per family (`NV-F020`). | — |
 | `family` | `ipv4` \| `ipv6` | no | *unset* | `ipv4` or `ipv6` — which family's database the rule is installed in. Derived from `src`/`dst` when they say, and both families when nothing does. | — |
 | `src` | IPv4 prefix \| IPv6 prefix | no | *unset* | Match packets from this prefix. The selector policy-based routing exists for: it is what makes a source route a source route. | — |
 | `dst` | IPv4 prefix \| IPv6 prefix | no | *unset* | Match packets to this prefix. | — |
 | `fwmark` | string | no | *unset* | Match the mark a firewall put on the packet, optionally masked: `0x1`, `0x1/0xff`, or a plain number. This is how a port, a user or an application reaches the policy database — something marks, and this matches. | — |
-| `iif` | interface name | no | *unset* | Match packets that arrived on this interface. Names an interface of this device (`NG-F021`). | — |
-| `oif` | interface name | no | *unset* | Match packets that would leave by this interface — locally originated traffic from a socket bound to it. Names an interface of this device (`NG-F021`). | — |
+| `iif` | interface name | no | *unset* | Match packets that arrived on this interface. Names an interface of this device (`NV-F021`). | — |
+| `oif` | interface name | no | *unset* | Match packets that would leave by this interface — locally originated traffic from a socket bound to it. Names an interface of this device (`NV-F021`). | — |
 | `dscp` | integer, 0–63 | no | *unset* | Match this DSCP code point, 0-63 (RFC 2474 §3) — the six bits, not the whole octet. | — |
-| `invert` | boolean | no | `false` | Match everything the selectors do *not*. Needs a selector to invert (`NG-F017`). | — |
+| `invert` | boolean | no | `false` | Match everything the selectors do *not*. Needs a selector to invert (`NV-F017`). | — |
 | `action` | `lookup` \| `blackhole` \| `unreachable` \| `prohibit` \| `goto` | no | `lookup` | What happens to a matching packet: `lookup` routes it by `table`, `blackhole`, `unreachable` and `prohibit` discard it, `goto` jumps to another priority. Default `lookup`. | — |
-| `table` | element name | no | *unset* | The table to route by. Required by `lookup` and refused by every other action (`NG-F016`); names an entry of `spec.route_tables`, a VRF, or a reserved table (`NG-F019`). | — |
-| `goto` | integer, 0–4294967295 | no | *unset* | The priority to jump to. Required by `goto` and refused by every other action (`NG-F016`), and strictly greater than this rule's own — the database is walked upwards, so a backwards jump is a loop. | — |
+| `table` | element name | no | *unset* | The table to route by. Required by `lookup` and refused by every other action (`NV-F016`); names an entry of `spec.route_tables`, a VRF, or a reserved table (`NV-F019`). | — |
+| `goto` | integer, 0–4294967295 | no | *unset* | The priority to jump to. Required by `goto` and refused by every other action (`NV-F016`), and strictly greater than this rule's own — the database is walked upwards, so a backwards jump is a loop. | — |
 | `description` | string | no | *unset* | Free text: what the rule is for. | — |
 
-* The database is walked from the lowest `priority` upwards and the first match decides, so `priority` is the rule's position and its identity: unique within the device, per family (`NG-F020`).
-* A rule with no selector matches every packet, which terminates the database — and makes every rule after it in that family unreachable (`NG-F024`).
+* The database is walked from the lowest `priority` upwards and the first match decides, so `priority` is the rule's position and its identity: unique within the device, per family (`NV-F020`).
+* A rule with no selector matches every packet, which terminates the database — and makes every rule after it in that family unreachable (`NV-F024`).
 * There is no layer-4 selector. Mark the packet in the firewall and match `fwmark` here; see §16.7.
 
 ## `spec.routing`
@@ -366,8 +366,8 @@ One OSPF area, and the interfaces that run it.
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `area` | OSPF area | no | `0.0.0.0` | Area identifier, written as a dotted quad or as a plain number; `0` and `0.0.0.0` are the same backbone area and both normalise to `0.0.0.0`. | — |
-| `router_id` | IPv4 address | no | *unset* | Router identifier — a dotted quad even in an IPv6-only network. Unique across the inventory (`NG-F012`). | — |
-| `interfaces` | interface name list, ≥ 1 entry | **yes** | — | The interfaces OSPF runs on. Non-empty, free of duplicates (`NG-F006`), and each one an interface of this device (`NG-F010`). | `/if:interfaces/if:interface/if:name` |
+| `router_id` | IPv4 address | no | *unset* | Router identifier — a dotted quad even in an IPv6-only network. Unique across the inventory (`NV-F012`). | — |
+| `interfaces` | interface name list, ≥ 1 entry | **yes** | — | The interfaces OSPF runs on. Non-empty, free of duplicates (`NV-F006`), and each one an interface of this device (`NV-F010`). | `/if:interfaces/if:interface/if:name` |
 
 * `area` accepts `0` and `0.0.0.0` for the backbone and stores the dotted quad, so two documents that spell one area differently still compare equal.
 * One area per device: per-interface areas, and therefore area border routers, are deferred (§16.7).
@@ -379,7 +379,7 @@ The autonomous system this device is in, and the sessions it configures.
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `asn` | integer, 1–4294967295 | **yes** | — | Local autonomous system number, 1 to 4294967295. AS 0 is reserved (RFC 7607). | — |
-| `router_id` | IPv4 address | no | *unset* | BGP identifier — a dotted quad. Unique across the inventory (`NG-F012`); commonly the same value as the OSPF router id, which is one identity rather than a duplicate. | — |
+| `router_id` | IPv4 address | no | *unset* | BGP identifier — a dotted quad. Unique across the inventory (`NV-F012`); commonly the same value as the OSPF router id, which is one identity rather than a duplicate. | — |
 | `neighbors` | [BgpNeighbor](#specroutingbgpneighbors) list | no | `[]` | The sessions this device configures. Peers are named by address, never by element name. | — |
 
 ## `spec.routing.bgp.neighbors[]`
@@ -388,11 +388,11 @@ One BGP session. The peer is an **address**, which is what the device is configu
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `address` | IPv4 address \| IPv6 address | **yes** | — | Peer address. Resolved against every address the inventory configures; a peer that resolves to nothing is `NG-F013`, a warning, because an eBGP peer may be external. | — |
-| `remote_asn` | integer, 1–4294967295 | **yes** | — | The AS the peer is in. Checked against the peer's own `asn` when the address resolves (`NG-F011`). | — |
+| `address` | IPv4 address \| IPv6 address | **yes** | — | Peer address. Resolved against every address the inventory configures; a peer that resolves to nothing is `NV-F013`, a warning, because an eBGP peer may be external. | — |
+| `remote_asn` | integer, 1–4294967295 | **yes** | — | The AS the peer is in. Checked against the peer's own `asn` when the address resolves (`NV-F011`). | — |
 | `description` | string | no | *unset* | Free text: what the session is for. | — |
 
-* The address is resolved against every address the inventory configures. A peer that resolves to nothing is a warning (`NG-F013`), because an eBGP peer may be a transit provider nobody declares here; a peer whose own `asn` contradicts `remote_asn` is an error (`NG-F011`).
+* The address is resolved against every address the inventory configures. A peer that resolves to nothing is a warning (`NV-F013`), because an eBGP peer may be a transit provider nobody declares here; a peer whose own `asn` contradicts `remote_asn` is an error (`NV-F011`).
 
 ## `spec.zones[]`
 
@@ -400,12 +400,12 @@ One security zone (§24.1): a name, and the interfaces in it. Policy is written 
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `name` | element name | **yes** | — | Name of the zone. Unique within the device, and not `local`, which is the machine itself and is nameable in a rule without being declared (`NG-B001`). | — |
-| `interfaces` | interface name list | no | `[]` | The interfaces in this zone. Each names an interface of this device (`NG-B002`), and no interface is in two zones (`NG-B003`). A zone holding none is inert (`W150`). | — |
+| `name` | element name | **yes** | — | Name of the zone. Unique within the device, and not `local`, which is the machine itself and is nameable in a rule without being declared (`NV-B001`). | — |
+| `interfaces` | interface name list | no | `[]` | The interfaces in this zone. Each names an interface of this device (`NV-B002`), and no interface is in two zones (`NV-B003`). A zone holding none is inert (`W150`). | — |
 | `description` | string | no | *unset* | Free text: what the zone is for. | — |
 
-* An interface is in at most one zone (`NG-B003`). That is the defining property of a zone, and what makes `from lan` a statement about a packet rather than a question.
-* `local` is the machine itself and may not be declared (`NG-B001`); it is nameable in a rule without being declared.
+* An interface is in at most one zone (`NV-B003`). That is the defining property of a zone, and what makes `from lan` a statement about a packet rather than a question.
+* `local` is the machine itself and may not be declared (`NV-B001`); it is nameable in a rule without being declared.
 * A zone holding no interface is inert (`W150`); an interface in no zone, on a device that declares zones at all, is worth a second look (`W151`).
 
 ## `spec.firewall`
@@ -414,15 +414,15 @@ What the device does to the packets it sees (§24.2): the three defaults, the fi
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `default_input` | `accept` \| `drop` \| `reject` \| `mark` \| `log` | no | `drop` | What a packet *for this machine* gets when no rule decides. One of `accept`, `drop` and `reject` — a default has to decide (`NG-B007`). Defaults to `drop`. | — |
+| `default_input` | `accept` \| `drop` \| `reject` \| `mark` \| `log` | no | `drop` | What a packet *for this machine* gets when no rule decides. One of `accept`, `drop` and `reject` — a default has to decide (`NV-B007`). Defaults to `drop`. | — |
 | `default_forward` | `accept` \| `drop` \| `reject` \| `mark` \| `log` | no | `drop` | What a packet *through* this machine gets when no rule decides, on the same terms. Defaults to `drop`. | — |
 | `default_output` | `accept` \| `drop` \| `reject` \| `mark` \| `log` | no | `accept` | What a packet *from* this machine gets when no rule decides, on the same terms. Defaults to `accept`: a machine that cannot answer a DNS query cannot be administered either. | — |
 | `rules` | [FirewallRule](#specfirewallrules) list | no | `[]` | The filter policy, in declaration order. What the device walks is this list in *priority* order, lowest first, first terminal match deciding (§24.2). | — |
 | `nat` | [NatRule](#specfirewallnat) list | no | `[]` | The address translations, in the order they are tried (§24.4). Apart from `rules` because a packet is translated *and* filtered, in different hooks. | — |
 | `description` | string | no | *unset* | Free text: what the policy as a whole is for. | — |
 
-* The defaults are *deny inbound, deny transit, permit outbound*. Each has to decide the packet, so `mark` and `log` are refused there (`NG-B007`).
-* Available on every layer-3 kind, not only on `kind: firewall`: a router with three rules on it filters, and that is what most networks run. A `hub` has no IP stack and refuses both this and `zones` (`NG-H003`).
+* The defaults are *deny inbound, deny transit, permit outbound*. Each has to decide the packet, so `mark` and `log` are refused there (`NV-B007`).
+* Available on every layer-3 kind, not only on `kind: firewall`: a router with three rules on it filters, and that is what most networks run. A `hub` has no IP stack and refuses both this and `zones` (`NV-H003`).
 
 ## `spec.firewall.rules[]`
 
@@ -430,26 +430,26 @@ One filter rule (§24.2): which packets it picks out, and what happens to them. 
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `priority` | integer, 0–4294967295 | **yes** | — | Unique within the device, per family (`NG-B008`). The chain is walked from the lowest priority upwards; the first rule whose action is terminal decides, and nothing after it is consulted. | — |
+| `priority` | integer, 0–4294967295 | **yes** | — | Unique within the device, per family (`NV-B008`). The chain is walked from the lowest priority upwards; the first rule whose action is terminal decides, and nothing after it is consulted. | — |
 | `name` | element name | no | *unset* | Optional label, for the diagram and for a diagnostic to name the rule by. | — |
-| `src_zone` | element name | no | *unset* | The zone the packet came from: a declared zone, or `local` for traffic this machine generated (`NG-B004`). Unset matches any zone. | — |
-| `dst_zone` | element name | no | *unset* | The zone the packet is going to, on the same terms (`NG-B004`). Together with `src_zone` this decides the hook: `to: local` is input, `from: local` is output, two real zones are forward. | — |
-| `family` | `ipv4` \| `ipv6` | no | *unset* | Which family's chain the rule is in. Omit to install in both, and derive from `src`, `dst` or `protocol` when possible (`NG-B005`); `ipv4` and `ipv6` are explicit. | — |
+| `src_zone` | element name | no | *unset* | The zone the packet came from: a declared zone, or `local` for traffic this machine generated (`NV-B004`). Unset matches any zone. | — |
+| `dst_zone` | element name | no | *unset* | The zone the packet is going to, on the same terms (`NV-B004`). Together with `src_zone` this decides the hook: `to: local` is input, `from: local` is output, two real zones are forward. | — |
+| `family` | `ipv4` \| `ipv6` | no | *unset* | Which family's chain the rule is in. Omit to install in both, and derive from `src`, `dst` or `protocol` when possible (`NV-B005`); `ipv4` and `ipv6` are explicit. | — |
 | `src` | IPv4 prefix \| IPv6 prefix | no | *unset* | Source prefix selector. Either family; optional. | — |
 | `dst` | IPv4 prefix \| IPv6 prefix | no | *unset* | Destination prefix selector, on the same terms. | — |
-| `protocol` | `tcp` \| `udp` \| `icmp` \| `icmpv6` \| `sctp` \| `esp` \| `ah` \| `gre` | no | *unset* | The IP protocol. Required by `src_ports` and `dst_ports`, which only `tcp`, `udp` and `sctp` have (`NG-B005`). `icmp` is IPv4 and `icmpv6` is IPv6, and stating one against the other family is refused. | — |
+| `protocol` | `tcp` \| `udp` \| `icmp` \| `icmpv6` \| `sctp` \| `esp` \| `ah` \| `gre` | no | *unset* | The IP protocol. Required by `src_ports` and `dst_ports`, which only `tcp`, `udp` and `sctp` have (`NV-B005`). `icmp` is IPv4 and `icmpv6` is IPv6, and stating one against the other family is refused. | — |
 | `src_ports` | string list | no | `[]` | Source ports: single ports and closed ranges (`443`, `30000-32767`), matched as a set. | — |
 | `dst_ports` | string list | no | `[]` | Destination ports, on the same terms. The usual selector, since it is the one that names the service. | — |
 | `ct_state` | `new` \| `established` \| `related` \| `invalid` list | no | `[]` | Connection-tracking states, matched as a set. Empty matches any state; one rule accepting `established` and `related` replaces the return path of every other rule. | — |
-| `iif` | interface name | no | *unset* | Ingress interface selector (`NG-B009`), for when a zone is too coarse. Rare: the point of a zone is not needing this. | — |
-| `oif` | interface name | no | *unset* | Egress interface selector, on the same terms (`NG-B009`). | — |
-| `invert` | boolean | no | `false` | Match everything the selectors do not. Meaningless without a selector to invert (`NG-B005`). | — |
+| `iif` | interface name | no | *unset* | Ingress interface selector (`NV-B009`), for when a zone is too coarse. Rare: the point of a zone is not needing this. | — |
+| `oif` | interface name | no | *unset* | Egress interface selector, on the same terms (`NV-B009`). | — |
+| `invert` | boolean | no | `false` | Match everything the selectors do not. Meaningless without a selector to invert (`NV-B005`). | — |
 | `action` | `accept` \| `drop` \| `reject` \| `mark` \| `log` | **yes** | — | `accept`, `drop` and `reject` decide the packet and end the walk; `mark` writes a firewall mark and `log` records it, and both carry on to the next rule. Stated, never defaulted. | — |
-| `mark` | string | no | *unset* | The mark to write, hexadecimal, optionally masked. Required by `action: mark` and refused by everything else (`NG-B005`). This is what `spec.routing_policy[].fwmark` reads — see §16.9 and §24.3. | — |
-| `log_prefix` | string, ≤ 64 characters | no | *unset* | The tag put in front of a logged packet. For `action: log` only (`NG-B005`). | — |
+| `mark` | string | no | *unset* | The mark to write, hexadecimal, optionally masked. Required by `action: mark` and refused by everything else (`NV-B005`). This is what `spec.routing_policy[].fwmark` reads — see §16.9 and §24.3. | — |
+| `log_prefix` | string, ≤ 64 characters | no | *unset* | The tag put in front of a logged packet. For `action: log` only (`NV-B005`). | — |
 | `description` | string | no | *unset* | Free text: what the rule is for. | — |
 
-* The chain is walked from the lowest `priority` upwards and the first *terminal* match decides, so `priority` is the rule's position and its identity: unique within the device, per family (`NG-B008`).
+* The chain is walked from the lowest `priority` upwards and the first *terminal* match decides, so `priority` is the rule's position and its identity: unique within the device, per family (`NV-B008`).
 * `accept`, `drop` and `reject` are terminal; `mark` and `log` do something to the packet and carry on walking, which is what makes them useful.
 * The hook is derived, never written: `dst_zone: local` is input, `src_zone: local` is output, two real zones are forward. A rule naming one real zone is in both the hooks it could be in.
 * A rule with no selector matches everything reaching its hooks, which terminates the chain — and makes every rule after it unreachable (`W154`).
@@ -462,20 +462,20 @@ One address translation (§24.4). Apart from the filter rules because it happens
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `name` | element name | no | *unset* | Optional label, for a diagnostic to name the translation by. | — |
-| `type` | `snat` \| `masquerade` \| `dnat` \| `redirect` | **yes** | — | `snat` and `masquerade` rewrite the source on the way out; `dnat` and `redirect` rewrite the destination on the way in. Which of the two fields below are required follows from this (`NG-B006`). | — |
-| `src_zone` | element name | no | *unset* | The zone the packet came from (`NG-B004`). | — |
-| `dst_zone` | element name | no | *unset* | The zone it is going to (`NG-B004`). The usual selector for a source translation: *everything leaving towards the wan is masqueraded*. | — |
-| `family` | `ipv4` \| `ipv6` | no | *unset* | Which family the translation is in. Derived from any address it names (`NG-B006`). | — |
+| `type` | `snat` \| `masquerade` \| `dnat` \| `redirect` | **yes** | — | `snat` and `masquerade` rewrite the source on the way out; `dnat` and `redirect` rewrite the destination on the way in. Which of the two fields below are required follows from this (`NV-B006`). | — |
+| `src_zone` | element name | no | *unset* | The zone the packet came from (`NV-B004`). | — |
+| `dst_zone` | element name | no | *unset* | The zone it is going to (`NV-B004`). The usual selector for a source translation: *everything leaving towards the wan is masqueraded*. | — |
+| `family` | `ipv4` \| `ipv6` | no | *unset* | Which family the translation is in. Derived from any address it names (`NV-B006`). | — |
 | `src` | IPv4 prefix \| IPv6 prefix | no | *unset* | Source prefix selector. | — |
 | `dst` | IPv4 prefix \| IPv6 prefix | no | *unset* | Destination prefix selector. | — |
-| `protocol` | `tcp` \| `udp` \| `icmp` \| `icmpv6` \| `sctp` \| `esp` \| `ah` \| `gre` | no | *unset* | The IP protocol. Required by `dst_ports` (`NG-B006`). | — |
+| `protocol` | `tcp` \| `udp` \| `icmp` \| `icmpv6` \| `sctp` \| `esp` \| `ah` \| `gre` | no | *unset* | The IP protocol. Required by `dst_ports` (`NV-B006`). | — |
 | `dst_ports` | string list | no | `[]` | Destination ports: the *published* port, not the internal one, which is `to_port`. | — |
-| `to_address` | IPv4 address \| IPv6 address | no | *unset* | What the address becomes. Required by `snat` and `dnat`; refused by `masquerade` (whose address is the egress interface's, unknown here) and by `redirect` (whose address is this machine) — `NG-B006`. | — |
-| `to_port` | integer, 1–65535 | no | *unset* | What the port becomes. Required by `redirect`, which translates the port and nothing else; on a source translation it needs a `dst_ports` to be about (`NG-B006`). | — |
+| `to_address` | IPv4 address \| IPv6 address | no | *unset* | What the address becomes. Required by `snat` and `dnat`; refused by `masquerade` (whose address is the egress interface's, unknown here) and by `redirect` (whose address is this machine) — `NV-B006`. | — |
+| `to_port` | integer, 1–65535 | no | *unset* | What the port becomes. Required by `redirect`, which translates the port and nothing else; on a source translation it needs a `dst_ports` to be about (`NV-B006`). | — |
 | `description` | string | no | *unset* | Free text: what the translation is for. | — |
 
 * Order in the list is the order the translations are tried, first match winning. There is no `priority`: a number that only ever repeated the position would be one more thing to keep in step.
-* `snat` and `dnat` state the address they translate to; `masquerade` cannot (it is the egress interface's, unknown until the packet leaves) and `redirect` need not (it is this machine) — `NG-B006`.
+* `snat` and `dnat` state the address they translate to; `masquerade` cannot (it is the egress interface's, unknown until the packet leaves) and `redirect` need not (it is this machine) — `NV-B006`.
 
 ## `spec` — cable
 
@@ -483,10 +483,10 @@ A cable is an undirected physical link between exactly two interfaces, and a fir
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `endpoints` | [InterfaceRef](#specendpoints) list | **yes** | — | Exactly two `device:interface` references (`NG-C001`). The link is undirected, so the pair is sorted on load and the order carries no meaning. | — |
-| `medium` | `copper` \| `fiber` \| `wireless` | **yes** | — | What the link physically is. `wireless` requires both endpoints to be `type: wifi` and forbids `length_m` and `category` (`NG-C006`, `NG-C007`). | — |
+| `endpoints` | [InterfaceRef](#specendpoints) list | **yes** | — | Exactly two `device:interface` references (`NV-C001`). The link is undirected, so the pair is sorted on load and the order carries no meaning. | — |
+| `medium` | `copper` \| `fiber` \| `wireless` | **yes** | — | What the link physically is. `wireless` requires both endpoints to be `type: wifi` and forbids `length_m` and `category` (`NV-C006`, `NV-C007`). | — |
 | `speed` | bit rate | no | *unset* | Negotiated link rate. Written as bit/s or as `1Gbps`; stored in bit/s. Projected onto `if:speed` of both endpoints, which is `config false`. | `…/if:speed (on both endpoints)` |
-| `duplex` | `full` \| `half` | no | `full` | Duplex of the link. `half` outside a hub link is `NG-C013`. | — |
+| `duplex` | `full` \| `half` | no | `full` | Duplex of the link. `half` outside a hub link is `NV-C013`. | — |
 | `length_m` | number, ≥ 0.0 | no | *unset* | Physical length in metres. Documentation only. | — |
 | `category` | string | no | *unset* | Cable category, free text (`cat6`, `cat6a`, `om4`). | — |
 | `connector` | string | no | *unset* | Connector type, free text (`rj45`, `lc`, `sc`). | — |
@@ -499,8 +499,8 @@ A reference to one port. Written as the string `device:interface`; the mapping f
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `device` | element reference | **yes** | — | Name of the element the port belongs to. Resolved in the cable's own namespace first, then upwards (`NG-C002`). | — |
-| `interface` | interface name | **yes** | — | Name of the interface on that element. An adapter's `upstream.name` counts (`NG-C003`). | — |
+| `device` | element reference | **yes** | — | Name of the element the port belongs to. Resolved in the cable's own namespace first, then upwards (`NV-C002`). | — |
+| `interface` | interface name | **yes** | — | Name of the interface on that element. An adapter's `upstream.name` counts (`NV-C003`). | — |
 
 ## `spec` — adapter
 
@@ -516,7 +516,7 @@ An adapter presents network interfaces over a non-network host port: USB dongles
 | `passthrough` | boolean | no | `true` | May the renderer collapse the adapter into its host? True draws the host and the adapter as one node at layer 2; false keeps them separate. | — |
 | `ports` | integer, ≥ 1 | no | *unset* | How many downstream ports the hardware physically has. Declaring it lets the validator catch an inventory that outgrew the device (`E006`). | — |
 | `upstream` | [UpstreamPort](#specupstream) | **yes** | — | The host-facing port: the bus the adapter plugs into. | — |
-| `interfaces` | [Interface](#specinterfaces) list, ≥ 1 entry | **yes** | — | The network ports the adapter presents downstream. Only `ethernet`, `wifi` and `lag` are allowed (`NG-X003`). | `/if:interfaces/if:interface` |
+| `interfaces` | [Interface](#specinterfaces) list, ≥ 1 entry | **yes** | — | The network ports the adapter presents downstream. Only `ethernet`, `wifi` and `lag` are allowed (`NV-X003`). | `/if:interfaces/if:interface` |
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 ## `spec.upstream`
@@ -525,12 +525,12 @@ The host-facing port of an adapter.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `name` | interface name | **yes** | — | Name of the host-side port. Shares the interface namespace of the adapter (`NG-X004`) and may be named by a cable endpoint. | `/if:interfaces/if:interface/if:name` |
+| `name` | interface name | **yes** | — | Name of the host-side port. Shares the interface namespace of the adapter (`NV-X004`) and may be named by a cable endpoint. | `/if:interfaces/if:interface/if:name` |
 | `type` | `usb` \| `usb-c` \| `thunderbolt` \| `pcie` \| `m2` \| `sfp` \| `internal` | **yes** | — | The host bus. `usb` and `usb-c` export as `ianaift:usb`; everything else as `ianaift:other`, because IANA registers no Thunderbolt or PCIe identity. | `…/if:type` |
 | `speed` | bit rate | no | *unset* | Host-bus rate, e.g. `5Gbps` for USB 3.0. Written as bit/s or with a unit suffix. | `…/if:speed` |
-| `attached_to` | element reference | no | *unset* | The host the adapter is plugged into. A bare device name, never a `device:interface` reference (`NG-X001`). This is what joins the adapter to the graph when no cable does. | — |
+| `attached_to` | element reference | no | *unset* | The host the adapter is plugged into. A bare device name, never a `device:interface` reference (`NV-X001`). This is what joins the adapter to the graph when no cable does. | — |
 
-* Declaring `attached_to` **and** cabling the upstream port is an error (`NG-X005`): the host attachment is declared exactly once.
+* Declaring `attached_to` **and** cabling the upstream port is an error (`NV-X005`): the host attachment is declared exactly once.
 
 ## `spec` — tunnel
 
@@ -539,22 +539,22 @@ A tunnel is an undirected logical link between two or more interfaces of `type: 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `type` | `wireguard` \| `ipsec` \| `openvpn` \| `pptp` \| `l2tp` \| `gre` \| `vxlan` \| `geneve` | **yes** | — | The encapsulation: `wireguard`, `ipsec`, `openvpn`, `pptp`, `l2tp`, `gre`, `vxlan` or `geneve`. It decides the layer carried, the outer transport, the default port, whether the payload is encrypted and how much MTU the headers cost. | — |
-| `endpoints` | [InterfaceRef](#specendpoints) list | **yes** | — | Two or more `device:interface` references, each naming an interface of `type: tunnel` (`NG-T001`, `NG-T003`). The link is undirected, so the list is sorted on load. Three or more endpoints make it multipoint, and it is then drawn as a node rather than a line. | — |
-| `over` | element reference | no | *unset* | The tunnel this one is encapsulated in — `vxlan` over `ipsec` is written by naming the IPsec tunnel here (`NG-T004`). Absent means the tunnel runs directly over the physical topology. The chain must not loop (`NG-T005`). | — |
-| `mode` | `tunnel` \| `transport` | no | *unset* | IPsec's encapsulation mode, `tunnel` or `transport` (RFC 4301). Defaults to `tunnel`; every other type has only one mode and must not declare it (`NG-T008`). | — |
-| `vni` | integer, 0–16777215 | no | *unset* | The 24-bit VXLAN/Geneve virtual network identifier. Required for those two types and rejected for every other (`NG-T007`). | — |
-| `port` | integer, 1–65535 | no | *unset* | Outer UDP/TCP port. Defaults to the registered port of the type (WireGuard 51820, OpenVPN 1194, L2TP 1701, VXLAN 4789, Geneve 6081) and is rejected for GRE and IPsec, which run directly over IP (`NG-T008`). | — |
-| `mtu` | integer, 68–65535 | no | *unset* | MTU of the tunnel interface. Compared with what the underlay leaves after the encapsulation overhead of the whole stack (`NG-T011`). | — |
+| `endpoints` | [InterfaceRef](#specendpoints) list | **yes** | — | Two or more `device:interface` references, each naming an interface of `type: tunnel` (`NV-T001`, `NV-T003`). The link is undirected, so the list is sorted on load. Three or more endpoints make it multipoint, and it is then drawn as a node rather than a line. | — |
+| `over` | element reference | no | *unset* | The tunnel this one is encapsulated in — `vxlan` over `ipsec` is written by naming the IPsec tunnel here (`NV-T004`). Absent means the tunnel runs directly over the physical topology. The chain must not loop (`NV-T005`). | — |
+| `mode` | `tunnel` \| `transport` | no | *unset* | IPsec's encapsulation mode, `tunnel` or `transport` (RFC 4301). Defaults to `tunnel`; every other type has only one mode and must not declare it (`NV-T008`). | — |
+| `vni` | integer, 0–16777215 | no | *unset* | The 24-bit VXLAN/Geneve virtual network identifier. Required for those two types and rejected for every other (`NV-T007`). | — |
+| `port` | integer, 1–65535 | no | *unset* | Outer UDP/TCP port. Defaults to the registered port of the type (WireGuard 51820, OpenVPN 1194, L2TP 1701, VXLAN 4789, Geneve 6081) and is rejected for GRE and IPsec, which run directly over IP (`NV-T008`). | — |
+| `mtu` | integer, 68–65535 | no | *unset* | MTU of the tunnel interface. Compared with what the underlay leaves after the encapsulation overhead of the whole stack (`NV-T011`). | — |
 | `encrypted` | boolean | no | *unset* | Whether the payload is protected. Defaults to what the type does — true for WireGuard, IPsec and OpenVPN, false for GRE, VXLAN, Geneve, L2TP and PPTP, whose MPPE is broken. Set it to true to record that the deployment protects an otherwise cleartext type some other way. | — |
-| `cipher` | string | no | *unset* | Negotiated cipher suite, free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NG-T009`). | — |
-| `auth` | `psk` \| `certificate` \| `public-key` \| `password` | no | *unset* | How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or `password`. The *method*, never the material — netviz stores no secrets (`NG-T010`). | — |
+| `cipher` | string | no | *unset* | Negotiated cipher suite, free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NV-T009`). | — |
+| `auth` | `psk` \| `certificate` \| `public-key` \| `password` | no | *unset* | How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or `password`. The *method*, never the material — netviz stores no secrets (`NV-T010`). | — |
 | `label` | string | no | *unset* | Free-text identifier printed on the edge, as a cable's `label` is. | — |
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
-* `endpoints` uses the same `device:interface` form a cable does, and each one must name an interface of `type: tunnel` (`NG-T003`) — the virtual interface the tunnel presents, not the physical port its outer packets leave by.
-* `over` nests one tunnel inside another: `vxlan` over `ipsec` is written by naming the IPsec tunnel there. The chain must not loop (`NG-T005`).
-* `type` supplies the defaults for `port`, `encrypted` and `mode`, and the encapsulation overhead `NG-T011` measures an MTU against. Materialised on load, so a loaded document states them explicitly.
-* There is nowhere to put a key, a password or a certificate, and the fields people reach for are rejected by name (`NG-T010`). `auth` records the *method*.
+* `endpoints` uses the same `device:interface` form a cable does, and each one must name an interface of `type: tunnel` (`NV-T003`) — the virtual interface the tunnel presents, not the physical port its outer packets leave by.
+* `over` nests one tunnel inside another: `vxlan` over `ipsec` is written by naming the IPsec tunnel there. The chain must not loop (`NV-T005`).
+* `type` supplies the defaults for `port`, `encrypted` and `mode`, and the encapsulation overhead `NV-T011` measures an MTU against. Materialised on load, so a loaded document states them explicitly.
+* There is nowhere to put a key, a password or a certificate, and the fields people reach for are rejected by name (`NV-T010`). `auth` records the *method*.
 
 ## `spec` — patchpanel
 
@@ -566,11 +566,11 @@ A patch panel is a passive cross-connect: numbered positions on the front, the s
 | `model` | string | no | *unset* | Hardware model designation, free text. | — |
 | `serial` | string | no | *unset* | Serial or asset number, free text. | — |
 | `form_factor` | string | no | *unset* | Descriptive: `keystone`, `fibre-lc`, `coupler`. Documentation only. | — |
-| `ports` | string, ≥ 1 character | **yes** | — | The positions the panel has, as a count (`24`) or as spans (`1-12,17-24`). Each one becomes a `front/<n>` and a `rear/<n>` interface (`NG-P006`). | `/if:interfaces/if:interface` |
-| `couplers` | map string → string | no | *unset* | Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NG-P007`). | — |
+| `ports` | string, ≥ 1 character | **yes** | — | The positions the panel has, as a count (`24`) or as spans (`1-12,17-24`). Each one becomes a `front/<n>` and a `rear/<n>` interface (`NV-P006`). | `/if:interfaces/if:interface` |
+| `couplers` | map string → string | no | *unset* | Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NV-P007`). | — |
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
-* `ports` is the only required key. Each position it names becomes two interfaces, `front/<n>` and `rear/<n>`, which a cable terminates on exactly as it terminates on a device port (`NG-P001`).
+* `ports` is the only required key. Each position it names becomes two interfaces, `front/<n>` and `rear/<n>`, which a cable terminates on exactly as it terminates on a device port (`NV-P001`).
 * A panel is not a hop. `netviz render --layer physical` draws it and both cable segments; every other layer splices the run into the single edge it electrically is, between the two active ports.
 * `couplers` is only needed for a panel that is cross-wired. The default is the identity mapping, which is what the numbering printed on a real panel promises.
 
@@ -584,14 +584,14 @@ A power distribution unit: numbered outlets, a rated capacity, and the supply th
 | `model` | string | no | *unset* | Hardware model designation, free text. | — |
 | `serial` | string | no | *unset* | Serial or asset number, free text. | — |
 | `form_factor` | string | no | *unset* | Descriptive: `vertical`, `horizontal`, `1U`, `0U`. Documentation only. | — |
-| `outlets` | string, ≥ 1 character | **yes** | — | The outlets the unit has, as a count (`24`) or as spans (`1-12,17-24`). Referred to by number from a device's `power.inputs`; at most 512, no repeats (`NG-E001`). | `/entity-mib:entPhysicalTable/entPhysicalEntry` |
-| `capacity_watts` | number, > 0.0, ≤ 1000000.0 | no | *unset* | How many watts may be drawn through the unit in total. `NG-E012` sums the declared loads against it; absent means the rating is not recorded, and nothing is graded. | `/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate` |
-| `input_feed` | string, ≤ 64 characters | no | *unset* | Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only for equality: two PDUs on one feed do not make a device redundant (`NG-E015`). | `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry` |
+| `outlets` | string, ≥ 1 character | **yes** | — | The outlets the unit has, as a count (`24`) or as spans (`1-12,17-24`). Referred to by number from a device's `power.inputs`; at most 512, no repeats (`NV-E001`). | `/entity-mib:entPhysicalTable/entPhysicalEntry` |
+| `capacity_watts` | number, > 0.0, ≤ 1000000.0 | no | *unset* | How many watts may be drawn through the unit in total. `NV-E012` sums the declared loads against it; absent means the rating is not recorded, and nothing is graded. | `/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate` |
+| `input_feed` | string, ≤ 64 characters | no | *unset* | Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only for equality: two PDUs on one feed do not make a device redundant (`NV-E015`). | `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry` |
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 * `outlets` is the only required key, and takes the same count-or-range shorthand `ports` does. An outlet is **not** an interface: a power cord is not a `cable`, so nothing is cabled to a PDU — a device names an outlet in `power.inputs` instead.
 * A PDU is placed on a rack elevation through `metadata.location`, exactly as a switch is, and `netviz render --layer rack` annotates it with its utilisation.
-* `input_feed` is free text and is compared only for equality. It is what makes A/B redundancy checkable: two units on one feed fail together (`NG-E015`).
+* `input_feed` is free text and is compared only for equality. It is what makes A/B redundancy checkable: two units on one feed fail together (`NV-E015`).
 
 ## `spec.power`
 
@@ -600,14 +600,14 @@ What a device draws, which outlets feed it, and how much PoE it hands out. One b
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `draw_watts` | [PowerDraw](#specpowerdraw_watts) | no | *unset* | What the device draws. A bare number is the typical draw; a mapping states `typical` and optionally `maximum`. | `/eo-mib:eoPowerTable/eoPowerEntry/eoPower` |
-| `inputs` | [PowerInput](#specpowerinputs) list, ≤ 8 entries | no | `[]` | One entry per power supply, naming the PDU outlet feeding it. At most 8. Empty for a device fed over PoE, or one whose feed is not recorded yet (`NG-E016`). | `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry` |
-| `redundant` | boolean | no | `false` | The feeds are meant to be independent: losing one must not lose the device. Needs at least two `inputs` (`NG-E002`) that land on different units and different feeds (`NG-E015`). | — |
-| `powered_by` | `outlet` \| `poe` | no | `outlet` | Where the device's own power comes from: `outlet` (the default) or `poe`, meaning it takes power over its uplink and declares no `inputs` (`NG-E005`, `NG-E014`). | — |
-| `poe_budget_watts` | number, > 0.0, ≤ 1000000.0 | no | *unset* | The PoE power this device can hand out across every PSE port together. `NG-E013` checks the ports that hold budget fit inside it. | `/power-ethernet-mib:pethMainPseTable/pethMainPseEntry/pethMainPsePower` |
+| `inputs` | [PowerInput](#specpowerinputs) list, ≤ 8 entries | no | `[]` | One entry per power supply, naming the PDU outlet feeding it. At most 8. Empty for a device fed over PoE, or one whose feed is not recorded yet (`NV-E016`). | `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry` |
+| `redundant` | boolean | no | `false` | The feeds are meant to be independent: losing one must not lose the device. Needs at least two `inputs` (`NV-E002`) that land on different units and different feeds (`NV-E015`). | — |
+| `powered_by` | `outlet` \| `poe` | no | `outlet` | Where the device's own power comes from: `outlet` (the default) or `poe`, meaning it takes power over its uplink and declares no `inputs` (`NV-E005`, `NV-E014`). | — |
+| `poe_budget_watts` | number, > 0.0, ≤ 1000000.0 | no | *unset* | The PoE power this device can hand out across every PSE port together. `NV-E013` checks the ports that hold budget fit inside it. | `/power-ethernet-mib:pethMainPseTable/pethMainPseEntry/pethMainPsePower` |
 
 * `draw_watts` accepts a bare number as shorthand for `{typical: n}`. The typical figure is what a load schedule sums; `maximum` is what a breaker has to survive.
-* `redundant: true` needs at least two `inputs` (`NG-E002`), and they have to land on different units *and* different `input_feed`s for the claim to hold (`NG-E015`).
-* `powered_by: poe` excludes `inputs` (`NG-E005`): a device fed over its uplink has no cord. `NG-E014` then checks the far end of that uplink actually sources power.
+* `redundant: true` needs at least two `inputs` (`NV-E002`), and they have to land on different units *and* different `input_feed`s for the claim to hold (`NV-E015`).
+* `powered_by: poe` excludes `inputs` (`NV-E005`): a device fed over its uplink has no cord. `NV-E014` then checks the far end of that uplink actually sources power.
 
 ## `spec.power.draw_watts`
 
@@ -616,7 +616,7 @@ The nameplate load of one device, in watts. Written as a bare number when only t
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `typical` | number, > 0.0, ≤ 1000000.0 | **yes** | — | Steady-state draw of the box as configured, in watts. This is what a load schedule sums. | `/eo-mib:eoPowerTable/eoPowerEntry/eoPower` |
-| `maximum` | number, > 0.0, ≤ 1000000.0 | no | *unset* | Nameplate or PSU rating, in watts — what a breaker has to survive. Must not be below `typical` (`NG-E003`). | `/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate` |
+| `maximum` | number, > 0.0, ≤ 1000000.0 | no | *unset* | Nameplate or PSU rating, in watts — what a breaker has to survive. Must not be below `typical` (`NV-E003`). | `/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate` |
 
 ## `spec.power.inputs[]`
 
@@ -624,23 +624,23 @@ One power supply and the outlet feeding it. Accepts the compact form `pdu-r1-a:7
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `pdu` | element reference | **yes** | — | The PDU feeding this supply. An element reference, so it may be written fully qualified to pick one of several PDUs sharing a short name (`NG-E011`). | — |
-| `outlet` | string, 1–16 characters | **yes** | — | The outlet on it, as the PDU numbers it. Must exist (`NG-E011`) and must not already feed something else (`NG-E010`). Writable as the shorthand `pdu-r1-a:7`. | — |
+| `pdu` | element reference | **yes** | — | The PDU feeding this supply. An element reference, so it may be written fully qualified to pick one of several PDUs sharing a short name (`NV-E011`). | — |
+| `outlet` | string, 1–16 characters | **yes** | — | The outlet on it, as the PDU numbers it. Must exist (`NV-E011`) and must not already feed something else (`NV-E010`). Writable as the shorthand `pdu-r1-a:7`. | — |
 | `psu` | string, ≤ 64 characters | no | *unset* | Which supply on the device this feeds, e.g. `psu1`. Documentation only, and worth writing: it is what an operator reads off the back of a chassis. | — |
 
 ## `interfaces[].poe`
 
-This port is power sourcing equipment: it hands power down the cable. Only on a type a cable terminates on — `ethernet` or `lag` (`NG-E006`).
+This port is power sourcing equipment: it hands power down the cable. Only on a type a cable terminates on — `ethernet` or `lag` (`NV-E006`).
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `standard` | `802.3af` \| `802.3at` \| `802.3bt` | **yes** | — | Which IEEE 802.3 amendment the port implements: `802.3af` (classes 0-3), `802.3at` (adds 4) or `802.3bt` (adds 5-8). | `/power-ethernet-mib:pethPsePortTable/pethPsePortEntry/pethPsePortType` |
-| `class` | integer, 0–8 | no | *unset* | The IEEE classification, 0 to 8, written `class` in YAML. Fixes the reservation; refused above the standard's own ceiling, and exclusive with `budget_watts` (`NG-E004`). | `…/pethPsePortEntry/pethPsePortPowerClassifications` |
+| `class` | integer, 0–8 | no | *unset* | The IEEE classification, 0 to 8, written `class` in YAML. Fixes the reservation; refused above the standard's own ceiling, and exclusive with `budget_watts` (`NV-E004`). | `…/pethPsePortEntry/pethPsePortPowerClassifications` |
 | `budget_watts` | number, > 0.0, ≤ 1000000.0 | no | *unset* | An explicit reservation in watts instead of a class, for a vendor that lets an operator cap a port below what its class allows. | `…/pethPsePortEntry/pethPsePortPowerLimit` |
-| `enabled` | boolean | no | `true` | Is the port administratively allowed to source power? A disabled PSE port reserves nothing and powers nothing, which is what `NG-E014` reports it for. | `…/pethPsePortEntry/pethPsePortAdminEnable` |
+| `enabled` | boolean | no | `true` | Is the port administratively allowed to source power? A disabled PSE port reserves nothing and powers nothing, which is what `NV-E014` reports it for. | `…/pethPsePortEntry/pethPsePortAdminEnable` |
 
-* How much the port reserves is said once: a `class`, or a `budget_watts`, never both (`NG-E004`). With neither, the port reserves its standard's maximum, which is what a switch with no per-port configuration does.
-* A `poe` block on a port with nothing on it is a *capability* and takes no budget. A port that feeds something, or one with an explicit `budget_watts`, does — see `NG-E013`.
+* How much the port reserves is said once: a `class`, or a `budget_watts`, never both (`NV-E004`). With neither, the port reserves its standard's maximum, which is what a switch with no per-port configuration does.
+* A `poe` block on a port with nothing on it is a *capability* and takes no budget. A port that feeds something, or one with an explicit `budget_watts`, does — see `NV-E013`.
 
 ## `spec` of a `user` document
 
@@ -648,18 +648,18 @@ One identity: a person, a service account or a shared login. Owns no interfaces 
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `login` | string, 1–64 characters | no | *unset* | The account name, when it differs from `metadata.name`; absent means the two are the same. Estate-wide, so two users claiming one login is `NG-S013`. | `/ietf-system:system/authentication/user/name` |
+| `login` | string, 1–64 characters | no | *unset* | The account name, when it differs from `metadata.name`; absent means the two are the same. Estate-wide, so two users claiming one login is `NV-S013`. | `/ietf-system:system/authentication/user/name` |
 | `full_name` | string, ≤ 253 characters | no | *unset* | The person's name as they write it. Free text: a real name is not a grammar. | — |
 | `email` | string, 3–254 characters | no | *unset* | Where mail reaches them, `local@domain.tld`. Also what ties the identity to a directory without netviz having to model the directory. | — |
-| `uid` | integer, 0–4294967294 | no | *unset* | POSIX user id, when the estate assigns one. 0 to 4294967294; two users claiming one is `NG-S013`. | `/ietf-system:system/authentication/user` |
-| `type` | `person` \| `service` \| `shared` | no | `person` | `person`, `service` or `shared`. Decides whether `NG-S015` and `NG-S016` have anything to say: only a person can depart, and only a person is expected in a group. | — |
-| `status` | `active` \| `suspended` \| `departed` | no | `active` | `active`, `suspended` or `departed`. A departed account is kept rather than deleted so the memberships still to be revoked stay visible (`NG-S015`). | — |
-| `ssh_keys` | string, ≥ 1 character list, ≤ 32 entries | no | `[]` | Public keys the account authenticates with, `<algorithm> <base64> [comment]`. Normalised to single spaces; a private key is refused (`NG-S002`). | `/ietf-system:system/authentication/user/authorized-key` |
+| `uid` | integer, 0–4294967294 | no | *unset* | POSIX user id, when the estate assigns one. 0 to 4294967294; two users claiming one is `NV-S013`. | `/ietf-system:system/authentication/user` |
+| `type` | `person` \| `service` \| `shared` | no | `person` | `person`, `service` or `shared`. Decides whether `NV-S015` and `NV-S016` have anything to say: only a person can depart, and only a person is expected in a group. | — |
+| `status` | `active` \| `suspended` \| `departed` | no | `active` | `active`, `suspended` or `departed`. A departed account is kept rather than deleted so the memberships still to be revoked stay visible (`NV-S015`). | — |
+| `ssh_keys` | string, ≥ 1 character list, ≤ 32 entries | no | `[]` | Public keys the account authenticates with, `<algorithm> <base64> [comment]`. Normalised to single spaces; a private key is refused (`NV-S002`). | `/ietf-system:system/authentication/user/authorized-key` |
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 * `login` is optional because `metadata.name` is usually the account name already. Absent means the two are the same; everything downstream reads the materialised value, so nothing has to re-apply the default.
-* A `departed` account is *kept*, not deleted: the group memberships still to be revoked are what `NG-S015` reports, and deleting the document would delete them too.
-* Only public keys. A pasted private key is refused with an explanation (`NG-S002`), which is the point of checking the shape at all.
+* A `departed` account is *kept*, not deleted: the group memberships still to be revoked are what `NV-S015` reports, and deleting the document would delete them too.
+* Only public keys. A pasted private key is refused with an explanation (`NV-S002`), which is the point of checking the shape at all.
 
 ## `spec` of a `group` document
 
@@ -667,14 +667,14 @@ A named set of identities. `members` may name a `user` or another `group`, which
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `members` | element reference list, ≤ 4096 entries | no | `[]` | The users and nested groups in this group, as element references resolved outwards from the group's own namespace. Must resolve (`NG-S010`), must be an identity (`NG-S011`), and the nesting must not loop (`NG-S012`). | — |
-| `gid` | integer, 0–4294967294 | no | *unset* | POSIX group id, when the estate assigns one. 0 to 4294967294; two groups claiming one is `NG-S013`. | — |
+| `members` | element reference list, ≤ 4096 entries | no | `[]` | The users and nested groups in this group, as element references resolved outwards from the group's own namespace. Must resolve (`NV-S010`), must be an identity (`NV-S011`), and the nesting must not loop (`NV-S012`). | — |
+| `gid` | integer, 0–4294967294 | no | *unset* | POSIX group id, when the estate assigns one. 0 to 4294967294; two groups claiming one is `NV-S013`. | — |
 | `email` | string, 3–254 characters | no | *unset* | Where mail to the whole group goes, when the group is also a distribution list. | — |
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 * Membership is written on the group and nowhere else. A `user` does not list its groups: two spellings of one fact are how an inventory starts disagreeing with itself.
-* A member is an ordinary element reference (§4.1), resolved outwards from the group's own namespace. It must resolve (`NG-S010`) and must be an identity (`NG-S011`).
-* A group naming itself is refused by the model; a longer loop needs the whole tree and is `NG-S012`.
+* A member is an ordinary element reference (§4.1), resolved outwards from the group's own namespace. It must resolve (`NV-S010`) and must be an identity (`NV-S011`).
+* A group naming itself is refused by the model; a longer loop needs the whole tree and is `NV-S012`.
 
 ## `spec` of a `layout` document
 
@@ -687,7 +687,7 @@ Where things are drawn, per view. A sidecar: it carries no network facts, and th
 
 * Coordinates are **points** (1/72 inch), `y` upwards, origin at the bottom left, and a `position` is the **centre** of what it places — Graphviz's system, so a stored arrangement can be handed straight back to it.
 * A key is an address, resolved like any other reference. A node the inventory does not declare is keyed by its graph id instead: `subnet:10.0.0.0/24`, `tunnel:site/wg0`, `rack:hq/comms/r1`.
-* A key naming something the inventory no longer has is `NG-Y001`, a warning; `netviz layout --prune` drops it.
+* A key naming something the inventory no longer has is `NV-Y001`, a warning; `netviz layout --prune` drops it.
 
 ## `spec.views.<view>`
 
@@ -768,12 +768,12 @@ Named claims about the network the other documents describe. `netviz test` grade
 | `description` | string | no | *unset* | What the suite is for, in one line. Printed as the suite's progress line. | — |
 | `assertions` | [Assertion](#one-assertion) list, 1–1024 entries | **yes** | — | The claims, graded in the order they are written. At least one: a suite that asserts nothing would report a green run having checked nothing. | — |
 
-* A suite must assert something (`NG-K002`). A suite that checked nothing would report a green run, which is worse than having no suite at all.
+* A suite must assert something (`NV-K002`). A suite that checked nothing would report a green run, which is worse than having no suite at all.
 * Assertions are graded in the order they are written, and a failure names the file and line of the assertion so an editor can jump to it.
 
 ## One assertion
 
-`assert` chooses the claim; every other key is read in its light. A key that belongs to a different assertion is rejected by name (`NG-K003`) rather than ignored.
+`assert` chooses the claim; every other key is read in its light. A key that belongs to a different assertion is rejected by name (`NV-K003`) rather than ignored.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
@@ -815,7 +815,7 @@ One callout on the diagram. Presentational throughout: a note cannot make `netvi
 | `leader` | boolean | no | `true` | Draw a line from the note to what it is anchored to. Inert without an `anchor`. | — |
 
 * A note needs somewhere to be: either an `anchor`, or a `geometry` giving `x` and `y`. Both is the shape dragging an anchored note produces — the point places it, the anchor is what the leader line points at.
-* `views` scopes the note to the drawings it makes sense in; empty means all of them. A note naming an element the inventory no longer has is `NG-G001`, a warning, exactly as a stale layout key is.
+* `views` scopes the note to the drawings it makes sense in; empty means all of them. A note naming an element the inventory no longer has is `NV-G001`, a warning, exactly as a stale layout key is.
 
 ## `spec.anchor`
 
@@ -855,7 +855,7 @@ A labelled box drawn behind the nodes. It says what it contains with `members`, 
 | `padding` | number, 0.0–400.0 | no | `16.0` | Space in points between the hull of the members and the box drawn round them. Ignored when `geometry` gives the rectangle outright. | — |
 
 * `members` and `selector` box wherever the elements were drawn, so the zone follows them; `geometry` boxes a region of the canvas instead, for a zone that is about the paper rather than about devices.
-* An area matching nothing is `NG-G004`, a warning: an empty box on a diagram reads as a claim that the zone is empty.
+* An area matching nothing is `NV-G004`, a warning: an empty box on a diagram reads as a claim that the zone is empty.
 
 ## `spec.selector`
 
@@ -911,14 +911,14 @@ How one element is drawn. Optional on every drawable kind and on cables and tunn
 | `icon` | string | no | *unset* | Picture to draw this one element as, overriding what the `--icons` theme picks for its kind. A bare name resolved inside the theme directory; `none` draws the plain shape. | — |
 | `opacity` | number, 0.0–1.0 | no | *unset* | How opaque the element is drawn, from 0 (invisible) to 1. | — |
 
-* The vocabulary is closed. A colour is a hex literal or one of the named colours, and every other field is a small enum or a bounded number, because these values end up inside Graphviz attributes and mxGraph style strings and a free-form pass-through would be an injection (`NG-Z001`).
+* The vocabulary is closed. A colour is a hex literal or one of the named colours, and every other field is a small enum or a bounded number, because these values end up inside Graphviz attributes and mxGraph style strings and a free-form pass-through would be an injection (`NV-Z001`).
 * `shape` is ignored on a cable and a tunnel, which have no shape to set. `icon` names a picture inside the `--icons` theme and is ignored when no theme is in use; `icon: none` draws this one element as a plain shape.
 
 ## Enumerations
 
 ### `interfaces[].type`
 
-Only `ethernet`, `wifi` and `lag` can terminate a cable (`NG-C009`).
+Only `ethernet`, `wifi` and `lag` can terminate a cable (`NV-C009`).
 
 | Value | `if:type` identity | Cableable |
 |---|---|---|
@@ -1041,7 +1041,7 @@ IPsec only; every other type has a single mode.
 
 ### `firewall.rules[].protocol`
 
-Only `tcp`, `udp` and `sctp` have ports to select on. `icmp` is IPv4 and `icmpv6` is IPv6, so stating either against the other family is refused (`NG-B005`).
+Only `tcp`, `udp` and `sctp` have ports to select on. `icmp` is IPv4 and `icmpv6` is IPv6, so stating either against the other family is refused (`NV-B005`).
 
 | Value |
 |---|
@@ -1107,7 +1107,7 @@ Which IEEE 802.3 amendment the port implements, and therefore which classes exis
 
 ### `tunnel.auth`
 
-The authentication *method*. netviz never stores key material (`NG-T010`).
+The authentication *method*. netviz never stores key material (`NV-T010`).
 
 | Value |
 |---|
@@ -1118,7 +1118,7 @@ The authentication *method*. netviz never stores key material (`NG-T010`).
 
 ### `user.type`
 
-Decides which identity rules apply: only a `person` can depart (`NG-S015`), and only a `person` is expected to be in a group (`NG-S016`).
+Decides which identity rules apply: only a `person` can depart (`NV-S015`), and only a `person` is expected to be in a group (`NV-S016`).
 
 | Value |
 |---|

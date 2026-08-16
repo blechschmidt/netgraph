@@ -1,4 +1,4 @@
-# E020 (NG-A013) - the first hop is not on-link.
+# E020 (NV-A013) - the first hop is not on-link.
 #
 # 'pc-a' sits in 10.0.0.0/24 but points its default route at 10.9.9.1. Nothing
 # resolves that address: the host would have to route to reach the router that

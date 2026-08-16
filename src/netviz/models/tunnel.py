@@ -18,7 +18,7 @@ can reason about them rather than about a free-text string.
 *Nesting.* ``spec.over`` names the tunnel this one is encapsulated in, which is
 how ``VXLAN over IPsec`` is written. The reference is resolved and the chain
 walked by the graph layer, so the rendering knows the full stack
-(``vxlan over ipsec``) and the validator can catch a loop (``NG-T005``).
+(``vxlan over ipsec``) and the validator can catch a loop (``NV-T005``).
 """
 
 from __future__ import annotations
@@ -242,19 +242,19 @@ class TunnelSpec(NetvizModel):
 
     type: TunnelType
     #: Two or more ``device:interface`` references, each naming a ``tunnel``
-    #: interface (``NG-T001``, ``NG-T003``); sorted for canonical output.
+    #: interface (``NV-T001``, ``NV-T003``); sorted for canonical output.
     endpoints: list[InterfaceRef]
     #: The tunnel this one runs inside, e.g. a VXLAN's IPsec underlay
-    #: (``NG-T004``). Absent means the tunnel runs directly over the physical
+    #: (``NV-T004``). Absent means the tunnel runs directly over the physical
     #: topology.
     over: ElementRef | None = None
     #: IPsec's encapsulation mode; materialised to ``tunnel`` on load.
     mode: TunnelMode | None = None
     #: The VXLAN/Geneve virtual network identifier. Required for those two types
-    #: and rejected for every other (``NG-T007``).
+    #: and rejected for every other (``NV-T007``).
     vni: VirtualNetworkId | None = None
     #: Outer port. Materialised from the registered default of the type on load;
-    #: rejected for GRE and ESP, which carry no port (``NG-T008``).
+    #: rejected for GRE and ESP, which carry no port (``NV-T008``).
     port: PortNumber | None = None
     #: MTU of the tunnel interface. ``W126`` compares it with what the underlay
     #: leaves after :attr:`TunnelType.overhead_bytes`.
@@ -286,7 +286,7 @@ class TunnelSpec(NetvizModel):
         if len(self.endpoints) < 2:
             raise field_error(
                 f"a tunnel joins at least two interfaces, got {len(self.endpoints)}",
-                rule="NG-T001",
+                rule="NV-T001",
                 path=("endpoints",),
             )
         seen: set[tuple[str, str]] = set()
@@ -294,7 +294,7 @@ class TunnelSpec(NetvizModel):
             if ref.sort_key in seen:
                 raise field_error(
                     f"endpoint {str(ref)!r} is listed twice",
-                    rule="NG-T001",
+                    rule="NV-T001",
                     path=("endpoints", index),
                 )
             seen.add(ref.sort_key)
@@ -308,39 +308,39 @@ class TunnelSpec(NetvizModel):
         if profile.has_vni and self.vni is None:
             raise field_error(
                 f"a {self.type} tunnel is identified by its 'vni'",
-                rule="NG-T007",
+                rule="NV-T007",
                 path=("vni",),
             )
         if not profile.has_vni and self.vni is not None:
             raise field_error(
                 f"'vni' is a VXLAN/Geneve identifier and has no meaning for {self.type}",
-                rule="NG-T007",
+                rule="NV-T007",
                 path=("vni",),
             )
         if not profile.has_mode and self.mode is not None:
             raise field_error(
                 f"'mode' distinguishes IPsec's tunnel and transport modes; {self.type} "
                 f"has only one",
-                rule="NG-T008",
+                rule="NV-T008",
                 path=("mode",),
             )
         if not profile.transport.has_port and self.port is not None:
             raise field_error(
                 f"{self.type} runs directly over IP as {profile.transport}, so it carries no port",
-                rule="NG-T008",
+                rule="NV-T008",
                 path=("port",),
             )
         if not self.encrypts and self.cipher is not None:
             raise field_error(
                 f"'cipher' describes an encrypted tunnel; {self.type} encrypts nothing "
                 f"unless 'encrypted: true' says the deployment adds it",
-                rule="NG-T009",
+                rule="NV-T009",
                 path=("cipher",),
             )
         if self.auth is not None and not (profile.encrypted or self.encrypted):
             raise field_error(
                 f"{self.type} authenticates no peer, so 'auth' has nothing to describe",
-                rule="NG-T009",
+                rule="NV-T009",
                 path=("auth",),
             )
 
@@ -388,7 +388,7 @@ class Tunnel(ElementBase):
                 raise field_error(
                     f"{key!r} is key material; netviz describes topology and never stores "
                     f"secrets. Use 'auth' to record the authentication method instead",
-                    rule="NG-T010",
+                    rule="NV-T010",
                     path=("spec", key),
                 )
         return value

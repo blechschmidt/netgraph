@@ -1,4 +1,4 @@
-# E044 (NG-S011) - a group names something that is not an identity.
+# E044 (NV-S011) - a group names something that is not an identity.
 #
 # 'pdu-admins' was meant; 'pdu-r1-a' was typed. The name resolves, to a power
 # strip, and resolving it any further would put a strip in the group's headcount

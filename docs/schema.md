@@ -75,7 +75,7 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
   `apiVersion` is the **only** camelCase key outside a `spec.style` block, whose
   three compound names keep the spelling SVG and mxGraph give them for the
   reason §22.1 records.
-* **Unknown keys are rejected** (`NG-D005`). Silently ignoring a misspelt
+* **Unknown keys are rejected** (`NV-D005`). Silently ignoring a misspelt
   `trunk_vlan` would produce a diagram that disagrees with the file, which is
   the exact failure mode this tool exists to prevent.
 * Enumerated values are lower-case and hyphen-free unless quoted from a
@@ -108,14 +108,14 @@ keeps names short without making them collide.
 
 | ID | Rule |
 |---|---|
-| `NG-L001` | Files matching `*.yaml` or `*.yml` (case-insensitive) are loaded. All other files are ignored. |
-| `NG-L002` | Path components whose basename starts with `.` or `_` are skipped, including directories. Use `_scratch/` for work in progress. |
-| `NG-L003` | Symbolic links are followed, but a link that escapes the inventory root, forms a cycle, or reaches a directory already loaded through another path is an error. |
-| `NG-L004` | A file MAY contain several documents separated by `---`. Empty documents are skipped silently, but they still consume a document index. |
-| `NG-L005` | Load order is deterministic: files sorted by their byte-wise POSIX path relative to the inventory root, then by document index within the file. Renderers rely on this for stable output. |
-| `NG-L006` | A `.netvizignore` file excludes paths from the walk. The syntax is the `.gitignore` subset described in §2.3; a file in a subdirectory applies to that subtree and overrides its parents. |
-| `NG-L007` | A mapping key that appears twice in the same block is an error. Silently keeping the last value would make the diagram disagree with the file. |
-| `NG-L008` | Files are read as UTF-8 (a leading BOM is tolerated) with a safe loader. Custom tags — `!Ref`, `!!python/...` — are rejected; anchors and aliases are supported within a single document. |
+| `NV-L001` | Files matching `*.yaml` or `*.yml` (case-insensitive) are loaded. All other files are ignored. |
+| `NV-L002` | Path components whose basename starts with `.` or `_` are skipped, including directories. Use `_scratch/` for work in progress. |
+| `NV-L003` | Symbolic links are followed, but a link that escapes the inventory root, forms a cycle, or reaches a directory already loaded through another path is an error. |
+| `NV-L004` | A file MAY contain several documents separated by `---`. Empty documents are skipped silently, but they still consume a document index. |
+| `NV-L005` | Load order is deterministic: files sorted by their byte-wise POSIX path relative to the inventory root, then by document index within the file. Renderers rely on this for stable output. |
+| `NV-L006` | A `.netvizignore` file excludes paths from the walk. The syntax is the `.gitignore` subset described in §2.3; a file in a subdirectory applies to that subtree and overrides its parents. |
+| `NV-L007` | A mapping key that appears twice in the same block is an error. Silently keeping the last value would make the diagram disagree with the file. |
+| `NV-L008` | Files are read as UTF-8 (a leading BOM is tolerated) with a safe loader. Custom tags — `!Ref`, `!!python/...` — are rejected; anchors and aliases are supported within a single document. |
 
 Loading is *total*: a file that cannot be read, a YAML syntax error, a schema
 violation and a duplicate name are all reported with their location and the walk
@@ -134,7 +134,7 @@ References (§4.2) are written with the plain name and resolved *outwards*:
 2. each ancestor namespace, nearest first, the root last,
 3. the inventory as a whole — but only when exactly one element carries that
    name; otherwise the reference is ambiguous and every candidate is named in
-   the diagnostic (`NG-N002`).
+   the diagnostic (`NV-N002`).
 
 So two racks may each hold a `sw1` without qualification, and a device at the
 root is visible from everywhere. A reference MAY also be written fully qualified
@@ -186,8 +186,8 @@ inventory/
 │   │   └── cables/hq-links.yaml          # several documents in one file
 │   └── lab/
 │       └── lab.yaml
-├── .netvizignore                       # optional exclusions (NG-L006)
-└── _drafts/                              # skipped (NG-L002)
+├── .netvizignore                       # optional exclusions (NV-L006)
+└── _drafts/                              # skipped (NV-L002)
 ```
 
 `sw-access-01` above is fully qualified as `sites/hq/switches/sw-access-01`; a
@@ -233,7 +233,7 @@ resolvable as a cable endpoint.
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `name` | name | M | — | Unique within its namespace (§2.2, `NG-N002`). Grammar in §4.1. |
+| `name` | name | M | — | Unique within its namespace (§2.2, `NV-N002`). Grammar in §4.1. |
 | `description` | string | O | `null` | Free text, may be multi-line. Rendered as a node tooltip. |
 | `location` | mapping | O | `null` | Where the hardware physically is: §3.2. |
 | `labels` | map[string, string] | O | `{}` | Selector-friendly key/value pairs. Keys match `[a-z0-9]([-a-z0-9_.]*[a-z0-9])?` (≤63 chars) and MAY carry a DNS-style prefix (`example.com/tier`). Values ≤253 chars. The prefix `netviz.dev/` is reserved for tool-generated labels. |
@@ -278,9 +278,9 @@ metadata:
 | `site` | string | O | `null` | Free text. |
 | `room` | string | O | `null` | Room or floor within the site. Free text. |
 | `rack` | string | O | `null` | Rack identifier, unique within its room. Naming one is what puts the element on an elevation; without it the block is documentation only. |
-| `position` | integer | O | `null` | The **lowest** rack unit the element occupies, counted from 1 at the bottom. Requires `rack` (`NG-U004`). 1–100. |
+| `position` | integer | O | `null` | The **lowest** rack unit the element occupies, counted from 1 at the bottom. Requires `rack` (`NV-U004`). 1–100. |
 | `height` | integer | O | `1` | How many units it occupies, upwards from `position`. 1–100. |
-| `rack_height` | integer | O | `null` | How tall the rack is. Any element in it may declare this; two that disagree are `NG-U003`. Requires `rack` (`NG-U004`). 1–100. |
+| `rack_height` | integer | O | `null` | How tall the rack is. Any element in it may declare this; two that disagree are `NV-U003`. Requires `rack` (`NV-U004`). 1–100. |
 
 #### Semantics
 
@@ -290,7 +290,7 @@ metadata:
   address and another only a rack name has not said the two are in one place.
 * `position` is the lowest unit and `height` counts *up*, so a 2U server at
   `position: 10` fills U10 and U11. Two elements whose spans intersect are
-  `NG-U001`; an element whose top exceeds `rack_height` is `NG-U002`.
+  `NV-U001`; an element whose top exceeds `rack_height` is `NV-U002`.
 * An element that names a `rack` but no `position` is in the room and nowhere in
   particular. It is not drawn on the elevation, and it collides with nothing.
 * `netviz render --layer rack` draws one front elevation per rack, with empty
@@ -318,7 +318,7 @@ ifname = 1*( ALPHA-DIGIT / "-" / "_" / "." / "/" )
 ```
 
 Examples: `eno1`, `eth0`, `GigabitEthernet1/0/1`, `ge-0/0/1`, `bond0.30`,
-`enx001122334455`. Interface names are unique within a device (`NG-I001`) and
+`enx001122334455`. Interface names are unique within a device (`NV-I001`) and
 map directly to the `if:interface` list key, which is a plain `string` in
 RFC 8343.
 
@@ -333,7 +333,7 @@ ifref = name ":" ifname
 `sw-access-01:GigabitEthernet1/0/1`. The device part MUST resolve to a
 declared element of kind `switch`, `router`, `hub`, `computer`, `server` or
 `adapter`; the interface part MUST resolve to an interface declared on that
-element (`NG-C002`, `NG-C003`).
+element (`NV-C002`, `NV-C003`).
 
 An equivalent mapping form is accepted and normalises to the same value — use
 it when a name would otherwise need quoting:
@@ -411,7 +411,7 @@ free of boilerplate.
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `name` | ifname | C | — | Unique per device (`NG-I001`). Exactly one of `name` and `range` is written. |
+| `name` | ifname | C | — | Unique per device (`NV-I001`). Exactly one of `name` and `range` is written. |
 | `range` | range | C | — | §6.2.5. Declares many interfaces at once; the entry is replaced by its expansion before validation. |
 | `type` | enum | M | — | §6.2.1. Optional only in an entry that overrides a template's interface of the same name (§6.6). |
 | `description` | string | O | `null` | → `if:description`. |
@@ -421,12 +421,12 @@ free of boilerplate.
 | `ipv4` | AddressFamily | O | `null` | §6.2.3. |
 | `ipv6` | AddressFamily | O | `null` | §6.2.3. |
 | `vlan` | Vlan | O | `null` | §6.2.4. |
-| `wireless` | Wireless | O | `null` | §6.2.6. `type: wifi` only (`NG-W002`). |
-| `poe` | PoeConfig | O | `null` | §17.3. This port hands power down the cable. `type: ethernet` or `lag` only (`NG-E006`). |
+| `wireless` | Wireless | O | `null` | §6.2.6. `type: wifi` only (`NV-W002`). |
+| `poe` | PoeConfig | O | `null` | §17.3. This port hands power down the cable. `type: ethernet` or `lag` only (`NV-E006`). |
 | `parent` | ifname | C | — | Required for `type: vlan`, optional for `type: tunnel`, MUST NOT appear otherwise. → `if:lower-layer-if`. |
 | `members` | list[ifname] | C | — | Required for `type: lag` and `type: bridge`; MUST NOT appear otherwise. → `if:lower-layer-if`. |
-| `netns` | name | O | *unset* | §23.1. The network namespace the interface is in; unset means the machine's initial one. Names an entry of `spec.netns` (`NG-N022`). |
-| `peer` | ifname | O | *unset* | §23.2. The other end of the veth pair this interface is one end of. `type: ethernet` only, and symmetric (`NG-N023`). |
+| `netns` | name | O | *unset* | §23.1. The network namespace the interface is in; unset means the machine's initial one. Names an entry of `spec.netns` (`NV-N022`). |
+| `peer` | ifname | O | *unset* | §23.2. The other end of the veth pair this interface is one end of. `type: ethernet` only, and symmetric (`NV-N023`). |
 
 #### 6.2.1 Interface `type`
 
@@ -448,8 +448,8 @@ otherwise be inexpressible (sub-interfaces, link aggregation and overlays):
 | `lag` | `ianaift:ieee8023adLag` | Aggregated link. Requires `members`. |
 | `tunnel` | `ianaift:tunnel` | The local end of a `tunnel` document (§14): `wg0`, `ipsec0`, `vxlan100`. Holds the *overlay* configuration — the addresses inside the tunnel — while the tunnel document holds the encapsulation. `parent` optionally names the underlay port. |
 
-Only `ethernet`, `wifi` and `lag` can terminate a cable (`NG-C009`); only
-`tunnel` can terminate a tunnel (`NG-T003`).
+Only `ethernet`, `wifi` and `lag` can terminate a cable (`NV-C009`); only
+`tunnel` can terminate a tunnel (`NV-T003`).
 
 #### 6.2.2 `mtu`
 
@@ -479,8 +479,8 @@ ipv4:
 | `enabled` | boolean | O | `true` | → `ip:ipv4/enabled`, `ip:ipv6/enabled`. |
 | `forwarding` | boolean | O | device `spec.forwarding` | → `ip:*/forwarding`. |
 | `mtu` | mtu | O | interface `mtu` | → `ip:ipv4/mtu`, `ip:ipv6/mtu`. |
-| `addresses` | list[Address] | O | `[]` | Key is `ip`; duplicates are an error (`NG-A002`). |
-| `gateway` | ipv4-address / ipv6-address | O | *unset* | First hop for off-link traffic, written **without** a prefix length. Must lie inside one of this interface's own prefixes (`NG-A013`). |
+| `addresses` | list[Address] | O | `[]` | Key is `ip`; duplicates are an error (`NV-A002`). |
+| `gateway` | ipv4-address / ipv6-address | O | *unset* | First hop for off-link traffic, written **without** a prefix length. Must lie inside one of this interface's own prefixes (`NV-A013`). |
 
 `gateway` is the one field of these containers that RFC 8344 does not define: a
 default route lives in `ietf-routing`
@@ -572,20 +572,20 @@ and may well say "50% utilised". No other field is substituted into.
 
 **Bounds.** One document expands to at most **4096** interfaces in total.
 `eth[1-99999999]` is a typo, and the answer to a typo is a diagnostic
-(`NG-R003`), not an out-of-memory kill.
+(`NV-R003`), not an out-of-memory kill.
 
 **Collisions.** An expanded name that another entry of the same element already
-claims — an explicit `name`, or the expansion of another range — is `NG-R004`,
+claims — an explicit `name`, or the expansion of another range — is `NV-R004`,
 and the diagnostic quotes both source locations. Two *explicitly* named
-duplicates remain `NG-I001`.
+duplicates remain `NV-I001`.
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-R001` | error | An interface entry declares exactly one of `name` and `range`. |
-| `NG-R002` | error | `range` is a string carrying between one and four well-formed, non-inverted `[low-high]` spans and no stray bracket. |
-| `NG-R003` | error | Expanding a document's ranges produces at most 4096 interfaces. |
-| `NG-R004` | error | An expanded interface name does not collide with another interface of the same element. |
-| `NG-R005` | error | Every `{...}` placeholder in a range `description` is empty or names a span the range declares, and every brace is paired. |
+| `NV-R001` | error | An interface entry declares exactly one of `name` and `range`. |
+| `NV-R002` | error | `range` is a string carrying between one and four well-formed, non-inverted `[low-high]` spans and no stray bracket. |
+| `NV-R003` | error | Expanding a document's ranges produces at most 4096 interfaces. |
+| `NV-R004` | error | An expanded interface name does not collide with another interface of the same element. |
+| `NV-R005` | error | Every `{...}` placeholder in a range `description` is empty or names a span the range declares, and every brace is paired. |
 
 #### 6.2.6 `wireless`
 
@@ -598,8 +598,8 @@ frequency. The block supplies exactly that.
 |---|---|---|---|---|
 | `role` | enum | M | — | `ap`, `station` or `mesh`. §6.2.6.1. |
 | `band` | enum | O | `null` | `2.4GHz`, `5GHz` or `6GHz`. Required alongside `channel` and `width_mhz`. |
-| `channel` | integer | O | `null` | The primary 20 MHz channel, as the band numbers it (`NG-W003`). |
-| `width_mhz` | enum | O | `null` | `20`, `40`, `80`, `160` or `320`, bounded by the band (`NG-W004`). |
+| `channel` | integer | O | `null` | The primary 20 MHz channel, as the band numbers it (`NV-W003`). |
+| `width_mhz` | enum | O | `null` | `20`, `40`, `80`, `160` or `320`, bounded by the band (`NV-W004`). |
 | `tx_power_dbm` | dbm | O | `null` | Radiated power. |
 | `bss` | list[Bss] | O | `[]` | The basic service sets this radio beacons or joins. §6.2.6.2. |
 
@@ -612,7 +612,7 @@ frequency. The block supplies exactly that.
 | `mesh` | The backhaul radio of a mesh node — a station that relays rather than consumes. Drawn as infrastructure, not as a client. |
 
 A `medium: wireless` cable is an *association*, so it joins exactly one `ap`
-radio to one `station` or `mesh` radio (`NG-W007`). Two access points on one
+radio to one `station` or `mesh` radio (`NV-W007`). Two access points on one
 link describe interference rather than a link; two clients describe a link no
 frame can cross.
 
@@ -620,15 +620,15 @@ frame can cross.
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `ssid` | ssid | M | — | The network name. Unique within one radio (`NG-W005`). |
-| `bssid` | mac | O | `null` | MAC address of this BSS. Unique across the inventory among `ap` radios (`NG-W008`). |
-| `vlan` | vlan-id | O | `null` | The VLAN this SSID is bridged into; absent means the radio's untagged domain. Checked against the device VLAN database (`NG-V004`) and against the VLANs the AP carries (`NG-W009`). |
+| `ssid` | ssid | M | — | The network name. Unique within one radio (`NV-W005`). |
+| `bssid` | mac | O | `null` | MAC address of this BSS. Unique across the inventory among `ap` radios (`NV-W008`). |
+| `vlan` | vlan-id | O | `null` | The VLAN this SSID is bridged into; absent means the radio's untagged domain. Checked against the device VLAN database (`NV-V004`) and against the VLANs the AP carries (`NV-W009`). |
 | `security` | enum | O | `null` | `open`, `wpa2-psk`, `wpa2-eap`, `wpa3-psk` or `wpa3-eap`. Absent means "not recorded", which is deliberately not the same as `open`. |
 | `hidden` | boolean | O | `false` | The SSID is left out of the beacon. It is still on the air. |
 
 On an `ap` radio each entry is one SSID the radio beacons; a dual-SSID access
 point has two. On a `station` or `mesh` radio there is at most one entry
-(`NG-W006`) — the association — and it names the SSID, and optionally the
+(`NV-W006`) — the association — and it names the SSID, and optionally the
 BSSID, the radio joined:
 
 ```yaml
@@ -658,7 +658,7 @@ BSSID, the radio joined:
 ```
 
 **One association per radio.** A cable terminates an interface once
-(`NG-C005`), and an association is a cable, so one radio serves one client in
+(`NV-C005`), and an association is a cable, so one radio serves one client in
 this model. An access point with thirty phones on it is not something an
 inventory is meant to enumerate: declare the associations that are part of the
 *infrastructure* — a mesh backhaul, a wireless bridge, a fixed client — and
@@ -672,24 +672,24 @@ four (6 GHz).
 
 **Frequency overlap** is computed by centring `width_mhz` on the primary
 channel; the real centre of a bonded channel depends on which secondary
-channels the radio picked, which no document states. `NG-W011` uses the
+channels the radio picked, which no document states. `NV-W011` uses the
 approximation, which can only make it warn more readily, never less.
 
 The projection onto `ieee802-dot11` is §9.6.
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-W001` | error | `ssid` is between 1 and 32 octets. |
-| `NG-W002` | error | `wireless` appears only on an interface of `type: wifi`. |
-| `NG-W003` | error | `channel` names `band`, and is a channel that band numbers. |
-| `NG-W004` | error | `width_mhz` names `band`, and is a width that band supports. |
-| `NG-W005` | error | `ssid` and `bssid` are each unique within one radio. |
-| `NG-W006` | error | A `station` or `mesh` radio lists at most one BSS. |
-| `NG-W007` | error | A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` radio. |
-| `NG-W008` | error | A `bssid` is advertised by at most one `ap` radio in the inventory. |
-| `NG-W009` | error | An SSID's `vlan` is carried by at least one interface of the access point. |
-| `NG-W010` | error | A client radio's SSID is one the access point at the far end advertises. |
-| `NG-W011` | warning | Two access points in one broadcast domain do not overlap in frequency. |
+| `NV-W001` | error | `ssid` is between 1 and 32 octets. |
+| `NV-W002` | error | `wireless` appears only on an interface of `type: wifi`. |
+| `NV-W003` | error | `channel` names `band`, and is a channel that band numbers. |
+| `NV-W004` | error | `width_mhz` names `band`, and is a width that band supports. |
+| `NV-W005` | error | `ssid` and `bssid` are each unique within one radio. |
+| `NV-W006` | error | A `station` or `mesh` radio lists at most one BSS. |
+| `NV-W007` | error | A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` radio. |
+| `NV-W008` | error | A `bssid` is advertised by at most one `ap` radio in the inventory. |
+| `NV-W009` | error | An SSID's `vlan` is carried by at least one interface of the access point. |
+| `NV-W010` | error | A client radio's SSID is one the access point at the far end advertises. |
+| `NV-W011` | warning | Two access points in one broadcast domain do not overlap in frequency. |
 
 ### 6.3 `bridge`
 
@@ -706,11 +706,11 @@ to. Optional: a switch with a single implicit bridge does not need it.
 
 The VLAN database. Declaring a VLAN here is optional but recommended: it gives
 the VLAN a name for rendering and lets the validator flag ports that reference
-an undeclared VLAN (`NG-V004`, a warning).
+an undeclared VLAN (`NV-V004`, a warning).
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `id` | vlan-id | M | — | → `dot1q:vlan/vid`. Unique per device (`NG-V001`). |
+| `id` | vlan-id | M | — | → `dot1q:vlan/vid`. Unique per device (`NV-V001`). |
 | `name` | string (≤32) | O | `null` | → `dot1q:vlan/name` (`dot1qtypes:name-type`). |
 | `description` | string | O | `null` | netviz-only. |
 
@@ -718,9 +718,9 @@ an undeclared VLAN (`NG-V004`, a warning).
 
 | | `switch` | `router` | `hub` | `computer` | `server` |
 |---|---|---|---|---|---|
-| `interfaces[].vlan` | ✔ | ✔ | ✘ `NG-H001` | ✔ | ✔ |
-| `interfaces[].ipv4` / `ipv6` | ✔ | ✔ | ✘ `NG-H002` | ✔ | ✔ |
-| `bridge`, `vlans` | ✔ | ✔ | ✘ `NG-H003` | ✔ | ✔ |
+| `interfaces[].vlan` | ✔ | ✔ | ✘ `NV-H001` | ✔ | ✔ |
+| `interfaces[].ipv4` / `ipv6` | ✔ | ✔ | ✘ `NV-H002` | ✔ | ✔ |
+| `bridge`, `vlans` | ✔ | ✔ | ✘ `NV-H003` | ✔ | ✔ |
 | `forwarding` default | `false` | `true` | n/a | `false` | `false` |
 | default glyph | switch | router | hub | workstation | rack server |
 
@@ -780,11 +780,11 @@ share a name, because no field ever accepts both.
 
 A template MAY itself declare `from`. The chain is resolved from the far end
 inwards, so the device always merges against one fully-resolved spec. A cycle is
-`NG-M003`.
+`NV-M003`.
 
 `from` is only meaningful where `spec` is a device spec, so it is accepted on
 `switch`, `router`, `hub`, `computer` and `server` and rejected elsewhere
-(`NG-M006`).
+(`NV-M006`).
 
 #### 6.6.1 Merge rules
 
@@ -839,12 +839,12 @@ Use `netviz show <name> --raw` to see a device as written and `netviz show
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-M001` | error | `spec.from` names exactly one `kind: template` document, resolved by §2.2. |
-| `NG-M002` | error | Template names are unique within their namespace; the diagnostic names both source locations. |
-| `NG-M003` | error | Template inheritance through `from` is acyclic. |
-| `NG-M004` | error | A device only inherits from a template that resolved; a template rejected for its own reasons is reported once, against itself. |
-| `NG-M005` | error | A `template` document's `spec` is a mapping whose keys are device-spec keys (plus `from`). |
-| `NG-M006` | error | `spec.from` appears only on the five device kinds. |
+| `NV-M001` | error | `spec.from` names exactly one `kind: template` document, resolved by §2.2. |
+| `NV-M002` | error | Template names are unique within their namespace; the diagnostic names both source locations. |
+| `NV-M003` | error | Template inheritance through `from` is acyclic. |
+| `NV-M004` | error | A device only inherits from a template that resolved; a template rejected for its own reasons is reported once, against itself. |
+| `NV-M005` | error | A `template` document's `spec` is a mapping whose keys are device-spec keys (plus `from`). |
+| `NV-M006` | error | `spec.from` appears only on the five device kinds. |
 
 ---
 
@@ -874,12 +874,12 @@ spec:
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `endpoints` | list[ifref] | M | — | Exactly two entries (`NG-C001`). Order is not significant; the loader sorts them for canonical output. |
+| `endpoints` | list[ifref] | M | — | Exactly two entries (`NV-C001`). Order is not significant; the loader sorts them for canonical output. |
 | `medium` | enum | M | — | `copper`, `fiber`, `wireless`. |
 | `speed` | speed | O | `null` | Negotiated link rate → `if:speed` on both endpoints (§9.4). |
 | `duplex` | enum | O | `full` | `full`, `half`. `half` is only meaningful on a `copper` link into a `hub`. |
-| `length_m` | length | O | `null` | Forbidden when `medium: wireless` (`NG-C007`). |
-| `category` | string | C | `null` | Copper: `cat5e`, `cat6`, `cat6a`, `cat7`, `cat8`, `dac`. Fiber: `om3`, `om4`, `om5`, `os2`. Forbidden for `wireless` (`NG-C007`). |
+| `length_m` | length | O | `null` | Forbidden when `medium: wireless` (`NV-C007`). |
+| `category` | string | C | `null` | Copper: `cat5e`, `cat6`, `cat6a`, `cat7`, `cat8`, `dac`. Fiber: `om3`, `om4`, `om5`, `os2`. Forbidden for `wireless` (`NV-C007`). |
 | `connector` | string | O | `null` | `rj45`, `lc`, `sc`, `mpo`, `sfp+`, `qsfp28`, … Free text; not validated against `medium`. |
 | `label` | string | O | `null` | Physical cable-label / patch-panel identifier printed on the edge. |
 
@@ -887,15 +887,15 @@ spec:
 
 * A cable is **undirected**. `[a:1, b:2]` and `[b:2, a:1]` describe the same
   link and produce the same graph edge and the same canonical JSON export.
-* An interface may terminate **at most one** cable (`NG-C005`). Multi-access
+* An interface may terminate **at most one** cable (`NV-C005`). Multi-access
   media are modelled by an explicit `hub` element or, for radio, by a
   `wireless` cable per associated station.
 * `medium: wireless` requires **both** endpoints to be `type: wifi`
-  (`NG-C006`). It represents an association, not a physical cable; renderers
+  (`NV-C006`). It represents an association, not a physical cable; renderers
   draw it dashed.
 * A cable between two interfaces of the same device is permitted (loopback
   cables and MLAG peer links on a single logical switch exist) but raises a
-  warning (`NG-C004`).
+  warning (`NV-C004`).
 * A cable is the *physical* link. Its logical counterpart — WireGuard, IPsec,
   OpenVPN, PPTP, L2TP, GRE, VXLAN, Geneve, and any of them nested inside
   another — is the `tunnel` kind, §14. Section numbers are append-only, which
@@ -941,9 +941,9 @@ spec:
 | `vendor`, `model`, `serial`, `location` | string | O | `null` | As §6.1. |
 | `form_factor` | string | O | `null` | Descriptive: `usb-ethernet`, `dock`, `media-converter`, `sfp-module`. |
 | `passthrough` | boolean | O | `true` | Rendering hint, §8.2. |
-| `ports` | uint (≥1) | O | `null` | Downstream network ports the hardware physically provides. Declaring it lets the validator catch an inventory that has outgrown the device (`NG-X008`); leaving it out disables that check. |
+| `ports` | uint (≥1) | O | `null` | Downstream network ports the hardware physically provides. Declaring it lets the validator catch an inventory that has outgrown the device (`NV-X008`); leaving it out disables that check. |
 | `upstream` | Upstream | M | — | §8.1. |
-| `interfaces` | list[Interface] | M | — | §6.2, at least one. Every entry MUST be `type: ethernet`, `wifi` or `lag` (`NG-X003`). |
+| `interfaces` | list[Interface] | M | — | §6.2, at least one. Every entry MUST be `type: ethernet`, `wifi` or `lag` (`NV-X003`). |
 
 ### 8.1 `upstream`
 
@@ -952,7 +952,7 @@ spec:
 | `name` | ifname | M | — | Port name on the adapter side, e.g. `usb0`. Referenceable as `adp-usb-eth-01:usb0`. |
 | `type` | enum | M | — | `usb`, `usb-c`, `thunderbolt`, `pcie`, `m2`, `sfp`, `internal`. |
 | `speed` | speed | O | `null` | Host-bus rate, e.g. `5Gbps` for USB 3.0. |
-| `attached_to` | name | O | `null` | The host device the adapter is plugged into, e.g. `laptop-01`. A **device** reference, not an `ifref`: `v1alpha1` has no interface type for a host-side USB/Thunderbolt receptacle, so there is nothing to point at. Unresolvable references are an error (`NG-X001`); the `device:port` form is reserved for a future revision.<br>An adapter chained behind another adapter (dongle in a dock) names the dock here. |
+| `attached_to` | name | O | `null` | The host device the adapter is plugged into, e.g. `laptop-01`. A **device** reference, not an `ifref`: `v1alpha1` has no interface type for a host-side USB/Thunderbolt receptacle, so there is nothing to point at. Unresolvable references are an error (`NV-X001`); the `device:port` form is reserved for a future revision.<br>An adapter chained behind another adapter (dongle in a dock) names the dock here. |
 
 `upstream.type` maps to `ianaift:usb` for `usb`/`usb-c` and to `ianaift:other`
 for the rest — the IANA registry has no Thunderbolt/PCIe identity. The upstream
@@ -966,7 +966,7 @@ and must not accumulate addresses.
   or permitted for the host attachment; use a cable only for what leaves the
   adapter's downstream ports.
 * An adapter with no `attached_to` is a free-standing node (spare in a drawer,
-  or a media converter in a run). It raises `NG-X002` (warning) if any of its
+  or a media converter in a run). It raises `NV-X002` (warning) if any of its
   downstream interfaces is cabled, since a cabled-but-unattached adapter is
   almost always an omission.
 * `passthrough: true` tells the renderer it MAY collapse the adapter, drawing
@@ -1091,7 +1091,7 @@ The VLAN database itself:
 For a `type: vlan` sub-interface, `vlan.access_vlan` is the encapsulation VID.
 It maps to `dot1q:pvid` on the sub-port and identifies the `l2vlan` interface's
 VLAN; the parent trunk port MUST list that VID in its `trunk_vlans` or as its
-`native_vlan` (`NG-V005`). A `bridge` parent — where a switch's SVI hangs —
+`native_vlan` (`NV-V005`). A `bridge` parent — where a switch's SVI hangs —
 carries the union of its members' VLAN sets instead, since the bridge itself
 declares no `vlan` block.
 
@@ -1106,7 +1106,7 @@ not the wire between them. Its fields project onto both endpoint interfaces:
 | `cable.medium` | no YANG node; informs the `ianaift` identity choice at export time (`ethernetCsmacd` regardless of copper/fibre; `ieee80211` for `wireless`) |
 | `cable.duplex`, `length_m`, `category`, `connector`, `label` | netviz-only, physical-plant metadata |
 
-If both endpoints and the cable declare a speed, they MUST agree (`NG-C008`).
+If both endpoints and the cable declare a speed, they MUST agree (`NV-C008`).
 
 ### 9.5 Adapter
 
@@ -1149,7 +1149,7 @@ negotiation are **not** modelled; see
 ## 10. Validation rules
 
 Every rule has a stable ID. The validator (`netviz validate`) reports them as
-`NG-C005: interface sw-access-01:Gi0/2 is terminated by 2 cables (cbl-a, cbl-b)`.
+`NV-C005: interface sw-access-01:Gi0/2 is terminated by 2 cables (cbl-a, cbl-b)`.
 IDs are permanent: once assigned, an ID is never reused for a different rule.
 
 Severity `error` fails the run (exit code 4, `ValidationError`); `warning` and
@@ -1158,122 +1158,122 @@ promotes every warning to an error. Individual rules can be re-graded or
 silenced per inventory (§10.11).
 
 The semantic validator also prints a short id (`E002`, `W103`) alongside the
-`NG-*` id; the two vocabularies are interchangeable everywhere a rule can be
+`NV-*` id; the two vocabularies are interchangeable everywhere a rule can be
 named. §10.10 maps them.
 
 ### 10.1 Document and naming
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-D001` | error | The document is a mapping with the four envelope keys; `apiVersion`, `kind`, `metadata`, `spec` are all present. |
-| `NG-D002` | error | `apiVersion` is a recognised version string. |
-| `NG-D003` | error | `kind` is one of the twelve element kinds, `template`, `layout`, `testsuite`, `note`, `area` or `legend`, lower-case. |
-| `NG-D004` | error | `spec` matches the shape required by `kind`. |
-| `NG-D005` | error | No unknown keys anywhere in the document. |
-| `NG-N001` | error | `metadata.name` matches the name grammar (§4.1). |
-| `NG-N002` | error | `metadata.name` is unique within its namespace (§2.2), across all kinds; the diagnostic names both source locations. A name reused in a *different* namespace is allowed, and only reported when a reference to it stays ambiguous after the namespace and ancestor lookups have failed. |
-| `NG-N003` | error | Label keys and values match the constraints in §3.1. |
+| `NV-D001` | error | The document is a mapping with the four envelope keys; `apiVersion`, `kind`, `metadata`, `spec` are all present. |
+| `NV-D002` | error | `apiVersion` is a recognised version string. |
+| `NV-D003` | error | `kind` is one of the twelve element kinds, `template`, `layout`, `testsuite`, `note`, `area` or `legend`, lower-case. |
+| `NV-D004` | error | `spec` matches the shape required by `kind`. |
+| `NV-D005` | error | No unknown keys anywhere in the document. |
+| `NV-N001` | error | `metadata.name` matches the name grammar (§4.1). |
+| `NV-N002` | error | `metadata.name` is unique within its namespace (§2.2), across all kinds; the diagnostic names both source locations. A name reused in a *different* namespace is allowed, and only reported when a reference to it stays ambiguous after the namespace and ancestor lookups have failed. |
+| `NV-N003` | error | Label keys and values match the constraints in §3.1. |
 
 ### 10.2 Interfaces
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-I001` | error | Interface names are unique within their device. |
-| `NG-I002` | error | `parent` is present exactly for `type: vlan` and resolves to an interface on the same device. |
-| `NG-I003` | error | `members` is present exactly for `type: lag` and `type: bridge`, is non-empty, has no duplicates, and every entry resolves to an interface on the same device. |
-| `NG-I004` | error | Interface stacking (`parent`/`members`) is acyclic. |
-| `NG-I005` | error | A `lag`/`bridge` member is not itself a member of another aggregate, and is not the `parent` of a VLAN sub-interface. |
-| `NG-I006` | warning | A `lag`/`bridge` member carries its own `ipv4`/`ipv6` addresses. Addresses belong on the aggregate. |
-| `NG-I007` | warning | `mac` is set on a `loopback` interface. |
-| `NG-I008` | warning | Two interfaces anywhere in the inventory share the same `mac`. Legitimate for VRRP/CARP and for a `parent`/sub-interface pair, which are exempt. |
-| `NG-I009` | warning | `mac` has the multicast bit (least-significant bit of the first octet) set — never valid as a source address. |
-| `NG-I010` | info | `mac` is locally administered (second-least-significant bit of the first octet set). |
-| `NG-I011` | error | `mtu` is within `[68, 65535]`, and within `[1280, 65535]` if the interface has IPv6 addresses. |
-| `NG-I012` | warning | A device declares no `ethernet`, `wifi` or `lag` interface, so it can never be cabled. |
-| `NG-I013` | warning | An interface has neither `ipv4` nor `ipv6` addresses and no `vlan` block, so it neither routes nor switches. Hub ports, disabled interfaces, and interfaces another one is stacked on (LAG members, the `parent` of a sub-interface) are exempt. |
+| `NV-I001` | error | Interface names are unique within their device. |
+| `NV-I002` | error | `parent` is present exactly for `type: vlan` and resolves to an interface on the same device. |
+| `NV-I003` | error | `members` is present exactly for `type: lag` and `type: bridge`, is non-empty, has no duplicates, and every entry resolves to an interface on the same device. |
+| `NV-I004` | error | Interface stacking (`parent`/`members`) is acyclic. |
+| `NV-I005` | error | A `lag`/`bridge` member is not itself a member of another aggregate, and is not the `parent` of a VLAN sub-interface. |
+| `NV-I006` | warning | A `lag`/`bridge` member carries its own `ipv4`/`ipv6` addresses. Addresses belong on the aggregate. |
+| `NV-I007` | warning | `mac` is set on a `loopback` interface. |
+| `NV-I008` | warning | Two interfaces anywhere in the inventory share the same `mac`. Legitimate for VRRP/CARP and for a `parent`/sub-interface pair, which are exempt. |
+| `NV-I009` | warning | `mac` has the multicast bit (least-significant bit of the first octet) set — never valid as a source address. |
+| `NV-I010` | info | `mac` is locally administered (second-least-significant bit of the first octet set). |
+| `NV-I011` | error | `mtu` is within `[68, 65535]`, and within `[1280, 65535]` if the interface has IPv6 addresses. |
+| `NV-I012` | warning | A device declares no `ethernet`, `wifi` or `lag` interface, so it can never be cabled. |
+| `NV-I013` | warning | An interface has neither `ipv4` nor `ipv6` addresses and no `vlan` block, so it neither routes nor switches. Hub ports, disabled interfaces, and interfaces another one is stacked on (LAG members, the `parent` of a sub-interface) are exempt. |
 
 ### 10.3 Addresses
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-A001` | error | Exactly one of `prefix_length` / `netmask` per IPv4 address; `prefix_length` is mandatory for IPv6. |
-| `NG-A002` | error | Addresses are unique within an address family on one interface (the RFC 8344 list key). |
-| `NG-A003` | error | `netmask` is contiguous, or the inventory opts in to non-contiguous masks. |
-| `NG-A004` | warning | The same IP address is assigned on two different devices. VRRP/anycast are legitimate; the warning exists because typos are more common. |
-| `NG-A005` | warning | An address is the network or broadcast address of its own prefix (does not apply to `/31`, `/32`, `/127`, `/128`). |
-| `NG-A006` | warning | Two interfaces on the same device hold overlapping prefixes. |
-| `NG-A007` | warning | A loopback interface carries a prefix other than `/32` (v4) or `/128` (v6). |
-| `NG-A008` | warning | Exactly one element is addressed in a prefix. Host routes and point-to-point prefixes (at most two host addresses: `/30`–`/32`, `/126`–`/128`) are exempt — the peer of an ISP hand-off is not a declared device. |
-| `NG-A009` | warning | Two elements claim the same address inside one prefix while sitting in different broadcast domains. When they share one, `NG-A004` reports it instead. |
-| `NG-A010` | warning | One prefix is claimed by interfaces in two different VLANs, and the two hold addresses of their own. Neither half can ARP for the other, and no router forwards between them. |
-| `NG-A011` | warning | A prefix nested inside another is used in a VLAN the wider prefix is not, so hosts in the wider one ARP for addresses they should route to. |
-| `NG-A012` | warning | The two interfaces a cable joins are addressed in prefixes that do not overlap, so neither address is inside any prefix on its own link. |
-| `NG-A013` | error | An interface's `gateway` is inside none of the prefixes that interface configures for the same family. A link-local IPv6 gateway is exempt. |
+| `NV-A001` | error | Exactly one of `prefix_length` / `netmask` per IPv4 address; `prefix_length` is mandatory for IPv6. |
+| `NV-A002` | error | Addresses are unique within an address family on one interface (the RFC 8344 list key). |
+| `NV-A003` | error | `netmask` is contiguous, or the inventory opts in to non-contiguous masks. |
+| `NV-A004` | warning | The same IP address is assigned on two different devices. VRRP/anycast are legitimate; the warning exists because typos are more common. |
+| `NV-A005` | warning | An address is the network or broadcast address of its own prefix (does not apply to `/31`, `/32`, `/127`, `/128`). |
+| `NV-A006` | warning | Two interfaces on the same device hold overlapping prefixes. |
+| `NV-A007` | warning | A loopback interface carries a prefix other than `/32` (v4) or `/128` (v6). |
+| `NV-A008` | warning | Exactly one element is addressed in a prefix. Host routes and point-to-point prefixes (at most two host addresses: `/30`–`/32`, `/126`–`/128`) are exempt — the peer of an ISP hand-off is not a declared device. |
+| `NV-A009` | warning | Two elements claim the same address inside one prefix while sitting in different broadcast domains. When they share one, `NV-A004` reports it instead. |
+| `NV-A010` | warning | One prefix is claimed by interfaces in two different VLANs, and the two hold addresses of their own. Neither half can ARP for the other, and no router forwards between them. |
+| `NV-A011` | warning | A prefix nested inside another is used in a VLAN the wider prefix is not, so hosts in the wider one ARP for addresses they should route to. |
+| `NV-A012` | warning | The two interfaces a cable joins are addressed in prefixes that do not overlap, so neither address is inside any prefix on its own link. |
+| `NV-A013` | error | An interface's `gateway` is inside none of the prefixes that interface configures for the same family. A link-local IPv6 gateway is exempt. |
 
 ### 10.4 VLANs
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-V001` | error | `vlans[].id` is unique within a device. |
-| `NG-V002` | error | `access_vlan` is present in `access` mode and absent in `trunk` mode; `trunk_vlans` vice versa. |
-| `NG-V003` | error | `native_vlan` only appears in `trunk` mode. |
-| `NG-V004` | warning | A port references a VLAN that the device's `vlans` list does not declare (suppressed when the device declares no `vlans` at all). |
-| `NG-V005` | error | For `type: vlan`, the `parent` interface is in `trunk` mode and its `trunk_vlans` (or `native_vlan`) contain the sub-interface's `access_vlan`. |
-| `NG-V006` | warning | `native_vlan` is not listed in `trunk_vlans`. It is implicitly added, because a PVID is always a member of its port's VLAN set. |
-| `NG-V007` | warning | `trunk_vlans: all` on a port facing a host rather than another switch. |
-| `NG-V008` | warning | A `lag` member declares its own `vlan` block that differs from the aggregate's (§10.6). |
-| `NG-V009` | warning | An `access` port of a layer-2-only switch (a `switch` that forwards neither IPv4 nor IPv6) carries an IP address. Management addresses belong on a `type: vlan` SVI, which is exempt. |
+| `NV-V001` | error | `vlans[].id` is unique within a device. |
+| `NV-V002` | error | `access_vlan` is present in `access` mode and absent in `trunk` mode; `trunk_vlans` vice versa. |
+| `NV-V003` | error | `native_vlan` only appears in `trunk` mode. |
+| `NV-V004` | warning | A port references a VLAN that the device's `vlans` list does not declare (suppressed when the device declares no `vlans` at all). |
+| `NV-V005` | error | For `type: vlan`, the `parent` interface is in `trunk` mode and its `trunk_vlans` (or `native_vlan`) contain the sub-interface's `access_vlan`. |
+| `NV-V006` | warning | `native_vlan` is not listed in `trunk_vlans`. It is implicitly added, because a PVID is always a member of its port's VLAN set. |
+| `NV-V007` | warning | `trunk_vlans: all` on a port facing a host rather than another switch. |
+| `NV-V008` | warning | A `lag` member declares its own `vlan` block that differs from the aggregate's (§10.6). |
+| `NV-V009` | warning | An `access` port of a layer-2-only switch (a `switch` that forwards neither IPv4 nor IPv6) carries an IP address. Management addresses belong on a `type: vlan` SVI, which is exempt. |
 
 ### 10.5 Cables and topology
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-C001` | error | `endpoints` has exactly two entries. |
-| `NG-C002` | error | Each endpoint's device part resolves to a declared element. |
-| `NG-C003` | error | Each endpoint's interface part resolves to an interface on that element (the adapter upstream port counts). |
-| `NG-C004` | warning | Both endpoints are on the same device. |
-| `NG-C005` | error | An interface terminates at most one cable. |
-| `NG-C006` | error | `medium: wireless` requires both endpoints to be `type: wifi`; a non-wireless medium requires neither endpoint to be `type: wifi`. |
-| `NG-C007` | error | `length_m` and `category` are absent when `medium: wireless`. |
-| `NG-C008` | warning | Endpoint interface speeds and `cable.speed` disagree. |
-| `NG-C009` | error | An endpoint is a `loopback`, `vlan` or `bridge` interface. Only physical interfaces (`ethernet`, `wifi`) and `lag` interfaces can be cabled — and cabling a `lag` is itself flagged by `NG-C012`. |
-| `NG-C010` | warning | `mtu` differs between the two endpoints. A classic cause of silent path-MTU failures. |
-| `NG-C011` | warning | VLAN configuration mismatch across a link: two access ports with different `access_vlan`; an access port facing a trunk; trunks whose `trunk_vlans` sets are disjoint or whose `native_vlan` differs. Resolved through the LAG master when an endpoint is a `lag` member (§10.6). |
-| `NG-C012` | warning | An endpoint is a `lag` interface rather than one of its members. Aggregates are logical; cable the physical members. |
-| `NG-C013` | warning | `duplex: half` on a link that does not involve a `hub`. |
-| `NG-C014` | warning | The topology graph is disconnected. Reported once, listing each component's smallest member name. |
-| `NG-C015` | info | An interface is `enabled: true` but terminates no cable. |
-| `NG-C016` | warning | A device terminates no cable and neither hosts nor is an adapter attachment: an orphan node. An `attached_to` edge counts as connectivity (§8.2), and a device whose cable names a missing *interface* is still cabled, so `NG-C002`/`NG-C003` are not compounded by this rule. |
+| `NV-C001` | error | `endpoints` has exactly two entries. |
+| `NV-C002` | error | Each endpoint's device part resolves to a declared element. |
+| `NV-C003` | error | Each endpoint's interface part resolves to an interface on that element (the adapter upstream port counts). |
+| `NV-C004` | warning | Both endpoints are on the same device. |
+| `NV-C005` | error | An interface terminates at most one cable. |
+| `NV-C006` | error | `medium: wireless` requires both endpoints to be `type: wifi`; a non-wireless medium requires neither endpoint to be `type: wifi`. |
+| `NV-C007` | error | `length_m` and `category` are absent when `medium: wireless`. |
+| `NV-C008` | warning | Endpoint interface speeds and `cable.speed` disagree. |
+| `NV-C009` | error | An endpoint is a `loopback`, `vlan` or `bridge` interface. Only physical interfaces (`ethernet`, `wifi`) and `lag` interfaces can be cabled — and cabling a `lag` is itself flagged by `NV-C012`. |
+| `NV-C010` | warning | `mtu` differs between the two endpoints. A classic cause of silent path-MTU failures. |
+| `NV-C011` | warning | VLAN configuration mismatch across a link: two access ports with different `access_vlan`; an access port facing a trunk; trunks whose `trunk_vlans` sets are disjoint or whose `native_vlan` differs. Resolved through the LAG master when an endpoint is a `lag` member (§10.6). |
+| `NV-C012` | warning | An endpoint is a `lag` interface rather than one of its members. Aggregates are logical; cable the physical members. |
+| `NV-C013` | warning | `duplex: half` on a link that does not involve a `hub`. |
+| `NV-C014` | warning | The topology graph is disconnected. Reported once, listing each component's smallest member name. |
+| `NV-C015` | info | An interface is `enabled: true` but terminates no cable. |
+| `NV-C016` | warning | A device terminates no cable and neither hosts nor is an adapter attachment: an orphan node. An `attached_to` edge counts as connectivity (§8.2), and a device whose cable names a missing *interface* is still cabled, so `NV-C002`/`NV-C003` are not compounded by this rule. |
 
 ### 10.6 LAG resolution
 
 When a cable endpoint is a member of a `lag`, VLAN and MTU checks
-(`NG-C010`, `NG-C011`) use the aggregate's configuration, not the member's.
+(`NV-C010`, `NV-C011`) use the aggregate's configuration, not the member's.
 Members are expected to carry no `vlan` block of their own; one that does
-triggers `NG-V008` (warning) unless it matches the master exactly.
+triggers `NV-V008` (warning) unless it matches the master exactly.
 
 ### 10.7 Hubs
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-H001` | error | A hub interface declares `vlan`. |
-| `NG-H002` | error | A hub interface declares `ipv4` or `ipv6`. |
-| `NG-H003` | error | A hub declares `bridge`, `vlans` or `forwarding`. |
-| `NG-H004` | error | Every hub interface is `type: ethernet`. |
-| `NG-H005` | warning | Two devices attached to the same hub have addresses in different subnets — a hub is a single broadcast domain. |
+| `NV-H001` | error | A hub interface declares `vlan`. |
+| `NV-H002` | error | A hub interface declares `ipv4` or `ipv6`. |
+| `NV-H003` | error | A hub declares `bridge`, `vlans` or `forwarding`. |
+| `NV-H004` | error | Every hub interface is `type: ethernet`. |
+| `NV-H005` | warning | Two devices attached to the same hub have addresses in different subnets — a hub is a single broadcast domain. |
 
 ### 10.8 Adapters
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-X001` | error | `upstream.attached_to` is a bare device name (no `:`) that resolves to a declared device. |
-| `NG-X002` | warning | An adapter has cabled downstream interfaces but no `attached_to`. |
-| `NG-X003` | error | Every entry in an adapter's `interfaces` is `type: ethernet`, `wifi` or `lag`. |
-| `NG-X004` | error | `upstream.name` does not collide with any `interfaces[].name` on the same adapter. |
-| `NG-X005` | error | A `cable` references an adapter's upstream port while `attached_to` is also set — the host attachment is declared exactly once. |
-| `NG-X006` | error | Adapter attachment is acyclic: an adapter chain (dock → dongle → host) must not loop. |
-| `NG-X007` | warning | `attached_to` points at a `hub` or `switch`. Adapters attach to hosts; a media converter between switches should be modelled with `passthrough: false` and cables on both sides. |
-| `NG-X008` | error | An adapter declares more entries in `interfaces` than `spec.ports` says the hardware has. Not checked when `ports` is absent. |
+| `NV-X001` | error | `upstream.attached_to` is a bare device name (no `:`) that resolves to a declared device. |
+| `NV-X002` | warning | An adapter has cabled downstream interfaces but no `attached_to`. |
+| `NV-X003` | error | Every entry in an adapter's `interfaces` is `type: ethernet`, `wifi` or `lag`. |
+| `NV-X004` | error | `upstream.name` does not collide with any `interfaces[].name` on the same adapter. |
+| `NV-X005` | error | A `cable` references an adapter's upstream port while `attached_to` is also set — the host attachment is declared exactly once. |
+| `NV-X006` | error | Adapter attachment is acyclic: an adapter chain (dock → dongle → host) must not loop. |
+| `NV-X007` | warning | `attached_to` points at a `hub` or `switch`. Adapters attach to hosts; a media converter between switches should be modelled with `passthrough: false` and cables on both sides. |
+| `NV-X008` | error | An adapter declares more entries in `interfaces` than `spec.ports` says the hardware has. Not checked when `ports` is absent. |
 
 ### 10.9 Ranges and templates
 
@@ -1284,96 +1284,96 @@ alias. §6.2.5 and §6.6 state them in context.
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-R001` | error | An interface entry declares exactly one of `name` and `range`. |
-| `NG-R002` | error | `range` is a string carrying between one and four well-formed, non-inverted `[low-high]` spans and no stray bracket. |
-| `NG-R003` | error | Expanding a document's ranges produces at most 4096 interfaces. |
-| `NG-R004` | error | An expanded interface name does not collide with another interface of the same element; the diagnostic names both source locations. |
-| `NG-R005` | error | Every `{...}` placeholder in a range `description` is empty or names a span the range declares, and every brace is paired. |
-| `NG-M001` | error | `spec.from` names exactly one `kind: template` document, resolved by §2.2. |
-| `NG-M002` | error | Template names are unique within their namespace; the diagnostic names both source locations. |
-| `NG-M003` | error | Template inheritance through `from` is acyclic. |
-| `NG-M004` | error | A device only inherits from a template that resolved; a template rejected for its own reasons is reported once, against itself. |
-| `NG-M005` | error | A `template` document's `spec` is a mapping whose keys are device-spec keys (plus `from`). |
-| `NG-M006` | error | `spec.from` appears only on the five device kinds. |
+| `NV-R001` | error | An interface entry declares exactly one of `name` and `range`. |
+| `NV-R002` | error | `range` is a string carrying between one and four well-formed, non-inverted `[low-high]` spans and no stray bracket. |
+| `NV-R003` | error | Expanding a document's ranges produces at most 4096 interfaces. |
+| `NV-R004` | error | An expanded interface name does not collide with another interface of the same element; the diagnostic names both source locations. |
+| `NV-R005` | error | Every `{...}` placeholder in a range `description` is empty or names a span the range declares, and every brace is paired. |
+| `NV-M001` | error | `spec.from` names exactly one `kind: template` document, resolved by §2.2. |
+| `NV-M002` | error | Template names are unique within their namespace; the diagnostic names both source locations. |
+| `NV-M003` | error | Template inheritance through `from` is acyclic. |
+| `NV-M004` | error | A device only inherits from a template that resolved; a template rejected for its own reasons is reported once, against itself. |
+| `NV-M005` | error | A `template` document's `spec` is a mapping whose keys are device-spec keys (plus `from`). |
+| `NV-M006` | error | `spec.from` appears only on the five device kinds. |
 
 ### 10.10 Rule identifiers
 
 The semantic validator (`netviz.validate`) reports the cross-document rules —
 and the per-element judgements that a single document cannot settle — under
-short ids. Each is an alias of the `NG-*` rule above it, and both spellings are
+short ids. Each is an alias of the `NV-*` rule above it, and both spellings are
 accepted wherever a rule is named — in `netviz.toml`, in a `netviz/ignore`
 annotation, and on the command line. The letter is the severity the rule was
 first assigned: `E` error, `W` warning, `I` info.
 
 | Short id | Sev. | Schema id | Rule |
 |---|---|---|---|
-| `E001` | error | `NG-C002`, `NG-C003` | A cable endpoint references an unknown device or interface. |
-| `E002` | error | `NG-C005` | An interface is terminated by more than one cable. |
-| `E003` | error | `NG-I008` | The same MAC address is used by two interfaces. Stacked interfaces (a LAG and its members, a sub-interface and its parent) share one address by design and are exempt. |
-| `E004` | error | `NG-A004` | The same IP address is assigned twice within one prefix *and* one VLAN. Re-using a prefix in a different VLAN is not a clash. |
-| `E005` | error | `NG-C011` | The two ends of a link disagree about VLANs: two access ports in different VLANs, an access port facing a trunk, trunks whose VLAN sets are disjoint, or two trunks that each name a different `native_vlan`. Resolved through the LAG master (§10.6). |
-| `E006` | error | `NG-X008` | An adapter declares more downstream interfaces than it has ports. |
-| `W101` | warning | `NG-I013` | An interface has neither IPv4 nor IPv6 and is not a switchport. |
-| `W102` | warning | `NG-C010` | The two endpoints of a cable disagree about the MTU. |
-| `W103` | warning | `NG-C016` | A device terminates no cable and hosts no adapter. |
-| `W104` | warning | `NG-V009` | An access port of a layer-2-only switch carries an IP address. |
-| `W105` | warning | `NG-A008` | A subnet holds exactly one element, so its prefix length may be wrong or its neighbour missing. Host and point-to-point prefixes are exempt. |
-| `W106` | warning | `NG-A009` | Two elements claim the same address in one subnet, in different VLANs — the clash `E004` scopes away, seen from layer 3. |
-| `E007` | error | `NG-I004` | Interface stacking through `parent`/`members` contains a cycle longer than the self-reference `NG-I002`/`NG-I003` already reject. |
-| `E008` | error | `NG-I005` | A `lag`/`bridge` member is claimed by a second aggregate, is an aggregate itself, or carries a `vlan` sub-interface. A `lag` inside a `bridge` is exempt: that is how a bridged bond is expressed. |
-| `E009` | error | `NG-V005` | A `type: vlan` sub-interface's VID is not carried by its `parent`. A `bridge` parent is resolved through the union of its members' VLAN sets. |
-| `E010` | error | `NG-I009` | A `mac` has the multicast bit set. |
-| `W107` | warning | `NG-I006` | A `lag`/`bridge` member carries its own `ipv4`/`ipv6` addresses. |
-| `W108` | warning | `NG-I007` | A `loopback` interface declares a `mac`. |
-| `W109` | warning | `NG-I012` | A device declares no `ethernet`, `wifi` or `lag` interface. Adapters are exempt — `NG-X003` already restricts them to those types. |
-| `W110` | warning | `NG-A005` | An address is the network or broadcast address of its own prefix. In IPv6 the all-zeros host part is reported as the subnet-router anycast address. |
-| `W111` | warning | `NG-A006` | Two *different* interfaces of one element hold overlapping prefixes. Loopback and link-local addresses are excluded. |
-| `W112` | warning | `NG-A007` | A `loopback` carries a prefix other than `/32` or `/128`. The host-scoped loopback addresses (`127.0.0.0/8`, `::1`) are exempt, so the `127.0.0.1/8` every OS configures is not reported. |
-| `W113` | warning | `NG-V004` | A port references a VLAN the device's `vlans` database omits. Devices with no database, ports trunking `all`, and VLAN 1 — the 802.1Q Default VLAN — are exempt. |
-| `W114` | warning | `NG-V006` | A trunk's `native_vlan` is not listed in its `trunk_vlans`. |
-| `W115` | warning | `NG-V007` | A port trunking `all` is cabled to a host rather than to another switch. Resolved through the LAG master (§10.6). |
-| `W116` | warning | `NG-V008` | A `lag` member declares a `vlan` block differing from its aggregate's. |
-| `I001` | info | `NG-I010` | A `mac` is locally administered rather than vendor-assigned. |
-| `E011` | error | `NG-C006` | `medium: wireless` requires both endpoints to be `type: wifi`; any other medium requires neither to be. An adapter's upstream port is a host bus, so it counts as wired. |
-| `E012` | error | `NG-C009` | A cable endpoint is a `loopback`, `vlan` or `bridge` interface. |
-| `E013` | error | `NG-X005` | A cable lands on an adapter's upstream port while `attached_to` is set as well. |
-| `E014` | error | `NG-X006` | The `attached_to` references form a cycle. |
-| `E015` | error | `NG-X001` | `attached_to` names no declared element, stays ambiguous, or names something that owns no interfaces. The grammar half of `NG-X001` is a schema rule (§10.8) and is not suppressible; this half is. |
-| `W117` | warning | `NG-C004` | Both endpoints of one cable land on the same element. The same-*port* case is `E002`. |
-| `W118` | warning | `NG-C008` | A cable's `speed` disagrees with the speed its endpoint declares — in practice an adapter's `upstream.speed` (§8.1), the only endpoint speed the schema carries. |
-| `W119` | warning | `NG-C012` | A cable endpoint is a `lag` aggregate rather than one of its members. |
-| `W120` | warning | `NG-C013` | `duplex: half` on a link where neither end belongs to a `hub`. |
-| `W121` | warning | `NG-C014` | The topology graph is disconnected. Reported once, naming each island's smallest member. Islands of one element are left to `W103`. |
-| `W122` | warning | `NG-H005` | Two elements cabled into one hub share no prefix. Chained hubs count as one collision domain; the two address families are checked separately. |
-| `W123` | warning | `NG-X002` | An adapter has cabled downstream ports but neither an `attached_to` nor a cable on its upstream port. |
-| `W124` | warning | `NG-X007` | `attached_to` points at a `hub` or a `switch` rather than at a host. |
-| `I002` | info | `NG-C015` | An interface is `enabled: true` but terminates no cable. `lag` aggregates are exempt: `NG-C012` asks for the members to be cabled. |
-| `E016` | error | `NG-T002` | A tunnel endpoint references an unknown element or interface, or a name that stays ambiguous. |
-| `E017` | error | `NG-T003` | A tunnel endpoint is not an interface of `type: tunnel`. |
-| `E018` | error | `NG-T004` | `over` names no tunnel of this inventory. |
-| `E019` | error | `NG-T005` | The `over` references form a cycle, so no tunnel in it reaches the underlay. |
-| `W125` | warning | `NG-T006` | A tunnel terminates on an element its `over` underlay does not reach. |
-| `W126` | warning | `NG-T011` | A tunnel's `mtu` exceeds its underlay's `mtu` minus its own encapsulation overhead (§14.1). |
-| `W127` | warning | `NG-T012` | A tunnel encrypts nothing and no tunnel in its `over` chain does either. |
-| `W128` | warning | `NG-T013` | An enabled `type: tunnel` interface is named by no `tunnel` document. |
-| `W129` | warning | `NG-T014` | Two tunnels terminating on one element declare the same `vni`. |
-| `I003` | info | `NG-T015` | A tunnel's `port` is not the registered port for its type. |
-| `E020` | error | `NG-A013` | An interface's `gateway` is on none of the prefixes it configures for that family. A link-local IPv6 gateway is exempt. |
-| `W130` | warning | `NG-A010` | One prefix is claimed by interfaces in two VLANs that hold addresses of their own. When the addresses are identical it is `W106`/`E004` instead. |
-| `W131` | warning | `NG-A011` | A nested prefix is used in a VLAN its parent prefix is not. |
-| `W132` | warning | `NG-A012` | The two ends of a cable are addressed in prefixes that do not overlap. Only families both ends configure are compared. |
-| `E028` | error | `NG-W007` | A `medium: wireless` cable joins two radios that are not one `ap` and one `station`/`mesh`. Checked once both ends declare a `wireless` block. |
-| `E029` | error | `NG-W008` | Two `ap` radios advertise the same `bssid`. A client's BSS entry repeats the AP's by design and is exempt. |
-| `E030` | error | `NG-W009` | An SSID's `vlan` is carried by no interface of the access point. An AP with a port trunking `all` is exempt. |
-| `E031` | error | `NG-W010` | A client radio's SSID is not one the `ap` radio at the far end advertises. An AP listing no BSS is exempt. |
-| `W134` | warning | `NG-W011` | Two access points that share a broadcast domain are in one band with overlapping channels. |
+| `E001` | error | `NV-C002`, `NV-C003` | A cable endpoint references an unknown device or interface. |
+| `E002` | error | `NV-C005` | An interface is terminated by more than one cable. |
+| `E003` | error | `NV-I008` | The same MAC address is used by two interfaces. Stacked interfaces (a LAG and its members, a sub-interface and its parent) share one address by design and are exempt. |
+| `E004` | error | `NV-A004` | The same IP address is assigned twice within one prefix *and* one VLAN. Re-using a prefix in a different VLAN is not a clash. |
+| `E005` | error | `NV-C011` | The two ends of a link disagree about VLANs: two access ports in different VLANs, an access port facing a trunk, trunks whose VLAN sets are disjoint, or two trunks that each name a different `native_vlan`. Resolved through the LAG master (§10.6). |
+| `E006` | error | `NV-X008` | An adapter declares more downstream interfaces than it has ports. |
+| `W101` | warning | `NV-I013` | An interface has neither IPv4 nor IPv6 and is not a switchport. |
+| `W102` | warning | `NV-C010` | The two endpoints of a cable disagree about the MTU. |
+| `W103` | warning | `NV-C016` | A device terminates no cable and hosts no adapter. |
+| `W104` | warning | `NV-V009` | An access port of a layer-2-only switch carries an IP address. |
+| `W105` | warning | `NV-A008` | A subnet holds exactly one element, so its prefix length may be wrong or its neighbour missing. Host and point-to-point prefixes are exempt. |
+| `W106` | warning | `NV-A009` | Two elements claim the same address in one subnet, in different VLANs — the clash `E004` scopes away, seen from layer 3. |
+| `E007` | error | `NV-I004` | Interface stacking through `parent`/`members` contains a cycle longer than the self-reference `NV-I002`/`NV-I003` already reject. |
+| `E008` | error | `NV-I005` | A `lag`/`bridge` member is claimed by a second aggregate, is an aggregate itself, or carries a `vlan` sub-interface. A `lag` inside a `bridge` is exempt: that is how a bridged bond is expressed. |
+| `E009` | error | `NV-V005` | A `type: vlan` sub-interface's VID is not carried by its `parent`. A `bridge` parent is resolved through the union of its members' VLAN sets. |
+| `E010` | error | `NV-I009` | A `mac` has the multicast bit set. |
+| `W107` | warning | `NV-I006` | A `lag`/`bridge` member carries its own `ipv4`/`ipv6` addresses. |
+| `W108` | warning | `NV-I007` | A `loopback` interface declares a `mac`. |
+| `W109` | warning | `NV-I012` | A device declares no `ethernet`, `wifi` or `lag` interface. Adapters are exempt — `NV-X003` already restricts them to those types. |
+| `W110` | warning | `NV-A005` | An address is the network or broadcast address of its own prefix. In IPv6 the all-zeros host part is reported as the subnet-router anycast address. |
+| `W111` | warning | `NV-A006` | Two *different* interfaces of one element hold overlapping prefixes. Loopback and link-local addresses are excluded. |
+| `W112` | warning | `NV-A007` | A `loopback` carries a prefix other than `/32` or `/128`. The host-scoped loopback addresses (`127.0.0.0/8`, `::1`) are exempt, so the `127.0.0.1/8` every OS configures is not reported. |
+| `W113` | warning | `NV-V004` | A port references a VLAN the device's `vlans` database omits. Devices with no database, ports trunking `all`, and VLAN 1 — the 802.1Q Default VLAN — are exempt. |
+| `W114` | warning | `NV-V006` | A trunk's `native_vlan` is not listed in its `trunk_vlans`. |
+| `W115` | warning | `NV-V007` | A port trunking `all` is cabled to a host rather than to another switch. Resolved through the LAG master (§10.6). |
+| `W116` | warning | `NV-V008` | A `lag` member declares a `vlan` block differing from its aggregate's. |
+| `I001` | info | `NV-I010` | A `mac` is locally administered rather than vendor-assigned. |
+| `E011` | error | `NV-C006` | `medium: wireless` requires both endpoints to be `type: wifi`; any other medium requires neither to be. An adapter's upstream port is a host bus, so it counts as wired. |
+| `E012` | error | `NV-C009` | A cable endpoint is a `loopback`, `vlan` or `bridge` interface. |
+| `E013` | error | `NV-X005` | A cable lands on an adapter's upstream port while `attached_to` is set as well. |
+| `E014` | error | `NV-X006` | The `attached_to` references form a cycle. |
+| `E015` | error | `NV-X001` | `attached_to` names no declared element, stays ambiguous, or names something that owns no interfaces. The grammar half of `NV-X001` is a schema rule (§10.8) and is not suppressible; this half is. |
+| `W117` | warning | `NV-C004` | Both endpoints of one cable land on the same element. The same-*port* case is `E002`. |
+| `W118` | warning | `NV-C008` | A cable's `speed` disagrees with the speed its endpoint declares — in practice an adapter's `upstream.speed` (§8.1), the only endpoint speed the schema carries. |
+| `W119` | warning | `NV-C012` | A cable endpoint is a `lag` aggregate rather than one of its members. |
+| `W120` | warning | `NV-C013` | `duplex: half` on a link where neither end belongs to a `hub`. |
+| `W121` | warning | `NV-C014` | The topology graph is disconnected. Reported once, naming each island's smallest member. Islands of one element are left to `W103`. |
+| `W122` | warning | `NV-H005` | Two elements cabled into one hub share no prefix. Chained hubs count as one collision domain; the two address families are checked separately. |
+| `W123` | warning | `NV-X002` | An adapter has cabled downstream ports but neither an `attached_to` nor a cable on its upstream port. |
+| `W124` | warning | `NV-X007` | `attached_to` points at a `hub` or a `switch` rather than at a host. |
+| `I002` | info | `NV-C015` | An interface is `enabled: true` but terminates no cable. `lag` aggregates are exempt: `NV-C012` asks for the members to be cabled. |
+| `E016` | error | `NV-T002` | A tunnel endpoint references an unknown element or interface, or a name that stays ambiguous. |
+| `E017` | error | `NV-T003` | A tunnel endpoint is not an interface of `type: tunnel`. |
+| `E018` | error | `NV-T004` | `over` names no tunnel of this inventory. |
+| `E019` | error | `NV-T005` | The `over` references form a cycle, so no tunnel in it reaches the underlay. |
+| `W125` | warning | `NV-T006` | A tunnel terminates on an element its `over` underlay does not reach. |
+| `W126` | warning | `NV-T011` | A tunnel's `mtu` exceeds its underlay's `mtu` minus its own encapsulation overhead (§14.1). |
+| `W127` | warning | `NV-T012` | A tunnel encrypts nothing and no tunnel in its `over` chain does either. |
+| `W128` | warning | `NV-T013` | An enabled `type: tunnel` interface is named by no `tunnel` document. |
+| `W129` | warning | `NV-T014` | Two tunnels terminating on one element declare the same `vni`. |
+| `I003` | info | `NV-T015` | A tunnel's `port` is not the registered port for its type. |
+| `E020` | error | `NV-A013` | An interface's `gateway` is on none of the prefixes it configures for that family. A link-local IPv6 gateway is exempt. |
+| `W130` | warning | `NV-A010` | One prefix is claimed by interfaces in two VLANs that hold addresses of their own. When the addresses are identical it is `W106`/`E004` instead. |
+| `W131` | warning | `NV-A011` | A nested prefix is used in a VLAN its parent prefix is not. |
+| `W132` | warning | `NV-A012` | The two ends of a cable are addressed in prefixes that do not overlap. Only families both ends configure are compared. |
+| `E028` | error | `NV-W007` | A `medium: wireless` cable joins two radios that are not one `ap` and one `station`/`mesh`. Checked once both ends declare a `wireless` block. |
+| `E029` | error | `NV-W008` | Two `ap` radios advertise the same `bssid`. A client's BSS entry repeats the AP's by design and is exempt. |
+| `E030` | error | `NV-W009` | An SSID's `vlan` is carried by no interface of the access point. An AP with a port trunking `all` is exempt. |
+| `E031` | error | `NV-W010` | A client radio's SSID is not one the `ap` radio at the far end advertises. An AP listing no BSS is exempt. |
+| `W134` | warning | `NV-W011` | Two access points that share a broadcast domain are in one band with overlapping channels. |
 
 Ids are permanent (§10), so a suppression written today keeps meaning the same
 thing. Where a short id covers two schema ids (`E001`), naming either alias
 selects the whole rule.
 
 Three rules are graded more harshly here than in the tables above: `E003`
-(`NG-I008`), `E004` (`NG-A004`) and `E010` (`NG-I009`). The first two because a
+(`NV-I008`), `E004` (`NV-A004`) and `E010` (`NV-I009`). The first two because a
 duplicate address is far more often a copy-paste mistake than a deliberate VRRP
 or anycast design; the third because a multicast source address is not a design
 at all. Re-grade them per inventory (§10.11) where the exception is real.
@@ -1387,7 +1387,7 @@ Two mechanisms, both additive; a rule is silenced if either applies.
 ```toml
 [validate]
 strict = false                    # promote surviving warnings to errors
-ignore = ["W103", "NG-C010"]      # never report these at all
+ignore = ["W103", "NV-C010"]      # never report these at all
 
 [validate.severity]
 E004 = "warning"                  # re-grade rather than silence
@@ -1422,81 +1422,81 @@ are append-only (§12), so a group added in a later revision lands at the end.
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-P001` | error | A cable endpoint on a patch panel names a position the panel declares, spelled `front/<n>` or `rear/<n>`. |
-| `NG-P002` | warning | A cabled panel position's coupled position also terminates a cable; a run that stops inside the panel reaches nothing. |
-| `NG-P003` | error | A panel position terminates at most one cable. |
-| `NG-P004` | error | A patch panel is not named where an active element is required: `upstream.attached_to` and a tunnel endpoint both need one. |
-| `NG-P005` | error | A patch run does not come back into a segment it has already crossed. |
-| `NG-P006` | error | `spec.ports` is a positive count or comma-separated spans, with no repeats and at most 1024 positions. |
-| `NG-P007` | error | Every position `spec.couplers` names is declared by `spec.ports`, and no two front positions share a rear one. |
+| `NV-P001` | error | A cable endpoint on a patch panel names a position the panel declares, spelled `front/<n>` or `rear/<n>`. |
+| `NV-P002` | warning | A cabled panel position's coupled position also terminates a cable; a run that stops inside the panel reaches nothing. |
+| `NV-P003` | error | A panel position terminates at most one cable. |
+| `NV-P004` | error | A patch panel is not named where an active element is required: `upstream.attached_to` and a tunnel endpoint both need one. |
+| `NV-P005` | error | A patch run does not come back into a segment it has already crossed. |
+| `NV-P006` | error | `spec.ports` is a positive count or comma-separated spans, with no repeats and at most 1024 positions. |
+| `NV-P007` | error | Every position `spec.couplers` names is declared by `spec.ports`, and no two front positions share a rear one. |
 
 ### 10.13 Physical placement
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-U001` | error | Two elements in one rack do not occupy overlapping units. |
-| `NG-U002` | error | No element extends past the declared `rack_height` of its rack. |
-| `NG-U003` | error | Every element in one rack declares the same `rack_height`. |
-| `NG-U004` | error | `position` and `rack_height` are only written alongside a `rack`. |
+| `NV-U001` | error | Two elements in one rack do not occupy overlapping units. |
+| `NV-U002` | error | No element extends past the declared `rack_height` of its rack. |
+| `NV-U003` | error | Every element in one rack declares the same `rack_height`. |
+| `NV-U004` | error | `position` and `rack_height` are only written alongside a `rack`. |
 
 ### 10.14 Wireless
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-W001` | error | `ssid` is between 1 and 32 octets. |
-| `NG-W002` | error | `wireless` appears only on an interface of `type: wifi`. |
-| `NG-W003` | error | `channel` names `band`, and is a channel that band numbers. |
-| `NG-W004` | error | `width_mhz` names `band`, and is a width that band supports. |
-| `NG-W005` | error | `ssid` and `bssid` are each unique within one radio. |
-| `NG-W006` | error | A `station` or `mesh` radio lists at most one BSS. |
-| `NG-W007` | error | A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` radio. |
-| `NG-W008` | error | A `bssid` is advertised by at most one `ap` radio in the inventory. |
-| `NG-W009` | error | An SSID's `vlan` is carried by at least one interface of the access point. |
-| `NG-W010` | error | A client radio's SSID is one the access point at the far end advertises. |
-| `NG-W011` | warning | Two access points in one broadcast domain do not overlap in frequency. |
+| `NV-W001` | error | `ssid` is between 1 and 32 octets. |
+| `NV-W002` | error | `wireless` appears only on an interface of `type: wifi`. |
+| `NV-W003` | error | `channel` names `band`, and is a channel that band numbers. |
+| `NV-W004` | error | `width_mhz` names `band`, and is a width that band supports. |
+| `NV-W005` | error | `ssid` and `bssid` are each unique within one radio. |
+| `NV-W006` | error | A `station` or `mesh` radio lists at most one BSS. |
+| `NV-W007` | error | A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` radio. |
+| `NV-W008` | error | A `bssid` is advertised by at most one `ap` radio in the inventory. |
+| `NV-W009` | error | An SSID's `vlan` is carried by at least one interface of the access point. |
+| `NV-W010` | error | A client radio's SSID is one the access point at the far end advertises. |
+| `NV-W011` | warning | Two access points in one broadcast domain do not overlap in frequency. |
 
-`NG-W001` to `NG-W006` are schema rules, reported while the document is parsed
+`NV-W001` to `NV-W006` are schema rules, reported while the document is parsed
 and not suppressible; the rest are semantic and carry the short ids of §10.10.
 
 ### 10.15 Routing
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-F001` | error | `vrfs[].name` is unique within a device. |
-| `NG-F002` | error | An interface's `vrf` names an entry of the device's `vrfs`; an adapter interface declares none. |
-| `NG-F003` | error | A route's `via` is of the same address family as its `prefix`. |
-| `NG-F004` | error | A route declares at least one of `via`, `dev` and `blackhole`, and `blackhole` excludes the other two. |
-| `NG-F005` | error | A route's `vrf` names an entry of the device's `vrfs`. |
-| `NG-F006` | error | `routing.ospf.interfaces` is non-empty and free of duplicates. |
-| `NG-F007` | error | `routing.bgp.neighbors[].address` is unique within a device. |
-| `NG-F008` | error | A route's next hop is inside a prefix the device configures, on an interface in the route's own VRF. |
-| `NG-F009` | error | A route's `dev` names an interface of the device. |
-| `NG-F010` | error | Every `routing.ospf.interfaces` entry names an interface of the device. |
-| `NG-F011` | error | The two ends of a resolved BGP session agree about both AS numbers. |
-| `NG-F012` | error | A router id is claimed by at most one element. |
-| `NG-F013` | warning | A BGP neighbour address resolves to an element of the inventory. |
-| `NG-F014` | warning | Every declared VRF has at least one interface bound to it. |
-| `NG-F015` | error | `route_tables[]` names and numbers are unique within a device, and neither shadows a reserved table. |
-| `NG-F016` | error | A policy rule's `action` agrees with its argument: `lookup` needs a `table`, `goto` needs a forward `goto`, the rest take neither. |
-| `NG-F017` | error | A policy rule's selectors agree with each other and with its `family`, and `invert` has something to invert. |
-| `NG-F018` | error | A route names `vrf` or `table`, not both. |
-| `NG-F019` | error | A `table` names a declared routing table, a VRF, or one of the reserved three. |
-| `NG-F020` | error | `routing_policy[].priority` is unique within a device, per address family. |
-| `NG-F021` | error | A policy rule's `iif`/`oif` names an interface of the device. |
-| `NG-F022` | warning | Every declared routing table a policy rule looks up holds at least one route. |
-| `NG-F023` | warning | Every declared routing table is looked up by at least one policy rule. |
-| `NG-F024` | warning | No policy rule sits below one that matches every packet of its family. |
+| `NV-F001` | error | `vrfs[].name` is unique within a device. |
+| `NV-F002` | error | An interface's `vrf` names an entry of the device's `vrfs`; an adapter interface declares none. |
+| `NV-F003` | error | A route's `via` is of the same address family as its `prefix`. |
+| `NV-F004` | error | A route declares at least one of `via`, `dev` and `blackhole`, and `blackhole` excludes the other two. |
+| `NV-F005` | error | A route's `vrf` names an entry of the device's `vrfs`. |
+| `NV-F006` | error | `routing.ospf.interfaces` is non-empty and free of duplicates. |
+| `NV-F007` | error | `routing.bgp.neighbors[].address` is unique within a device. |
+| `NV-F008` | error | A route's next hop is inside a prefix the device configures, on an interface in the route's own VRF. |
+| `NV-F009` | error | A route's `dev` names an interface of the device. |
+| `NV-F010` | error | Every `routing.ospf.interfaces` entry names an interface of the device. |
+| `NV-F011` | error | The two ends of a resolved BGP session agree about both AS numbers. |
+| `NV-F012` | error | A router id is claimed by at most one element. |
+| `NV-F013` | warning | A BGP neighbour address resolves to an element of the inventory. |
+| `NV-F014` | warning | Every declared VRF has at least one interface bound to it. |
+| `NV-F015` | error | `route_tables[]` names and numbers are unique within a device, and neither shadows a reserved table. |
+| `NV-F016` | error | A policy rule's `action` agrees with its argument: `lookup` needs a `table`, `goto` needs a forward `goto`, the rest take neither. |
+| `NV-F017` | error | A policy rule's selectors agree with each other and with its `family`, and `invert` has something to invert. |
+| `NV-F018` | error | A route names `vrf` or `table`, not both. |
+| `NV-F019` | error | A `table` names a declared routing table, a VRF, or one of the reserved three. |
+| `NV-F020` | error | `routing_policy[].priority` is unique within a device, per address family. |
+| `NV-F021` | error | A policy rule's `iif`/`oif` names an interface of the device. |
+| `NV-F022` | warning | Every declared routing table a policy rule looks up holds at least one route. |
+| `NV-F023` | warning | Every declared routing table is looked up by at least one policy rule. |
+| `NV-F024` | warning | No policy rule sits below one that matches every packet of its family. |
 
-`NG-F001` to `NG-F007` and `NG-F015` to `NG-F021` are schema rules, reported
-while the document is parsed and not suppressible; `NG-F008` to `NG-F014` and
-`NG-F022` to `NG-F024` are semantic and carry the short ids of §10.10. The
-group is lettered `F`, for *forwarding*: `NG-R` was spent on interface ranges
+`NV-F001` to `NV-F007` and `NV-F015` to `NV-F021` are schema rules, reported
+while the document is parsed and not suppressible; `NV-F008` to `NV-F014` and
+`NV-F022` to `NV-F024` are semantic and carry the short ids of §10.10. The
+group is lettered `F`, for *forwarding*: `NV-R` was spent on interface ranges
 (§10.9) long before routing was modelled, and an id, once assigned, is never
 reused.
 
 ### 10.16 Power
 
-The `NG-E*` group — PDU outlets, device power and PoE — is tabulated beside the
+The `NV-E*` group — PDU outlets, device power and PoE — is tabulated beside the
 model it constrains, in [§17.8](#178-rules), because half of what each rule says
 is a sentence about watts that only makes sense next to the class table. The
 severities and the schema/semantic split are stated there.
@@ -1505,14 +1505,14 @@ severities and the schema/semantic split are stated there.
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-Z001` | error | Every value in a `style` block is inside the vocabulary of §22.1: a colour is `#rgb`, `#rrggbb` or a named colour; `dash` and `shape` are listed spellings; `icon` is a bare name or `none`; `strokeWidth`, `fontSize` and `opacity` are within their bounds. The message names the nearest legal spelling. |
-| `NG-Z002` | error | A `style` block declares at least one of the nine fields. An empty one renders identically to no block at all. |
-| `NG-Z003` | warning | No element is faded to nothing (`opacity: 0`), which draws it invisibly while its links are still drawn to it. Reported as `W144`. |
-| `NG-Z004` | error | A `theme` document is usable: between 1 and 1000 rules, every selector clause a string or a list of strings, every `style` it carries satisfying `NG-Z001`. |
-| `NG-Z005` | warning | An element does not draw its label in the colour of its own fill. Reported as `W145`. |
+| `NV-Z001` | error | Every value in a `style` block is inside the vocabulary of §22.1: a colour is `#rgb`, `#rrggbb` or a named colour; `dash` and `shape` are listed spellings; `icon` is a bare name or `none`; `strokeWidth`, `fontSize` and `opacity` are within their bounds. The message names the nearest legal spelling. |
+| `NV-Z002` | error | A `style` block declares at least one of the nine fields. An empty one renders identically to no block at all. |
+| `NV-Z003` | warning | No element is faded to nothing (`opacity: 0`), which draws it invisibly while its links are still drawn to it. Reported as `W144`. |
+| `NV-Z004` | error | A `theme` document is usable: between 1 and 1000 rules, every selector clause a string or a list of strings, every `style` it carries satisfying `NV-Z001`. |
+| `NV-Z005` | warning | An element does not draw its label in the colour of its own fill. Reported as `W145`. |
 
-`NG-Z001`, `NG-Z002` and `NG-Z004` are schema rules, reported while the document
-is parsed and not suppressible; `NG-Z003` and `NG-Z005` are semantic and carry
+`NV-Z001`, `NV-Z002` and `NV-Z004` are schema rules, reported while the document
+is parsed and not suppressible; `NV-Z003` and `NV-Z005` are semantic and carry
 the short ids above. [§22.7](#227-rules) states them in context, with why each
 one is graded the way it is.
 
@@ -1520,17 +1520,17 @@ one is graded the way it is.
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-N020` | error | `spec.netns[].name` is unique within its device. |
-| `NG-N021` | error | `spec.netns[].parent` names another entry of the same table, is not the entry itself, and the nesting chain does not loop. |
-| `NG-N022` | error | `interfaces[].netns` names an entry of the device's `spec.netns`. An `adapter` declares no namespace table, so any value on one is refused. |
-| `NG-N023` | error | `peer` appears only on `type: ethernet`, names another interface of the same element, is not the interface itself, and that interface names it back. |
-| `NG-N024` | error | No cable terminates on an interface that declares a `peer`: a veth end has no socket. Reported as `E049`. |
-| `NG-N025` | error | Every member of a `bridge` or `lag` is in the same network namespace as the aggregate. Reported as `E050`. |
-| `NG-N026` | warning | Every declared namespace holds at least one interface. Reported as `W146`. |
-| `NG-N027` | info | The two ends of a veth pair are in different network namespaces. Reported as `I005`. |
+| `NV-N020` | error | `spec.netns[].name` is unique within its device. |
+| `NV-N021` | error | `spec.netns[].parent` names another entry of the same table, is not the entry itself, and the nesting chain does not loop. |
+| `NV-N022` | error | `interfaces[].netns` names an entry of the device's `spec.netns`. An `adapter` declares no namespace table, so any value on one is refused. |
+| `NV-N023` | error | `peer` appears only on `type: ethernet`, names another interface of the same element, is not the interface itself, and that interface names it back. |
+| `NV-N024` | error | No cable terminates on an interface that declares a `peer`: a veth end has no socket. Reported as `E049`. |
+| `NV-N025` | error | Every member of a `bridge` or `lag` is in the same network namespace as the aggregate. Reported as `E050`. |
+| `NV-N026` | warning | Every declared namespace holds at least one interface. Reported as `W146`. |
+| `NV-N027` | info | The two ends of a veth pair are in different network namespaces. Reported as `I005`. |
 
-`NG-N020` to `NG-N023` are schema rules, reported while the document is parsed;
-`NG-N024` to `NG-N027` need the whole inventory and are the semantic
+`NV-N020` to `NV-N023` are schema rules, reported while the document is parsed;
+`NV-N024` to `NV-N027` need the whole inventory and are the semantic
 validator's. [§23.4](#234-rules) states them in context.
 
 ---
@@ -1641,7 +1641,7 @@ spec:
 
 `ge-0/0/1` carries no addresses: it is a pure layer-2 trunk, and the layer-3
 configuration lives on the two `vlan` sub-interfaces. Both sub-interface VIDs
-appear in the parent's `trunk_vlans`, satisfying `NG-V005`.
+appear in the parent's `trunk_vlans`, satisfying `NV-V005`.
 
 **`switches/sw-access-01.yaml`**
 
@@ -1728,7 +1728,7 @@ spec:
 
 `Vlan99` is a `vlan` sub-interface of the `bridge` interface rather than of a
 physical port — that is how a switch virtual interface is expressed here. Note
-that `NG-V005` is satisfied because the bridge's member port `Gi0/1` trunks
+that `NV-V005` is satisfied because the bridge's member port `Gi0/1` trunks
 VLAN 99; `br0` itself carries no `vlan` block, and the validator resolves a
 bridge parent by taking the union of its members' VLAN sets.
 
@@ -1841,15 +1841,15 @@ spec:
 ```
 
 The hosts declare no `vlan` block while the switch ports they face are
-`access` ports. That is correct and does not trigger `NG-C011`: an untagged
+`access` ports. That is correct and does not trigger `NV-C011`: an untagged
 host on an access port is the expected pairing, and the host inherits the
 port's VLAN.
 
 Two ports terminate no cable, and the difference between them is the whole of
-`NG-C015` (info). `Gi0/3` says `enabled: false`, which documents the spare
+`NV-C015` (info). `Gi0/3` says `enabled: false`, which documents the spare
 patch and silences the rule at the same time. `ge-0/0/0` is up and faces an ISP
 that is not an element of this inventory, so it *is* reported — annotate the
-router with `netviz/ignore: "NG-C015"` to say that the far end lives outside
+router with `netviz/ignore: "NV-C015"` to say that the far end lives outside
 the tree on purpose.
 
 ### 11.2 Lab bench: adapter, hub and a wireless link
@@ -1990,7 +1990,7 @@ spec:
 ```
 
 The hub declares no `vlan`, no addresses and no `bridge`/`vlans` block — those
-are errors on a hub (`NG-H001`–`NG-H003`). The access point is modelled as a
+are errors on a hub (`NV-H001`–`NV-H003`). The access point is modelled as a
 `switch` with a `mac-bridge` (802.1D) component: it forwards frames but is not
 VLAN-aware, which is exactly what `mac-bridge` means. `pc-legacy-01` uses the
 `netmask` form; the loader normalises `255.255.255.0` to `prefix_length: 24`.
@@ -2044,16 +2044,16 @@ Points worth noting:
 
 * There is **no** cable between `laptop-01` and `adp-usb-eth-01`. The host
   attachment comes from `upstream.attached_to`; adding a cable as well would be
-  `NG-X005`.
-* `duplex: half` on `cbl-legacy-hub` does not warn (`NG-C013`) because one
+  `NV-X005`.
+* `duplex: half` on `cbl-legacy-hub` does not warn (`NV-C013`) because one
   endpoint is a hub.
-* Everything on the hub is in `192.168.50.0/24`, satisfying `NG-H005`.
+* Everything on the hub is in `192.168.50.0/24`, satisfying `NV-H005`.
 * With `passthrough: true` the default rendering draws
   `laptop-01 —(usb)— hub-lab-01` with the dongle folded into the edge label;
   `netviz render --no-collapse-adapters` draws `adp-usb-eth-01` as its own
   node. Connectivity is identical either way.
 * The graph is connected: the laptop reaches the bench segment twice, once over
-  Wi-Fi via `ap-lab-01` and once over USB via the hub, so `NG-C014` stays quiet.
+  Wi-Fi via `ap-lab-01` and once over USB via the hub, so `NV-C014` stays quiet.
 
 ### 11.3 Data-centre rack: dual-homed server, LAG, routed fibre uplinks
 
@@ -2331,7 +2331,7 @@ spec:
 ```
 
 `bond0` deliberately repeats `eno1`'s MAC — that is what Linux bonding does.
-`NG-I008` (duplicate MAC) exempts a member/aggregate pair, so this is silent.
+`NV-I008` (duplicate MAC) exempts a member/aggregate pair, so this is silent.
 The bond members carry no addresses and no `vlan` block of their own; VLAN and
 MTU checks on their cables resolve through `bond0` (§10.6).
 
@@ -2450,8 +2450,8 @@ spec:
 Known limitations this example makes visible:
 
 * **MTU.** The switches use 9214 (Arista's layer-2 maximum) throughout while
-  the servers use 9000. The spine↔ToR links agree at 9214, so `NG-C010` stays
-  quiet there; the three server-facing links do not agree, so `NG-C010` warns
+  the servers use 9000. The spine↔ToR links agree at 9214, so `NV-C010` stays
+  quiet there; the three server-facing links do not agree, so `NV-C010` warns
   on `cbl-tora-db01`, `cbl-torb-db01` and `cbl-tora-app01`. The example keeps
   the mismatch on purpose: this is the common real-world state, and surfacing
   it is the point. Setting the ToR server ports to 9000 silences the warning.
@@ -2460,7 +2460,7 @@ Known limitations this example makes visible:
   between `sw-tor-a` and `sw-tor-b`; the peer link's `description` and a
   `role: tor` label are the only hints. Modelling multi-chassis aggregation is
   deferred (§12).
-* `NG-C012` does not fire: the cables terminate on `eno1`/`eno2`, the physical
+* `NV-C012` does not fire: the cables terminate on `eno1`/`eno2`, the physical
   members, not on `bond0`.
 
 ---
@@ -2485,7 +2485,7 @@ Within one `apiVersion`:
   never reused.
 
 The loader accepts documents whose `apiVersion` it recognises and rejects
-everything else with `NG-D002` rather than guessing. When a second version
+everything else with `NV-D002` rather than guessing. When a second version
 exists, documents of different versions may coexist in one inventory; the
 loader converts older documents to the current internal model on read.
 
@@ -2544,7 +2544,7 @@ models.
 
 | | Schema | `netviz validate` |
 |---|---|---|
-| Unknown or misspelt keys | yes (`NG-D005`) | yes |
+| Unknown or misspelt keys | yes (`NV-D005`) | yes |
 | Required keys, enum values, numeric ranges | yes | yes |
 | Value grammars: MAC, bit rate, VLAN set, CIDR, names | yes | yes |
 | Rules within one object: `native_vlan` on an access port, `members` on an `ethernet` port | yes | yes |
@@ -2701,15 +2701,15 @@ spec:
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `type` | enum | M | — | The encapsulation; see §14.1. |
-| `endpoints` | list[ifref] | M | — | Two or more entries, each naming a `type: tunnel` interface (`NG-T001`, `NG-T003`). Order is not significant; the loader sorts them. |
+| `endpoints` | list[ifref] | M | — | Two or more entries, each naming a `type: tunnel` interface (`NV-T001`, `NV-T003`). Order is not significant; the loader sorts them. |
 | `over` | element ref | O | `null` | The tunnel this one runs inside (§14.3). Absent means it runs over the physical topology. |
-| `mode` | enum | C | `tunnel` for `ipsec` and `l2tp` | `tunnel` or `transport` (RFC 4301 §3.2). Rejected for every other type (`NG-T008`). |
-| `vni` | uint24 | C | — | Required for `vxlan` and `geneve`, rejected otherwise (`NG-T007`). |
-| `port` | uint16 | O | the registered port of `type` | Rejected for `gre` and `ipsec`, which run directly over IP (`NG-T008`). |
-| `mtu` | mtu | O | `null` | MTU of the tunnel interface; checked against the underlay by `NG-T011`. |
+| `mode` | enum | C | `tunnel` for `ipsec` and `l2tp` | `tunnel` or `transport` (RFC 4301 §3.2). Rejected for every other type (`NV-T008`). |
+| `vni` | uint24 | C | — | Required for `vxlan` and `geneve`, rejected otherwise (`NV-T007`). |
+| `port` | uint16 | O | the registered port of `type` | Rejected for `gre` and `ipsec`, which run directly over IP (`NV-T008`). |
+| `mtu` | mtu | O | `null` | MTU of the tunnel interface; checked against the underlay by `NV-T011`. |
 | `encrypted` | boolean | O | what `type` does | Set it `true` to record that a cleartext type is protected some other way. |
-| `cipher` | string | C | `null` | Free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NG-T009`). |
-| `auth` | enum | C | `null` | `psk`, `certificate`, `public-key`, `password`. Only on a tunnel that encrypts or authenticates (`NG-T009`). |
+| `cipher` | string | C | `null` | Free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NV-T009`). |
+| `auth` | enum | C | `null` | `psk`, `certificate`, `public-key`, `password`. Only on a tunnel that encrypts or authenticates (`NV-T009`). |
 | `label` | string | O | `null` | Free-text identifier printed on the edge, as a cable's `label` is. |
 
 ### 14.1 Tunnel types
@@ -2736,10 +2736,10 @@ only what it is called.
 * **Encrypts** is a property of the technology, not of the deployment. PPTP is
   listed as cleartext deliberately: MPPE is broken, so a PPTP tunnel protects
   nothing. A cleartext tunnel that is not nested inside an encrypting one is
-  `NG-T012`.
+  `NV-T012`.
 * **Overhead** is the widely published worst case over IPv4 — the number an
   operator would set an overlay MTU from — not an exact packet layout, which
-  varies with cipher, IP version and NAT traversal. `NG-T011` measures an `mtu`
+  varies with cipher, IP version and NAT traversal. `NV-T011` measures an `mtu`
   against it.
 
 `port`, `mode` and `encrypted` are **materialised on load** from this table
@@ -2750,7 +2750,7 @@ only what it is called.
 There is nowhere in this schema to put a private key, a pre-shared key, a
 password, a passphrase or a certificate, and the field names people reach for
 are rejected **by name** with an explanation rather than as unknown keys
-(`NG-T010`). An inventory is a file in version control that gets rendered into
+(`NV-T010`). An inventory is a file in version control that gets rendered into
 diagrams and pasted into tickets; it is the wrong place for key material, and a
 schema that accepted some would be inviting the mistake.
 
@@ -2761,7 +2761,7 @@ needs and what an auditor asks for — and `cipher` the negotiated suite.
 
 * A tunnel is **undirected**, exactly as a cable is. The endpoint order carries
   no meaning and the loader sorts it for canonical output.
-* An endpoint names a **`type: tunnel` interface** (`NG-T003`) — the virtual
+* An endpoint names a **`type: tunnel` interface** (`NV-T003`) — the virtual
   interface the operating system presents (`wg0`, `ipsec0`, `vxlan100`), never
   the physical port the outer packets leave by. That interface holds the
   *overlay* configuration: the addresses inside the tunnel, which is what puts
@@ -2770,18 +2770,18 @@ needs and what an auditor asks for — and `cipher` the negotiated suite.
 * Unlike a cable, an interface may terminate **several** tunnels: a router that
   is the hub of three VPNs presents three virtual interfaces, but a VTEP may
   legitimately carry several VXLANs. What is checked instead is that two of them
-  do not claim the same `vni` on one element (`NG-T014`).
+  do not claim the same `vni` on one element (`NV-T014`).
 * **Two or more endpoints.** Three or more make the tunnel multipoint — a VXLAN
   mesh, a hub-and-spoke VPN — and it is then drawn as a *node* with one leg per
   endpoint rather than as a line, the same choice a subnet gets at layer 3.
 * **`over` nests one tunnel inside another.** `vxlan over ipsec` is written by
   naming the IPsec tunnel in the VXLAN's `over`. The chain is walked outwards to
   give every tunnel a depth, a stack (`("vxlan", "ipsec")`) and the nearest
-  underlay that encrypts; it must not loop (`NG-T005`), and each step should
-  reach every endpoint of the tunnel above it (`NG-T006`). Nesting is what makes
-  a cleartext overlay confidential, so it is what silences `NG-T012`.
+  underlay that encrypts; it must not loop (`NV-T005`), and each step should
+  reach every endpoint of the tunnel above it (`NV-T006`). Nesting is what makes
+  a cleartext overlay confidential, so it is what silences `NV-T012`.
 * A tunnel is **not a cable**. It is not part of the physical topology, does not
-  join two islands for `NG-C014`, and is not something a technician can unplug.
+  join two islands for `NV-C014`, and is not something a technician can unplug.
   Renderers draw it dashed and violet, or crimson when nothing in its stack
   encrypts.
 
@@ -2846,8 +2846,8 @@ spec:
 | `model` | string | O | `null` | Free text. |
 | `serial` | string | O | `null` | Free text. |
 | `form_factor` | string | O | `null` | Descriptive: `keystone`, `fibre-lc`, `coupler`. |
-| `ports` | port range | M | — | The positions the panel has: a count (`24`, meaning 1 to 24) or comma-separated spans (`1-24`, `1-12,17-24`). At most 1024, no repeats (`NG-P006`). |
-| `couplers` | map[number, number] | O | `null` | Front position → rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NG-P007`). |
+| `ports` | port range | M | — | The positions the panel has: a count (`24`, meaning 1 to 24) or comma-separated spans (`1-24`, `1-12,17-24`). At most 1024, no repeats (`NV-P006`). |
+| `couplers` | map[number, number] | O | `null` | Front position → rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NV-P007`). |
 
 A panel owns **no `interfaces` key**. Its ports are derived from `ports`: every
 position `n` becomes an interface named `front/<n>` and one named `rear/<n>`, of
@@ -2908,14 +2908,14 @@ the panels on the link line — as a pass-through, never as a waypoint, because 
 panel takes no decision — and an SVG tooltip lists the same record.
 
 A run that does not arrive anywhere is not spliced. A coupler with nothing
-patched into its far side is `NG-P002`, a position with two cables is `NG-P003`,
-and a run that closes on itself is `NG-P005`; in each case the incomplete run is
+patched into its far side is `NV-P002`, a position with two cables is `NV-P003`,
+and a run that closes on itself is `NV-P005`; in each case the incomplete run is
 dropped from every spliced layer and stays visible at `--layer physical`.
 
 ### 15.3 What a panel is not
 
 * **Not a host.** `upstream.attached_to` on an adapter and a tunnel endpoint
-  both require an active element (`NG-P004`). A media converter that looks like
+  both require an active element (`NV-P004`). A media converter that looks like
   it wants to be a panel is an `adapter` with `passthrough: false` (§8.2).
 * **Not a repeater.** A `hub` is active: it regenerates a signal and joins a
   collision domain, so it *is* a node at every layer. A panel joins nothing; it
@@ -2979,20 +2979,20 @@ spec:
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
-| `name` | element name | yes | How everything else refers to the instance. Unique within the device (`NG-F001`). |
+| `name` | element name | yes | How everything else refers to the instance. Unique within the device (`NV-F001`). |
 | `rd` | route distinguisher | yes | `65001:1`, `192.0.2.1:1` or `4200000000:1` — one of the three RFC 4364 §4.2 encodings. |
 | `description` | string | no | Free text. |
 
 `interfaces[].vrf` binds one interface to one instance and must name an entry of
-the same device's `vrfs` (`NG-F002`). An interface that binds to none is in the
+the same device's `vrfs` (`NV-F002`). An interface that binds to none is in the
 **global instance**, which is where every address is until something says
 otherwise.
 
 **Binding is what partitions the address space.** An address only collides with
 another address in the same instance, so `10.0.0.1/24` in `blue` and
 `10.0.0.1/24` in the global table are two addresses and not a duplicate
-(`NG-A004`); two interfaces of one device may hold overlapping prefixes when
-they are in different instances (`NG-A006`); and `netviz list subnets`,
+(`NV-A004`); two interfaces of one device may hold overlapping prefixes when
+they are in different instances (`NV-A006`); and `netviz list subnets`,
 `netviz ipam` and `--layer l3` each report one row, one prefix and one node
 *per instance*. That is the whole reason to model a VRF: it is a routing table
 of its own, so it is an address space of its own.
@@ -3002,14 +3002,14 @@ what an operator means by "the blue VRF". The route distinguisher is recorded
 because MPLS needs it, not because netviz identifies the instance by it.
 
 A VRF nothing is bound to holds no address and no connected route, so the
-isolation it was declared to create does not exist; that is `NG-F014`.
+isolation it was declared to create does not exist; that is `NV-F014`.
 
 > **Quote the `rd`.** `65001:59` is the base-60 integer 3900059 to a YAML 1.1
 > reader and `65001:99` is a string, so the class is quoted whole — exactly as
 > MAC addresses are (§5). `netviz fmt` adds the quotes if you forget them.
 
 An adapter has no `vrfs` of its own and its interfaces may not declare `vrf`
-(`NG-F002`): an adapter is a *port* of the host it hangs off, and the routing
+(`NV-F002`): an adapter is a *port* of the host it hangs off, and the routing
 instance belongs to that host.
 
 ### 16.2 `route_tables[]` — additional routing tables
@@ -3034,26 +3034,26 @@ spec:
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
-| `name` | element name | yes | How a route and a policy rule refer to the table. Unique within the device (`NG-F015`). |
-| `id` | 1–4294967295 | yes | The number the table is known by. Unique within the device (`NG-F015`). |
+| `name` | element name | yes | How a route and a policy rule refer to the table. Unique within the device (`NV-F015`). |
+| `id` | 1–4294967295 | yes | The number the table is known by. Unique within the device (`NV-F015`). |
 | `description` | string | no | Free text. |
 
 **The reserved three are never declared.** `main` (254), `local` (255) and
 `default` (253) exist on every stack, are nameable from `routes[].table` and
 `routing_policy[].table` without appearing here, and cannot be declared:
-neither their names nor their numbers (`NG-F015`). A second `main` is not a
+neither their names nor their numbers (`NV-F015`). A second `main` is not a
 second table, it is a document that has stopped describing the device.
 
 **A VRF is a table too.** `table: mgmt` resolves against `spec.vrfs` as readily
-as against `spec.route_tables` (`NG-F019`) — a routing instance *is* a routing
+as against `spec.route_tables` (`NV-F019`) — a routing instance *is* a routing
 table, which is the whole of §16.1. What netviz does not have for it is a
 *number*: a route distinguisher identifies the VRF in BGP and says nothing about
 which table an implementation gave it, so every emitter that needs a number
 refuses rather than inventing one, and says so in its manifest.
 
 **A table is inert on its own.** Nothing consults it until a policy rule looks
-it up, so a declared table nothing selects is `NG-F023` and a rule selecting a
-table nothing is placed in is `NG-F022`. The two halves are only useful
+it up, so a declared table nothing selects is `NV-F023` and a rule selecting a
+table nothing is placed in is `NV-F022`. The two halves are only useful
 together, which is why they are declared next to each other.
 
 ### 16.3 `routes[]` — static routes
@@ -3083,22 +3083,22 @@ spec:
 | `blackhole` | boolean | no | Discard matching packets. Default `false`. |
 
 A route needs somewhere to send the packet, so at least one of `via`, `dev` and
-`blackhole` is required, and `blackhole` excludes the other two (`NG-F004`).
-`via` is of the same family as `prefix` (`NG-F003`) — a next hop is resolved on
+`blackhole` is required, and `blackhole` excludes the other two (`NV-F004`).
+`via` is of the same family as `prefix` (`NV-F003`) — a next hop is resolved on
 the destination's own address family — and must be **on-link**: inside a prefix
 this device configures, on an interface in the route's own instance
-(`NG-F008`). An IPv6 link-local next hop is exempt, being on-link by
-definition. `dev` names an interface of this device (`NG-F009`).
+(`NV-F008`). An IPv6 link-local next hop is exempt, being on-link by
+definition. `dev` names an interface of this device (`NV-F009`).
 
 `prefix` rejects a destination with host bits set. `10.0.0.1/24` as a
 destination is either a typo or a `/32`, and guessing which would put a route in
 the diagram that the device does not have.
 
 `table` names an entry of `spec.route_tables`, a VRF, or one of the reserved
-three (`NG-F019`). A route that names neither `table` nor `vrf` is in `main`,
+three (`NV-F019`). A route that names neither `table` nor `vrf` is in `main`,
 which is where routing looks unless a policy rule sends it elsewhere. `vrf` and
 `table` are *alternatives*, not a pair: a VRF is a table of its own, so naming
-both is a contradiction rather than a refinement (`NG-F018`).
+both is a contradiction rather than a refinement (`NV-F018`).
 
 Nothing here computes a best path. `metric` is recorded, routes are not sorted,
 and two routes for one prefix are two declarations rather than a decision:
@@ -3146,18 +3146,18 @@ spec:
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
-| `priority` | 0–4294967295 | yes | Where the rule sits in the walk. Unique within the device, per family (`NG-F020`). |
+| `priority` | 0–4294967295 | yes | Where the rule sits in the walk. Unique within the device, per family (`NV-F020`). |
 | `family` | `ipv4` \| `ipv6` | no | Which database the rule is installed in. Derived from `src`/`dst`; both when neither says. |
 | `src` | IPv4/IPv6 prefix | no | Match packets **from** this prefix. |
 | `dst` | IPv4/IPv6 prefix | no | Match packets **to** this prefix. |
 | `fwmark` | mark | no | Match the mark a firewall put on the packet: `'0x1'`, `'0x1/0xff'`, or a plain number. |
-| `iif` | interface name | no | Match packets that arrived on this interface (`NG-F021`). |
-| `oif` | interface name | no | Match packets that would leave by it — locally originated traffic (`NG-F021`). |
+| `iif` | interface name | no | Match packets that arrived on this interface (`NV-F021`). |
+| `oif` | interface name | no | Match packets that would leave by it — locally originated traffic (`NV-F021`). |
 | `dscp` | 0–63 | no | Match this DSCP code point ([RFC 2474](https://www.rfc-editor.org/rfc/rfc2474) §3). |
 | `invert` | boolean | no | Match everything the selectors do *not*. Default `false`. |
 | `action` | see below | no | What happens to a match. Default `lookup`. |
-| `table` | element name | no | The table to route by. Required by `lookup`, refused by the rest (`NG-F016`). |
-| `goto` | 0–4294967295 | no | The priority to jump to. Required by `goto`, refused by the rest (`NG-F016`). |
+| `table` | element name | no | The table to route by. Required by `lookup`, refused by the rest (`NV-F016`). |
+| `goto` | 0–4294967295 | no | The priority to jump to. Required by `goto`, refused by the rest (`NV-F016`). |
 
 **The five actions.**
 
@@ -3171,11 +3171,11 @@ spec:
 
 A `goto` jumps **forward**: the database is walked from the lowest priority
 upwards, so a target that is not greater than the rule's own priority is a loop,
-and is refused (`NG-F016`).
+and is refused (`NV-F016`).
 
 **Priority is the rule's identity.** It is where the rule sits in the walk, and
 it is what makes a document say what the device does: two rules of one family at
-one priority leave the order they are consulted in unstated, which is `NG-F020`.
+one priority leave the order they are consulted in unstated, which is `NV-F020`.
 The document may list them in any order — netviz sorts by priority everywhere
 it shows the database, because that is the only order in which the list means
 anything.
@@ -3183,8 +3183,8 @@ anything.
 **A rule with no selector matches everything**, which is how the database is
 terminated (the `32766: lookup main` above) and also the most common way to
 break one: everything after it in the same family is unreachable, whatever it
-says. That is `NG-F024`. `invert` needs something to invert, so a rule carrying
-it and no selector is refused outright (`NG-F017`).
+says. That is `NV-F024`. `invert` needs something to invert, so a rule carrying
+it and no selector is refused outright (`NV-F017`).
 
 **A rule with no `family` is installed in both.** `src: 10.20.0.0/16` says IPv4
 by itself; a rule selecting only on `fwmark` says nothing, so it goes in both
@@ -3226,7 +3226,7 @@ Both blocks are optional and neither implies the other.
 |---|---|---|---|
 | `area` | area id | no | Dotted quad or plain number; `0` and `0.0.0.0` are the same backbone area and both normalise to `0.0.0.0`. Default `0.0.0.0`. |
 | `router_id` | IPv4 address | no | A dotted quad even in an IPv6-only network (RFC 5340 §2.1). |
-| `interfaces` | interface names | yes | The interfaces OSPF runs on. Non-empty and free of duplicates (`NG-F006`); each names an interface of this device (`NG-F010`). |
+| `interfaces` | interface names | yes | The interfaces OSPF runs on. Non-empty and free of duplicates (`NV-F006`); each names an interface of this device (`NV-F010`). |
 
 **`bgp`**
 
@@ -3234,11 +3234,11 @@ Both blocks are optional and neither implies the other.
 |---|---|---|---|
 | `asn` | 1–4294967295 | yes | The local autonomous system. AS 0 is reserved (RFC 7607). |
 | `router_id` | IPv4 address | no | The BGP identifier (RFC 4271 §4.2). |
-| `neighbors[].address` | IP address | yes | The peer. Unique within the device (`NG-F007`). |
+| `neighbors[].address` | IP address | yes | The peer. Unique within the device (`NV-F007`). |
 | `neighbors[].remote_asn` | 1–4294967295 | yes | The AS the peer is in. |
 | `neighbors[].description` | string | no | Free text. |
 
-A router id is unique across the inventory (`NG-F012`): it names the router
+A router id is unique across the inventory (`NV-F012`): it names the router
 itself, so OSPF drops an adjacency with a neighbour claiming the local id
 (RFC 2328 §10.5) and BGP refuses a session with a duplicate identifier
 (RFC 4271 §6.8). One device giving OSPF and BGP the same value is *one* identity,
@@ -3254,9 +3254,9 @@ configured with. netviz resolves it against every address the inventory
 declares, and that resolution is what draws the session in the routing view and
 what lets the two ends be compared:
 
-* the peer's own `asn` is checked against `remote_asn` (`NG-F011`) — a
+* the peer's own `asn` is checked against `remote_asn` (`NV-F011`) — a
   disagreement is a session that never establishes;
-* an address that matches nothing is a **warning**, not an error (`NG-F013`): a
+* an address that matches nothing is a **warning**, not an error (`NV-F013`): a
   correct eBGP session towards a transit provider points at an address on
   *their* router, which is not an element of this inventory and never will be.
   What the warning says is that netviz cannot check the far end, and that the
@@ -3438,9 +3438,9 @@ spec:
 | `model` | string | O | `null` | Free text. |
 | `serial` | string | O | `null` | Free text. |
 | `form_factor` | string | O | `null` | Descriptive: `vertical`, `horizontal`, `1U`, `0U`. |
-| `outlets` | outlet range | M | — | The outlets the unit has: a count (`24`, meaning 1 to 24) or comma-separated spans (`1-24`, `1-12,17-24`). At most 512, no repeats (`NG-E001`). |
-| `capacity_watts` | watts | O | `null` | How many watts may be drawn through the unit in total. `NG-E012` sums the declared loads against it; absent means the rating is not recorded, and nothing is graded. |
-| `input_feed` | string (≤64) | O | `null` | Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text; compared only for equality (`NG-E015`). |
+| `outlets` | outlet range | M | — | The outlets the unit has: a count (`24`, meaning 1 to 24) or comma-separated spans (`1-24`, `1-12,17-24`). At most 512, no repeats (`NV-E001`). |
+| `capacity_watts` | watts | O | `null` | How many watts may be drawn through the unit in total. `NV-E012` sums the declared loads against it; absent means the rating is not recorded, and nothing is graded. |
+| `input_feed` | string (≤64) | O | `null` | Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text; compared only for equality (`NV-E015`). |
 
 **The `outlets` shorthand** is the one §15.1 uses. A bare count `24` means outlets
 1 to 24; spans are written `1-24`, `7`, or `1-12,17-24` for a strip with a gap in
@@ -3448,8 +3448,8 @@ its numbering. The zero padding of a span follows its *low* bound, as in §6.2.5
 so a strip printed `01`…`24` is transcribed `01-24` and yields `01 … 24`, while
 `1-24` yields `1 … 24`. The two are different labels and are compared as written:
 naming outlet `7` on a strip that calls it `07` puts a cord in a hole nobody can
-find, so `NG-E011` reports it. At most 512 outlets, with no number declared twice
-(`NG-E001`) — the largest strip anybody ships has 54, and the ceiling is what
+find, so `NV-E011` reports it. At most 512 outlets, with no number declared twice
+(`NV-E001`) — the largest strip anybody ships has 54, and the ceiling is what
 bounds what a typo can ask for.
 
 **An outlet is not an interface, and nothing is cabled to a PDU.** A patch-panel
@@ -3468,7 +3468,7 @@ in a slot of `netviz render --layer rack` — where the elevation annotates it
 with how full the unit is (§17.5). The two strips above name a rack and *no*
 `position`, which is the honest model of a 0U vertical unit: it occupies no rack
 unit, so it is in the room without being in a slot, it collides with nothing
-(`NG-U001`), and it is not drawn on the elevation. A 1U horizontal strip declares
+(`NV-U001`), and it is not drawn on the elevation. A 1U horizontal strip declares
 a `position` like any other 1U box, and appears on it.
 
 **Feeds are what make A/B redundancy expressible.** Two PDUs in one rack are only
@@ -3476,7 +3476,7 @@ independent if they are fed from different places, and the inventory has no way 
 know whether they are unless somebody writes it down. `input_feed` is free text on
 purpose: what counts as "a different feed" is site knowledge — two utility feeds,
 two UPS strings, a UPS and a generator — and netviz's job is to notice that two
-feeds a device calls redundant carry the same name (`NG-E015`), not to decide what
+feeds a device calls redundant carry the same name (`NV-E015`), not to decide what
 the names mean.
 
 ### 17.2 Device power
@@ -3518,22 +3518,22 @@ spec:
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `draw_watts` | watts \| PowerDraw | O | `null` | The nameplate load. A bare number is shorthand for `{typical: <n>}`. |
-| `inputs` | list[PowerInput] | O | `[]` | One entry per power supply, naming the outlet feeding it. At most 8. Empty for a device fed over PoE, or one whose feed is not recorded yet (`NG-E016`). |
-| `redundant` | boolean | O | `false` | The feeds are meant to be independent: losing one must not lose the device. Needs at least two `inputs` (`NG-E002`) that land somewhere making the claim true (`NG-E015`). |
-| `powered_by` | enum | O | `outlet` | `outlet` or `poe`. `poe` says the device takes its power over its uplink, and excludes `inputs` (`NG-E005`). |
-| `poe_budget_watts` | watts | O | `null` | The PoE this device can hand out across every PSE port together (§17.3). `NG-E013` checks the ports fit inside it. |
+| `inputs` | list[PowerInput] | O | `[]` | One entry per power supply, naming the outlet feeding it. At most 8. Empty for a device fed over PoE, or one whose feed is not recorded yet (`NV-E016`). |
+| `redundant` | boolean | O | `false` | The feeds are meant to be independent: losing one must not lose the device. Needs at least two `inputs` (`NV-E002`) that land somewhere making the claim true (`NV-E015`). |
+| `powered_by` | enum | O | `outlet` | `outlet` or `poe`. `poe` says the device takes its power over its uplink, and excludes `inputs` (`NV-E005`). |
+| `poe_budget_watts` | watts | O | `null` | The PoE this device can hand out across every PSE port together (§17.3). `NV-E013` checks the ports fit inside it. |
 
 **`draw_watts`** — the nameplate load of the box:
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `typical` | watts | M | — | Steady-state draw of the box as configured. This is the figure a load schedule sums and the one `NG-E012` grades a PDU against. |
-| `maximum` | watts | O | `null` | Nameplate or PSU rating — what a breaker has to survive. MUST NOT be below `typical` (`NG-E003`). |
+| `typical` | watts | M | — | Steady-state draw of the box as configured. This is the figure a load schedule sums and the one `NV-E012` grades a PDU against. |
+| `maximum` | watts | O | `null` | Nameplate or PSU rating — what a breaker has to survive. MUST NOT be below `typical` (`NV-E003`). |
 
 `draw_watts: 45` is accepted as shorthand for `draw_watts: {typical: 45}`. The
 typical figure is the one every load schedule is built from and the only one most
 nameplates state, so requiring a mapping to say it would be ceremony. A boolean
-is refused with an explanation rather than coerced (`NG-E003`), and a wattage is
+is refused with an explanation rather than coerced (`NV-E003`), and a wattage is
 strictly positive and at most 1 MW (§5): `0 W` is not a load, it is the absence of
 one.
 
@@ -3541,15 +3541,15 @@ one.
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `pdu` | element ref | M | — | The PDU. A full element reference, so it may be written fully qualified to pick one of several PDUs sharing a short name (§2.2, `NG-E011`). |
-| `outlet` | string (1–16, alphanumeric) | M | — | The outlet as the PDU numbers it. Must exist (`NG-E011`) and must not already feed something else (`NG-E010`). |
+| `pdu` | element ref | M | — | The PDU. A full element reference, so it may be written fully qualified to pick one of several PDUs sharing a short name (§2.2, `NV-E011`). |
+| `outlet` | string (1–16, alphanumeric) | M | — | The outlet as the PDU numbers it. Must exist (`NV-E011`) and must not already feed something else (`NV-E010`). |
 | `psu` | string (≤64) | O | `null` | Which supply on the *device* this feeds, e.g. `psu1`. Documentation only. |
 
 An entry may be written as the compact string **`pdu:outlet`** — `pdu-r1-a:7`,
 `sites/hq/mdf/pdu-r1-a:B12` — or as the equivalent mapping, which is the same
 grammar and the same choice a cable endpoint offers (§4.2), because it is the same
 kind of fact: a named thing on a named element. Anything that is not one
-identifier either side of one colon is `NG-E002`. The mapping form is what a `psu`
+identifier either side of one colon is `NV-E002`. The mapping form is what a `psu`
 label needs, and the label is worth writing: it is what an operator reads off the
 back of a chassis, and it is what makes a diagnostic about "the second input" name
 something real. `outlet` is alphanumeric rather than digits alone so that a
@@ -3557,25 +3557,25 @@ two-bank unit printed `A1`…`B12` can be transcribed as it is printed.
 
 At most eight inputs. Four-PSU chassis exist; forty do not, and the bound keeps a
 copy-paste accident from becoming a load schedule nobody reads. Two of a device's
-own inputs naming one outlet is `NG-E002`; two *different* devices naming one
-outlet is `NG-E010`.
+own inputs naming one outlet is `NV-E002`; two *different* devices naming one
+outlet is `NV-E010`.
 
 **`redundant: true`** is a claim, not a description: losing one feed does not lose
-the device. It needs at least two `inputs` to be sayable at all (`NG-E002`), and
-`NG-E015` checks the claim is true of where they land — two cords into one strip
+the device. It needs at least two `inputs` to be sayable at all (`NV-E002`), and
+`NV-E015` checks the claim is true of where they land — two cords into one strip
 are not redundant, and neither are two strips on one `input_feed`.
 
 **`powered_by: poe`** is for the box with no power cord — a ceiling access point,
 a camera, a doorbell. Its power path *is* the cable that carries its traffic, so
-it declares no `inputs` (`NG-E005`), and the feed is derived by walking that
-cable rather than declared (§17.4). `NG-E014` then checks the far end of the walk
+it declares no `inputs` (`NV-E005`), and the feed is derived by walking that
+cable rather than declared (§17.4). `NV-E014` then checks the far end of the walk
 offers PoE at all, and offers enough of it.
 
 ### 17.3 Power over Ethernet
 
 Declaring an `interfaces[].poe` block is what makes a port **power sourcing
 equipment**: a port that hands power down the twisted pairs of the run instead of
-only frames. It is permitted on `ethernet` and `lag` only (`NG-E006`) — PoE
+only frames. It is permitted on `ethernet` and `lag` only (`NV-E006`) — PoE
 travels over copper, so a `loopback`, a `vlan` sub-interface, a `bridge` or a
 `tunnel` cannot source it, and `wifi` is refused for the same reason and one
 further one: a radio is precisely the port with no cable. `lag` is permitted
@@ -3584,13 +3584,13 @@ because an aggregate of two PoE ports is how a multi-gigabit access point is fed
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `standard` | enum | M | — | `802.3af`, `802.3at` or `802.3bt` — which amendment the port implements. |
-| `class` | integer 0–8 | C | `null` | The IEEE classification. Refused above the ceiling its `standard` defines, and exclusive with `budget_watts` (`NG-E004`). |
-| `budget_watts` | watts | C | `null` | An explicit reservation instead of a class, for a vendor that lets an operator cap a port below what its class allows. Exclusive with `class` (`NG-E004`). |
+| `class` | integer 0–8 | C | `null` | The IEEE classification. Refused above the ceiling its `standard` defines, and exclusive with `budget_watts` (`NV-E004`). |
+| `budget_watts` | watts | C | `null` | An explicit reservation instead of a class, for a vendor that lets an operator cap a port below what its class allows. Exclusive with `class` (`NV-E004`). |
 | `enabled` | boolean | O | `true` | Is the port administratively allowed to source power? A disabled PSE port reserves nothing and powers nothing. |
 
 `spec.power.poe_budget_watts` (§17.2) is the other half of the same fact: the pool
 the whole box can hand out across every PSE port together. The ports say what each
-one wants and the pool says what there is, so `NG-E013` compares the two — and
+one wants and the pool says what there is, so `NV-E013` compares the two — and
 which ports count towards it is the question the rest of this section answers.
 
 #### The class table
@@ -3614,13 +3614,13 @@ and 145):
 
 `standard` therefore fixes which classes exist: `802.3af` stops at class 3,
 `802.3at` adds class 4, `802.3bt` adds 5 to 8. A class outside its standard is
-`NG-E004` — an `802.3af` port cannot deliver class 4, so declaring one is a
+`NV-E004` — an `802.3af` port cannot deliver class 4, so declaring one is a
 mistake about the hardware rather than a preference, and the diagnostic says which
 `standard` would make it true.
 
 #### How much a port reserves
 
-Say it with `class` **or** with `budget_watts`, never both (`NG-E004`): a class
+Say it with `class` **or** with `budget_watts`, never both (`NV-E004`): a class
 already fixes the reservation, and two answers cannot both be the budget.
 
 * With `class`, the port reserves the **PSE-side** figure for that class, which is
@@ -3634,7 +3634,7 @@ already fixes the reservation, and two answers cannot both be the budget.
 A disabled port (`enabled: false`) reserves nothing, whichever of the three
 applies: a switch does not set power aside for a PSE it is told not to use.
 Recording the block anyway is worth it, because `enabled: false` is the difference
-between "no PoE here" and "PoE turned off here" — and the second is what `NG-E014`
+between "no PoE here" and "PoE turned off here" — and the second is what `NV-E014`
 names when a camera on that port will not come up.
 
 #### Capability versus allocation
@@ -3692,7 +3692,7 @@ spec:
   model: U6-Pro
   power:
     draw_watts: 22
-    powered_by: poe           # excludes 'inputs' (NG-E005)
+    powered_by: poe           # excludes 'inputs' (NV-E005)
   interfaces:
     - name: eth0
       type: ethernet
@@ -3745,7 +3745,7 @@ spec:
 The switch allocates 37 W of its 445 W pool: 30 W on `1/0/1` and 7 W on `1/0/2`.
 `1/0/3` is a capability and `1/0/24` is switched off, so neither holds any. The AP
 draws 22 W and the class-4 port delivers 25.5 W PD-side, so it fits; a class-2
-port would not, and that is exactly the `NG-E014` this example is shaped to show
+port would not, and that is exactly the `NV-E014` this example is shaped to show
 the right side of.
 
 ### 17.4 How power paths are resolved
@@ -3765,22 +3765,22 @@ lands on. The walk **crosses patch panels** — a run that enters `front/7`
 continues from `rear/7`, because a run through a panel is electrically one run,
 for power exactly as for frames (§15.2) — since a ceiling access point patched
 through an IDF panel is the normal case and not the exotic one. It gives up after
-sixteen hops, because a run that long is a loop (`NG-P005`) or a plant nobody
+sixteen hops, because a run that long is a loop (`NV-P005`) or a plant nobody
 could trace, and the bound is what keeps a cross-wired pair of panels from
 hanging the resolver.
 
 A device with two runs to two switches is fed over whichever actually sources
 power, and over the more capable of the two when both do. Every run is recorded
 whether or not its far end sources anything, because "the uplink lands on a port
-with no PoE" is precisely what `NG-E014` has to be able to say.
+with no PoE" is precisely what `NV-E014` has to be able to say.
 
 A reference that does not resolve is *recorded* rather than dropped: the validator
-grades it (`NG-E011`) and the renderer still has to draw the feeds that did
+grades it (`NV-E011`) and the renderer still has to draw the feeds that did
 resolve, because `--force` must produce a picture.
 
 **Load sharing.** A dual-corded server draws its load through both cords, so each
 of a device's *n* feeds carries `typical / n`. That is the figure summed per PDU,
-and it is what capacity is graded against (`NG-E012`), because it is the load the
+and it is what capacity is graded against (`NV-E012`), because it is the load the
 strip carries in normal operation — the state the plant is in on every day that
 nothing has failed. The share is computed once per device, so two cords of one
 server always add up to exactly its draw whatever the arithmetic rounds to.
@@ -3793,13 +3793,13 @@ utilisation table (§17.6) and the load schedule (§17.7).
 **Only the normal-operation figure is graded.** A pair of PDUs each sized for half
 the rack is a design, not an error: that is what redundancy costs, and every
 correctly built A/B rack would fail a rule that graded the failover number. So
-`NG-E012` reports a strip with more plugged into it than it is rated for, the
+`NV-E012` reports a strip with more plugged into it than it is rated for, the
 failover column is reported without a verdict, and the gap between the two *is*
 the redundancy plan, stated where somebody can read it.
 
 A PoE feed's reservation is the PSE-side class figure of the port (§17.3), not the
 device's draw: that is what the switch sets aside. Its PD-side counterpart is what
-`NG-E014` compares a declared draw against.
+`NV-E014` compares a declared draw against.
 
 ### 17.5 The power view
 
@@ -3828,7 +3828,7 @@ One row per PDU — feed, outlets, used, free, capacity, load, failover, utilisa
 and the number of loads — shaped after the `netviz ipam` utilisation table and
 for the same reason: the question is capacity planning, so the columns are what is
 there, what is used, what is left, and the percentage that decides whether
-anybody has to act. `LOAD` is the normal-operation figure `NG-E012` grades;
+anybody has to act. `LOAD` is the normal-operation figure `NV-E012` grades;
 `FAILOVER` is what the unit carries when its partner dies (§17.4). A single-fed
 rack has the two the same; an A/B pair does not.
 
@@ -3845,36 +3845,36 @@ See [`docs/export.md`](export.md).
 
 ### 17.8 Rules
 
-The group is lettered `E`, for *electrical*. `NG-E001` to `NG-E006` are schema
-rules, reported while the document is parsed and not suppressible; `NG-E010` to
-`NG-E016` are semantic and carry the short ids of §10.10. `NG-E007` to `NG-E009`
+The group is lettered `E`, for *electrical*. `NV-E001` to `NV-E006` are schema
+rules, reported while the document is parsed and not suppressible; `NV-E010` to
+`NV-E016` are semantic and carry the short ids of §10.10. `NV-E007` to `NV-E009`
 are unassigned, and stay that way: numbering the schema half from 1 and the
 semantic half from 10 means a rule added to either does not disturb the other,
 and an id, once assigned, is never reused (§10).
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-E001` | error | A `pdu`'s `spec.outlets` is a positive count or comma-separated spans, with no repeats and at most 512 outlets. |
-| `NG-E002` | error | `spec.power` is well formed: an `inputs` entry is `pdu:outlet` or the equivalent mapping, no two of the device's own inputs name one outlet, and `redundant: true` declares at least two inputs. |
-| `NG-E003` | error | `draw_watts` is a wattage or a `{typical, maximum}` mapping, and `maximum` is not below `typical`. |
-| `NG-E004` | error | An `interfaces[].poe` block declares at most one of `class` and `budget_watts`, and `class` is within the ceiling its `standard` defines. |
-| `NG-E005` | error | `powered_by: poe` excludes `inputs`: a device fed over its uplink has no cord. |
-| `NG-E006` | error | `poe` appears only on a port a cable terminates on — `type: ethernet` or `type: lag`. |
-| `NG-E010` | error | One PDU outlet is claimed by at most one element. Two of *one* device's inputs claiming it is `NG-E002` instead. |
-| `NG-E011` | error | Every `inputs` entry resolves: the reference names one declared `pdu` — unambiguously, after the §2.2 lookups — and that unit declares that outlet. |
-| `NG-E012` | error | A PDU's normal-operation load does not exceed its `capacity_watts` (§17.4). Silent when no capacity is recorded. |
-| `NG-E013` | error | The PoE allocated across the ports that hold budget does not exceed the device's `poe_budget_watts`. Silent when no budget is recorded. |
-| `NG-E014` | error | A `powered_by: poe` device reaches a PSE port that is enabled and delivers at least what the device declares it draws. |
-| `NG-E015` | error | A device claiming `redundant` is fed from two different PDUs, and from two different `input_feed`s where the units record one. |
-| `NG-E016` | warning | A device that declares a `draw_watts` also declares a power path — `inputs`, or `powered_by: poe`. |
+| `NV-E001` | error | A `pdu`'s `spec.outlets` is a positive count or comma-separated spans, with no repeats and at most 512 outlets. |
+| `NV-E002` | error | `spec.power` is well formed: an `inputs` entry is `pdu:outlet` or the equivalent mapping, no two of the device's own inputs name one outlet, and `redundant: true` declares at least two inputs. |
+| `NV-E003` | error | `draw_watts` is a wattage or a `{typical, maximum}` mapping, and `maximum` is not below `typical`. |
+| `NV-E004` | error | An `interfaces[].poe` block declares at most one of `class` and `budget_watts`, and `class` is within the ceiling its `standard` defines. |
+| `NV-E005` | error | `powered_by: poe` excludes `inputs`: a device fed over its uplink has no cord. |
+| `NV-E006` | error | `poe` appears only on a port a cable terminates on — `type: ethernet` or `type: lag`. |
+| `NV-E010` | error | One PDU outlet is claimed by at most one element. Two of *one* device's inputs claiming it is `NV-E002` instead. |
+| `NV-E011` | error | Every `inputs` entry resolves: the reference names one declared `pdu` — unambiguously, after the §2.2 lookups — and that unit declares that outlet. |
+| `NV-E012` | error | A PDU's normal-operation load does not exceed its `capacity_watts` (§17.4). Silent when no capacity is recorded. |
+| `NV-E013` | error | The PoE allocated across the ports that hold budget does not exceed the device's `poe_budget_watts`. Silent when no budget is recorded. |
+| `NV-E014` | error | A `powered_by: poe` device reaches a PSE port that is enabled and delivers at least what the device declares it draws. |
+| `NV-E015` | error | A device claiming `redundant` is fed from two different PDUs, and from two different `input_feed`s where the units record one. |
+| `NV-E016` | warning | A device that declares a `draw_watts` also declares a power path — `inputs`, or `powered_by: poe`. |
 
-`NG-E016` is a warning deliberately. Recording draws before recording the outlets
+`NV-E016` is a warning deliberately. Recording draws before recording the outlets
 they are plugged into is the normal order in which an as-built document gets
 written, and refusing the half-finished state would make the model unusable
 exactly while it is being adopted. It is still worth saying: a load that appears
 on no PDU appears on no schedule either, so the rack looks emptier than it is.
 
-`NG-E015` accepts two PDUs that record no `input_feed` at all. Silence is not a
+`NV-E015` accepts two PDUs that record no `input_feed` at all. Silence is not a
 claim, and a rule that treated a missing fact as evidence would punish the
 inventory for being incomplete rather than for being wrong.
 
@@ -3961,7 +3961,7 @@ value has not changed.
 somewhere different in each. The l3 diagram is a different graph with different neighbours,
 not the same diagram recoloured.
 
-An unknown view name is `NG-Y003`.
+An unknown view name is `NV-Y003`.
 
 ### 18.4 Keys
 
@@ -3981,7 +3981,7 @@ A node the inventory does not declare is keyed by the id the graph gives it:
 An edge key is a cable's or a tunnel's address, or the synthetic id of a derived
 edge. A group key is a namespace.
 
-A key naming nothing the inventory declares is `NG-Y001` — a **warning**, not an
+A key naming nothing the inventory declares is `NV-Y001` — a **warning**, not an
 error. Deleting a switch must not make `netviz validate` fail, and geometry for
 a node that is not in the diagram places nothing. `netviz layout --prune` drops
 them.
@@ -4010,7 +4010,7 @@ honoured on read wherever it appears, for an editor that lets somebody resize a
 box on purpose.
 
 An `edges` entry is where a link's own geometry goes. None of its three fields
-is required, but an entry must carry **at least one** of them (`NG-Y003`): a key
+is required, but an entry must carry **at least one** of them (`NV-Y003`): a key
 with nothing under it says nothing, and the way to say nothing is to leave the
 key out.
 
@@ -4071,9 +4071,9 @@ Graphviz at all. An edge's object carries both what the document pinned
 
 | Rule | Severity | Statement |
 |---|---|---|
-| `NG-Y001` | warning | Every key names something the inventory declares. `netviz layout --prune` drops the rest. |
-| `NG-Y002` | error | Two layout documents in one namespace do not share a name. |
-| `NG-Y003` | error | A view is one of the layers netviz draws, a coordinate is a finite number, and a size is positive. |
+| `NV-Y001` | warning | Every key names something the inventory declares. `netviz layout --prune` drops the rest. |
+| `NV-Y002` | error | Two layout documents in one namespace do not share a name. |
+| `NV-Y003` | error | A view is one of the layers netviz draws, a coordinate is a finite number, and a size is positive. |
 
 ---
 
@@ -4087,7 +4087,7 @@ exists because one department needed it: all three are facts about people,
 written down today in a spreadsheet nobody diffs.
 
 So an identity is an element like any other. It has a document, a namespace, a
-name unique within it (`NG-N002`), labels, a description and a source location;
+name unique within it (`NV-N002`), labels, a description and a source location;
 it is planned, applied, formatted, listed, exported and drawn by exactly the
 machinery every other kind goes through. Nothing here is a special case, which is
 the point: the moment identity needs its own loader or its own diff, the single
@@ -4115,25 +4115,25 @@ spec:
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `login` | string | O | `metadata.name` | The account name, when it differs from the document's own. Letters, digits and `. _ - @`, starting with a letter, a digit or `_`; at most 64 characters (`NG-S001`). `@` is accepted because a user principal name (`ana@example.com`) *is* the login on a domain-joined estate. |
+| `login` | string | O | `metadata.name` | The account name, when it differs from the document's own. Letters, digits and `. _ - @`, starting with a letter, a digit or `_`; at most 64 characters (`NV-S001`). `@` is accepted because a user principal name (`ana@example.com`) *is* the login on a domain-joined estate. |
 | `full_name` | string | O | `null` | The person's name as they write it. Free text, ≤253 characters: a real name is not a grammar, and the ones that do not fit a first/last split are exactly the ones a schema must not mangle. |
-| `email` | string | O | `null` | `local@domain.tld`, ≤254 characters (RFC 5321). Checked for shape rather than against RFC 5322, which accepts things no mail system delivers to and rejects nothing anybody mistypes (`NG-S001`). |
-| `uid` | integer | O | `null` | POSIX user id, 0 to 4294967294 — `4294967295` is `(uid_t) -1` and is not assignable (`NG-S001`). Two users claiming one is `NG-S013`. |
+| `email` | string | O | `null` | `local@domain.tld`, ≤254 characters (RFC 5321). Checked for shape rather than against RFC 5322, which accepts things no mail system delivers to and rejects nothing anybody mistypes (`NV-S001`). |
+| `uid` | integer | O | `null` | POSIX user id, 0 to 4294967294 — `4294967295` is `(uid_t) -1` and is not assignable (`NV-S001`). Two users claiming one is `NV-S013`. |
 | `type` | enum | O | `person` | `person`, `service` or `shared`. See below. |
 | `status` | enum | O | `active` | `active`, `suspended` or `departed`. See below. |
-| `ssh_keys` | list[string] | O | `[]` | Public keys, `<algorithm> <base64> [comment]`, at most 32. Normalised to single spaces, so a key pasted wrapped compares equal to the same key pasted flat. Two entries with the same material are `NG-S002` however their comments differ, and a **private** key is refused outright with an explanation — which is the mistake this check exists for. |
+| `ssh_keys` | list[string] | O | `[]` | Public keys, `<algorithm> <base64> [comment]`, at most 32. Normalised to single spaces, so a key pasted wrapped compares equal to the same key pasted flat. Two entries with the same material are `NV-S002` however their comments differ, and a **private** key is refused outright with an explanation — which is the mistake this check exists for. |
 
 `type` is not cosmetic: it decides which rules have anything to say. A `service`
 account belongs to no group on a great many estates, so reporting that as an
-oversight would be noise (`NG-S016` is silent for one); a `shared` account has no
-single person to depart, so `NG-S015` is silent for one too.
+oversight would be noise (`NV-S016` is silent for one); a `shared` account has no
+single person to depart, so `NV-S015` is silent for one too.
 
 `status: departed` is the field the whole section turns on. The tempting response
 to somebody leaving is to delete their `user` document — which removes them from
 the inventory *and* from every group naming them, losing exactly the list somebody
 has to work through. The memberships are the access still to be revoked; they
 cannot be revoked from a record that no longer exists. Marking the account
-`departed` keeps the work visible until it has been done, and `NG-S015` is the
+`departed` keeps the work visible until it has been done, and `NV-S015` is the
 worklist.
 
 ### 19.2 `group`
@@ -4152,8 +4152,8 @@ spec:
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `members` | list[element ref] | O | `[]` | The users and nested groups in this group, at most 4096. Each is an ordinary element reference (§4.1), resolved outwards from the group's own namespace (§2.2). Must resolve (`NG-S010`), must name a `user` or a `group` (`NG-S011`), and the nesting must not loop (`NG-S012`). One member named twice, or a group naming itself, is `NG-S003`. |
-| `gid` | integer | O | `null` | POSIX group id, 0 to 4294967294. Two groups claiming one is `NG-S013`. |
+| `members` | list[element ref] | O | `[]` | The users and nested groups in this group, at most 4096. Each is an ordinary element reference (§4.1), resolved outwards from the group's own namespace (§2.2). Must resolve (`NV-S010`), must name a `user` or a `group` (`NV-S011`), and the nesting must not loop (`NV-S012`). One member named twice, or a group naming itself, is `NV-S003`. |
+| `gid` | integer | O | `null` | POSIX group id, 0 to 4294967294. Two groups claiming one is `NV-S013`. |
 | `email` | string | O | `null` | Where mail to the whole group goes, when the group is also a distribution list. Same grammar as a user's. |
 
 **Membership is written on the group and nowhere else.** A `user` does not list
@@ -4187,7 +4187,7 @@ have an icon in the bundled themes.
 **Edges** are the memberships, one per entry of `spec.members`, drawn from the
 group to the member — the direction the fact is written in and the direction a
 reader follows to answer "who is in this?". A member that does not resolve is not
-drawn: `NG-S010` is the place that says so, and `--force` must still produce a
+drawn: `NV-S010` is the place that says so, and `--force` must still produce a
 picture.
 
 Everything else is discarded, exactly as the power view discards the cabling
@@ -4197,27 +4197,27 @@ and drawing both graphs at once produces a picture in which neither is readable.
 ### 19.4 Rules
 
 The group is lettered `S`, for *subject* — the term an access-control system uses
-for a principal it names. `NG-U` was spent on rack units (§10.13) and `NG-I` on
-interfaces, so neither initial was available. `NG-S001` to `NG-S003` are schema
-rules, reported while the document is parsed and not suppressible; `NG-S010`
+for a principal it names. `NV-U` was spent on rack units (§10.13) and `NV-I` on
+interfaces, so neither initial was available. `NV-S001` to `NV-S003` are schema
+rules, reported while the document is parsed and not suppressible; `NV-S010`
 onwards are semantic and carry the short ids of §10.10.
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-S001` | error | A `user`'s `login` matches the account grammar and fits in 64 characters, its `email` is `local@domain.tld` within 254, and a `uid`/`gid` is an assignable POSIX id. |
-| `NG-S002` | error | Every `ssh_keys` entry is `<algorithm> <base64> [comment]`, no two entries share key material, and none of them is a private key. |
-| `NG-S003` | error | A `group`'s `members` names nothing twice and does not name the group itself. |
-| `NG-S010` | error | Every member resolves: the reference names one declared element, unambiguously, after the §2.2 lookups. |
-| `NG-S011` | error | Every member is a `user` or a `group`. Anything else is a name collision, not a statement about the switch it landed on. |
-| `NG-S012` | error | Group nesting is acyclic. A cyclic group has no membership: expanding it does not terminate. |
-| `NG-S013` | error | No two identities claim one `login`, one `uid` or one `gid`. Namespaces make no difference: the account namespace is the estate, not the folder. |
-| `NG-S014` | warning | A `group` has at least one member. Anything granted to an empty group is granted to nobody, and *looks* granted. |
-| `NG-S015` | warning | No group lists a `person` whose `status` is `departed`. The membership is access that has not been revoked. |
-| `NG-S016` | info | An active `person` is a member of at least one group. |
+| `NV-S001` | error | A `user`'s `login` matches the account grammar and fits in 64 characters, its `email` is `local@domain.tld` within 254, and a `uid`/`gid` is an assignable POSIX id. |
+| `NV-S002` | error | Every `ssh_keys` entry is `<algorithm> <base64> [comment]`, no two entries share key material, and none of them is a private key. |
+| `NV-S003` | error | A `group`'s `members` names nothing twice and does not name the group itself. |
+| `NV-S010` | error | Every member resolves: the reference names one declared element, unambiguously, after the §2.2 lookups. |
+| `NV-S011` | error | Every member is a `user` or a `group`. Anything else is a name collision, not a statement about the switch it landed on. |
+| `NV-S012` | error | Group nesting is acyclic. A cyclic group has no membership: expanding it does not terminate. |
+| `NV-S013` | error | No two identities claim one `login`, one `uid` or one `gid`. Namespaces make no difference: the account namespace is the estate, not the folder. |
+| `NV-S014` | warning | A `group` has at least one member. Anything granted to an empty group is granted to nobody, and *looks* granted. |
+| `NV-S015` | warning | No group lists a `person` whose `status` is `departed`. The membership is access that has not been revoked. |
+| `NV-S016` | info | An active `person` is a member of at least one group. |
 
-`NG-S014` is a warning deliberately: a group created before the people who will
+`NV-S014` is a warning deliberately: a group created before the people who will
 be in it is a normal intermediate state, and so is one emptied on purpose to keep
-its name reserved. `NG-S016` is only info, and only about a `person`: granting a
+its name reserved. `NV-S016` is only info, and only about a `person`: granting a
 person access directly and putting them in nothing is a normal way to run an
 estate. It is printed because the opposite reading — "she is in no group,
 therefore she has no access" — is a claim an auditor wants confirmed rather than
@@ -4282,7 +4282,7 @@ to the site, is the other arrangement that reads well.
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `description` | string | O | *unset* | What the suite is for, in one line. Printed as the suite's progress line. |
-| `assertions` | list | M | — | One to 1024 assertions (§20.2), graded in the order they are written (`NG-K002`). |
+| `assertions` | list | M | — | One to 1024 assertions (§20.2), graded in the order they are written (`NV-K002`). |
 
 `assertions` may not be empty. A suite that asserts nothing reports a green run
 having checked nothing, which is worse than having no suite at all — it is the
@@ -4291,7 +4291,7 @@ false green that the exit code of this command exists to prevent.
 ### 20.2 An assertion
 
 `assert` chooses the claim, and every other key is read in its light. A key that
-belongs to a *different* assertion is rejected by name (`NG-K003`) rather than
+belongs to a *different* assertion is rejected by name (`NV-K003`) rather than
 ignored, so `hops` written on a `same-vlan` is a diagnostic naming both keys and
 not a silently unchecked bound.
 
@@ -4415,8 +4415,8 @@ cannot be mistaken for a pass.
 
 ### 20.5 Rules
 
-The group is lettered `K`, for *check*: `NG-C` was spent on cables and `NG-T` on
-tunnels, so neither obvious initial was available. `NG-K001` to `NG-K003` are
+The group is lettered `K`, for *check*: `NV-C` was spent on cables and `NV-T` on
+tunnels, so neither obvious initial was available. `NV-K001` to `NV-K003` are
 reported while
 the document is read and are not suppressible. A false assertion is not a rule
 violation at all — it is a failing test, reported by `netviz test` against the
@@ -4424,9 +4424,9 @@ assertion's own file and line.
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-K001` | error | Two `testsuite` documents in one namespace do not share a name. The first declaration wins and the second is ignored, which keeps loading deterministic. |
-| `NG-K002` | error | `spec.assertions` holds between one and 1024 entries. |
-| `NG-K003` | error | Every key an assertion carries belongs to the assertion its `assert` names, every key that assertion requires is present — `query` satisfying a required `select` — and a `count` compares against a bound it can satisfy. |
+| `NV-K001` | error | Two `testsuite` documents in one namespace do not share a name. The first declaration wins and the second is ignored, which keeps loading deterministic. |
+| `NV-K002` | error | `spec.assertions` holds between one and 1024 entries. |
+| `NV-K003` | error | Every key an assertion carries belongs to the assertion its `assert` names, every key that assertion requires is present — `query` satisfying a required `select` — and a `count` compares against a bound it can satisfy. |
 
 ---
 
@@ -4515,7 +4515,7 @@ Each of the three is indexed in **a name space of its own**. A note called
 called `core` beside both of them: nothing ever resolves one where the other is
 meant, because an anchor and a member reference resolve against the *elements*
 and a `kind: note` document is only ever reached as a note. Uniqueness is
-therefore per kind and per namespace (`NG-G002`), exactly as it is for a layout.
+therefore per kind and per namespace (`NV-G002`), exactly as it is for a layout.
 
 The alternative was `metadata.annotations` (§3.1), which already exists on every
 element and is already a bag of per-element input to the tooling. It was
@@ -4541,7 +4541,7 @@ renderer asks about one:
 
 `views` is the closed set §18 scopes geometry by — `physical`, `l1`, `l2`, `l3`,
 `overlay`, `routing`, `rack`, `power`, `identity`, `netns` — and an unknown name is
-refused (`NG-G003`) rather than accepted and silently drawn nowhere. Empty is
+refused (`NV-G003`) rather than accepted and silently drawn nowhere. Empty is
 the default because a remark about a site is a remark about the site in every
 picture of it; `views: [l3]` is for the remark that only makes sense once the
 diagram is prefixes rather than cables.
@@ -4606,7 +4606,7 @@ does not understand degrades to its own text rather than to a traceback.
 | `element` | reference | C | *unset* | A device, adapter, patch panel, PDU, user or group. |
 | `link` | reference | C | *unset* | A cable or a tunnel. |
 
-Exactly one of the two, and writing both — or neither — is `NG-G005`. They are
+Exactly one of the two, and writing both — or neither — is `NV-G005`. They are
 separate keys rather than one `target` because a reader of the file should be
 able to tell what sort of thing is being commented on without resolving the
 name, and because the two are drawn differently: a note about a device sits
@@ -4614,7 +4614,7 @@ beside a shape, a note about a cable sits beside a line.
 
 References are spelled the way every reference in this schema is spelled (§4):
 a short name resolved against the annotation document's own namespace, or a
-fully-qualified one. An anchor naming nothing is `NG-G001` — a warning — and the
+fully-qualified one. An anchor naming nothing is `NV-G001` — a warning — and the
 note keeps its text and loses its leader line.
 
 **`geometry` — where it sits.**
@@ -4630,7 +4630,7 @@ The coordinates are §18.2's, deliberately and exactly: points, `x` rightwards,
 `y` **upwards**, origin at the bottom left, and `x`/`y` is the **centre** of the
 box rather than a corner. A note dragged around a canvas is stored by the same
 machinery that stores a dragged switch, so it had better be stored in the same
-system. Half a position — `x` without `y` — is `NG-G005`: it places nothing, and
+system. Half a position — `x` without `y` — is `NV-G005`: it places nothing, and
 accepting it would draw the note at an origin nobody asked for.
 
 The shape is flat (`x`, `y`, `width`, `height`) rather than §18's nested
@@ -4639,7 +4639,7 @@ produce and what an editor writes back. A note is one box; a node is a thing
 with an optional extent.
 
 **An anchor, a point, or both.** At least one of `anchor` and a placed
-`geometry` is required (`NG-G005`); otherwise nothing knows where to draw the
+`geometry` is required (`NV-G005`); otherwise nothing knows where to draw the
 note. The two are not alternatives so much as two different promises:
 
 * **anchored** — the note follows what it is about when the diagram is laid out
@@ -4683,7 +4683,7 @@ An area is a box drawn *behind* the nodes.
 | `padding` | number | O | `16.0` | Points between the hull of the members and the box drawn round them. Ignored when `geometry` gives the rectangle outright. |
 
 At least one of `members`, `selector` and a fully specified `geometry` is
-required (`NG-G005`): an area that encloses nothing is a caption with no
+required (`NV-G005`): an area that encloses nothing is a caption with no
 subject. `members` and `selector` may be combined, and the box is then the hull
 of both — the explicit names first, in the order they were written, then
 whatever the selector adds in load order. That ordering is not cosmetic: a
@@ -4695,8 +4695,8 @@ of hardware, and a solid box in a diagram of solid boxes reads as a real
 container — a chassis, a stack, something with a serial number. `none` keeps the
 fill and drops the edge, for a wash of colour behind part of the picture.
 
-A member that names nothing is `NG-G001` and is dropped from the hull; a
-`selector` that matches nothing is `NG-G004` and the box is not drawn at all.
+A member that names nothing is `NV-G001` and is dropped from the hull; a
+`selector` that matches nothing is `NV-G004` and the box is not drawn at all.
 Both are warnings — [`W142`](validation-rules.md#w142--annotation-about-something-that-is-gone)
 and [`W143`](validation-rules.md#w143--area-that-encloses-nothing) — and both
 pages say when it is right to suppress them.
@@ -4710,7 +4710,7 @@ pages say when it is right to suppress them.
 | `kinds` | string list | C | `[]` | Element kinds, for a zone that is about a class of thing. |
 
 Clauses are conjunctive — an element must satisfy every one that is given — and
-a selector with no clause at all is refused (`NG-G005`), because it would
+a selector with no clause at all is refused (`NV-G005`), because it would
 silently box the whole inventory. A relative `namespace` is resolved against the
 namespace the area was declared in, exactly as every other reference is: an area
 in `sites/hq` selecting `access` means `sites/hq/access`.
@@ -4761,7 +4761,7 @@ not a legitimate state for a selector that was meant to match something.
 | `auto` | enum | C | *unset* | `layers` derives the entries from what the drawing actually drew. |
 | `entries` | list | C | `[]` | The rows, written out. At most 64. |
 
-Exactly one of `auto` and `entries` (`NG-G005`): a key that was both generated
+Exactly one of `auto` and `entries` (`NV-G005`): a key that was both generated
 and written out would have to merge two lists that disagree, and there is no
 right answer to which of them wins.
 
@@ -4779,7 +4779,7 @@ out of the same palette the renderer draws with. It is the only form of key that
 cannot go stale — a hand-written one is wrong the first time somebody adds a
 fibre run, and a generated one on a `--vlan 10` diagram describes the ten
 devices that were drawn rather than the four hundred that were not. A legend is
-also the one annotation kind that never trips `NG-G001`: its content is colours
+also the one annotation kind that never trips `NV-G001`: its content is colours
 and words, so it names nothing that can go missing.
 
 **`entries[]`.**
@@ -4814,37 +4814,37 @@ and the drawing is already there.
 
 ### 21.4 Rules
 
-The group is lettered `G`, for *graphic*: `NG-A` was spent on addresses and
-`NG-N` on names, so neither initial of "annotation" was available.
+The group is lettered `G`, for *graphic*: `NV-A` was spent on addresses and
+`NV-N` on names, so neither initial of "annotation" was available.
 
 | Rule | Severity | Statement |
 |---|---|---|
-| `NG-G001` | warning | Every `anchor` and every `members` entry names something the inventory declares. Reported as `W142`; the stale reference is dropped and the rest of the annotation is still drawn. |
-| `NG-G002` | error | Two annotation documents of one kind in one namespace do not share a name. The first declaration wins and the second is ignored, which keeps loading deterministic. |
-| `NG-G003` | error | Every *value* an annotation carries is well formed: a colour is `#rgb` or `#rrggbb`, a view is one netviz draws, a text is not empty. |
-| `NG-G004` | warning | An area's `selector` matches at least one element. Reported as `W143`; the box is not drawn. |
-| `NG-G005` | error | An annotation's fields *agree*: an anchor names exactly one of `element` and `link`, a position has both `x` and `y`, a note is anchored or placed, an area encloses something, a selector narrows something, and a legend is generated or written out but not both. |
+| `NV-G001` | warning | Every `anchor` and every `members` entry names something the inventory declares. Reported as `W142`; the stale reference is dropped and the rest of the annotation is still drawn. |
+| `NV-G002` | error | Two annotation documents of one kind in one namespace do not share a name. The first declaration wins and the second is ignored, which keeps loading deterministic. |
+| `NV-G003` | error | Every *value* an annotation carries is well formed: a colour is `#rgb` or `#rrggbb`, a view is one netviz draws, a text is not empty. |
+| `NV-G004` | warning | An area's `selector` matches at least one element. Reported as `W143`; the box is not drawn. |
+| `NV-G005` | error | An annotation's fields *agree*: an anchor names exactly one of `element` and `link`, a position has both `x` and `y`, a note is anchored or placed, an area encloses something, a selector narrows something, and a legend is generated or written out but not both. |
 
-`NG-G003` and `NG-G005` are the same severity and are split for one reason,
+`NV-G003` and `NV-G005` are the same severity and are split for one reason,
 which is what an *editor* does with them. A gesture is several writes: dragging
 a note that has never been placed writes `spec.geometry.x` and then
-`spec.geometry.y`, and between those two the document says something `NG-G005`
-forbids. So `netviz edit` refuses a write that trips `NG-G003` the moment it
+`spec.geometry.y`, and between those two the document says something `NV-G005`
+forbids. So `netviz edit` refuses a write that trips `NV-G003` the moment it
 is made — `color: red` is wrong when it is typed and wrong afterwards — and lets
-one that trips `NG-G005` through, leaving it to the gate that judges the
+one that trips `NV-G005` through, leaving it to the gate that judges the
 finished batch. A batch is atomic, so a document that is still incoherent when
 the batch ends is never written; the split buys the second half of a drag, and
 costs nothing.
 
-`NG-G002`, `NG-G003` and `NG-G005` are reported while the document is **read** —
+`NV-G002`, `NV-G003` and `NV-G005` are reported while the document is **read** —
 one by the loader, two by the schema — and are therefore deliberately absent
 from the suppressible rule catalogue in
-[`validation-rules.md`](validation-rules.md), exactly as `NG-Y002` and `NG-Y003`
+[`validation-rules.md`](validation-rules.md), exactly as `NV-Y002` and `NV-Y003`
 are (§18.7). A finding about a document that could not be loaded is about the
 *file* rather than about the network, and there is nothing to suppress: as far
 as everything downstream is concerned the annotation does not exist.
 
-`NG-G001` and `NG-G004` are the other kind of finding — the annotation loaded,
+`NV-G001` and `NV-G004` are the other kind of finding — the annotation loaded,
 and what it says about the network has stopped being true — so both are
 suppressible per rule and per document (§10.11), and both are **warnings**. That
 is not a close call: an annotation is barred from failing a build, and a rule
@@ -4992,7 +4992,7 @@ written into the document would pin the value to the element and defeat the
 inheritance it is meant to fall through, and *unsetting* a field is how the
 editor's "reset to theme" works.
 
-An empty `style: {}` is an error (`NG-Z002`). It would otherwise validate, render
+An empty `style: {}` is an error (`NV-Z002`). It would otherwise validate, render
 identically to no block at all, and give the writer no signal that what they
 typed did nothing; in practice it is a half-finished edit or a key indented one
 level too far.
@@ -5039,7 +5039,7 @@ emitted by somebody's importer — is exactly the wrong place to be able to do i
 
 So the vocabulary is closed at both ends. A colour is a hex literal or a name
 from the table; everything else is a small enum or a bounded number; and the
-closure is enforced twice, once when the document is read (`NG-Z001`) and once
+closure is enforced twice, once when the document is read (`NV-Z001`) and once
 on the way out, where a shape the renderer does not recognise falls back to a
 box rather than being written through. Nothing typed into a manifest reaches an
 output format unvalidated.
@@ -5110,7 +5110,7 @@ spec:
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `rules` | list | M | — | The rules, in declaration order. Between 1 and 1000; an empty list is `NG-Z004`. |
+| `rules` | list | M | — | The rules, in declaration order. Between 1 and 1000; an empty list is `NV-Z004`. |
 | `rules[].select` | mapping | O | *matches everything* | Which elements this rule is about. |
 | `rules[].style` | mapping | M | — | What to draw them as: exactly the block of §22.1. |
 
@@ -5150,7 +5150,7 @@ label every inventory grows, and because the shorthand is what people write.
 *presence* of a label, for the estate where `tier` is set on everything that has
 one and absent elsewhere.
 
-A thousand rules is the ceiling (`NG-Z004`). Every rule is tested against every
+A thousand rules is the ceiling (`NV-Z004`). Every rule is tested against every
 drawn element, so a theme costs rules × elements; well before the bound it has
 stopped being a file anybody can predict the effect of.
 
@@ -5265,7 +5265,7 @@ style = {fill = "#f8fafc"}
 
 The entries under `[[theme.rules]]` are exactly the `spec.rules` of a theme
 document and are validated by the same models, so a mistyped colour in
-`netviz.toml` is refused with the same wording, and under the same `NG-Z001`,
+`netviz.toml` is refused with the same wording, and under the same `NV-Z001`,
 that it would get in a `theme.yaml`.
 
 The inline rules are **appended** to the named theme's rather than merged into
@@ -5312,31 +5312,31 @@ diagram; where the styling is the point, export a format that can carry it.
 
 ### 22.7 Rules
 
-The group is lettered `Z`. `NG-S` was spent on identity (§19.4) and `NG-T` on
+The group is lettered `Z`. `NV-S` was spent on identity (§19.4) and `NV-T` on
 tunnels, so neither initial of "style" nor of "theme" was available; `Z` is the
 end of the alphabet, which suits the last thing that happens to an element
 before it is drawn. The same table appears in [§10.17](#1017-styling).
 
 | ID | Sev. | Rule |
 |---|---|---|
-| `NG-Z001` | error | Every value in a `style` block is inside the vocabulary of §22.1: a colour is `#rgb`, `#rrggbb` or a named colour; `dash` and `shape` are listed spellings; `icon` is a bare name or `none`; `strokeWidth`, `fontSize` and `opacity` are within their bounds. The message names the nearest legal spelling. |
-| `NG-Z002` | error | A `style` block declares at least one of the nine fields. An empty one renders identically to no block at all, so it is always a mistake. |
-| `NG-Z003` | warning | No element is faded to nothing. Reported as `W144`; the element is still drawn, invisibly, and its links are still drawn to it. |
-| `NG-Z004` | error | A `theme` document is usable: it holds between 1 and 1000 rules, every selector clause is a string or a list of strings, and every `style` it carries satisfies `NG-Z001`. |
-| `NG-Z005` | warning | An element does not draw its label in the colour of its own fill. Reported as `W145`; the label is drawn where a reader cannot see it. |
+| `NV-Z001` | error | Every value in a `style` block is inside the vocabulary of §22.1: a colour is `#rgb`, `#rrggbb` or a named colour; `dash` and `shape` are listed spellings; `icon` is a bare name or `none`; `strokeWidth`, `fontSize` and `opacity` are within their bounds. The message names the nearest legal spelling. |
+| `NV-Z002` | error | A `style` block declares at least one of the nine fields. An empty one renders identically to no block at all, so it is always a mistake. |
+| `NV-Z003` | warning | No element is faded to nothing. Reported as `W144`; the element is still drawn, invisibly, and its links are still drawn to it. |
+| `NV-Z004` | error | A `theme` document is usable: it holds between 1 and 1000 rules, every selector clause is a string or a list of strings, and every `style` it carries satisfies `NV-Z001`. |
+| `NV-Z005` | warning | An element does not draw its label in the colour of its own fill. Reported as `W145`; the label is drawn where a reader cannot see it. |
 
-`NG-Z001`, `NG-Z002` and `NG-Z004` are reported while the document is **read**,
+`NV-Z001`, `NV-Z002` and `NV-Z004` are reported while the document is **read**,
 by the schema rather than by the semantic validator, and are therefore
 deliberately absent from the suppressible catalogue in
-[`validation-rules.md`](validation-rules.md), exactly as `NG-G003` and `NG-G005`
+[`validation-rules.md`](validation-rules.md), exactly as `NV-G003` and `NV-G005`
 are (§21.4). There is nothing to suppress: an element whose style does not parse
 is an element that did not load, and a theme that does not parse was not applied
-to anything. `NG-Z001` is also what `netviz edit` refuses a write against the
+to anything. `NV-Z001` is also what `netviz edit` refuses a write against the
 moment it is made, on the reasoning §21.4 sets out — a bad value is wrong when
 it is typed and wrong afterwards, so there is no half-finished gesture to
 protect.
 
-`NG-Z003` and `NG-Z005` are the other kind of finding: every value involved is
+`NV-Z003` and `NV-Z005` are the other kind of finding: every value involved is
 legal on its own and only the combination is a mistake, which is precisely what
 an editor passes through on its way somewhere else. Dragging an opacity slider
 from one end to the other visits `opacity: 0`. So both are **warnings** from the
@@ -5390,12 +5390,12 @@ container runtime creates one per container and tells nobody. FreeBSD calls it a
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `name` | name | M | — | As `ip netns` spells it. Unique within the device (`NG-N020`), and what `parent` and `interfaces[].netns` refer to. |
-| `parent` | name | O | *unset* | Another entry of the same table (`NG-N021`). Unset means the machine's initial namespace. |
+| `name` | name | M | — | As `ip netns` spells it. Unique within the device (`NV-N020`), and what `parent` and `interfaces[].netns` refer to. |
+| `parent` | name | O | *unset* | Another entry of the same table (`NV-N021`). Unset means the machine's initial namespace. |
 | `description` | string | O | `null` | What the namespace is for: a tenant, a container, a test harness. |
 
 `spec.netns` is permitted on the five device kinds and **not** on an `adapter`
-(`NG-N022`): a namespace belongs to a machine with a kernel in it, and a USB
+(`NV-N022`): a namespace belongs to a machine with a kernel in it, and a USB
 dongle is not one. It is not permitted on a `hub` either, for the reason §6.5
 gives — a layer-1 repeater has no stack to duplicate.
 
@@ -5428,9 +5428,9 @@ spec:
 
 **Nesting is a tree, and it is a tree because a namespace has exactly one
 creator.** `parent` is that creator, the chain always ends at the initial
-namespace, and a cycle is `NG-N021`. There is no depth limit: `web` inside
+namespace, and a cycle is `NV-N021`. There is no depth limit: `web` inside
 `blue` inside the initial namespace is three levels, and so is anything deeper.
-A namespace no interface is in is `NG-N026` — legal, since `ip netns add` makes
+A namespace no interface is in is `NV-N026` — legal, since `ip netns add` makes
 exactly that, but far more often the isolation somebody declared does not exist.
 
 **A namespace is not a VRF, and the two compose.** A VRF (§16.1) partitions the
@@ -5457,25 +5457,25 @@ have:
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `peer` | ifname | O | *unset* | The other end. `type: ethernet` only (`NG-N023`), an interface of the same element, and it must name this one back. |
+| `peer` | ifname | O | *unset* | The other end. `type: ethernet` only (`NV-N023`), an interface of the same element, and it must name this one back. |
 
 Four rules follow from that, and each says something the model would otherwise
 have to be trusted about:
 
-* **`NG-N023` — the pairing is symmetric.** A veth pair is created as a pair and
+* **`NV-N023` — the pairing is symmetric.** A veth pair is created as a pair and
   destroyed as a pair; there is no operation that leaves one end. A document in
   which `veth0` names `veth1` and `veth1` names nothing does not describe half a
   pair, it describes something that cannot be asked for — and the half that is
   written is as likely to be the wrong half as the right one.
-* **`NG-N024` — a cable must not terminate on a veth end.** Its far side is
-  already claimed. `NG-C009` cannot catch this, because by *type* a veth end is
+* **`NV-N024` — a cable must not terminate on a veth end.** Its far side is
+  already claimed. `NV-C009` cannot catch this, because by *type* a veth end is
   cableable and should be.
-* **`NG-N025` — a `bridge` or `lag` must not aggregate a member in another
+* **`NV-N025` — a `bridge` or `lag` must not aggregate a member in another
   namespace.** One datapath belongs to one stack; moving a port into a namespace
   is precisely the operation that takes it out of the aggregate. A `vlan`
   sub-interface is deliberately not constrained: moving one across is supported
   and it keeps receiving the frames its parent tags.
-* **`NG-N027` — a pair with both ends in one namespace is reported as info.** It
+* **`NV-N027` — a pair with both ends in one namespace is reported as info.** It
   is legal, and it is the standard way to join two bridges inside one stack; it
   is printed because the commoner reading is a `netns` written on one end and
   forgotten on the other.
@@ -5529,17 +5529,17 @@ a decision about what an element node *is* at layer 3, not about §23.
 
 | Id | Severity | Rule |
 |---|---|---|
-| `NG-N020` | error | `spec.netns[].name` is unique within its device. |
-| `NG-N021` | error | `spec.netns[].parent` names another entry of the same table, is not the entry itself, and the nesting chain does not loop. |
-| `NG-N022` | error | `interfaces[].netns` names an entry of the device's `spec.netns`. An `adapter` declares no namespace table, so any value on one is refused. |
-| `NG-N023` | error | `peer` appears only on `type: ethernet`, names another interface of the same element, is not the interface itself, and that interface names it back. An `adapter` has no stack to join, so any value on one is refused. |
-| `NG-N024` | error | No cable terminates on an interface that declares a `peer`. |
-| `NG-N025` | error | Every member of a `bridge` or `lag` is in the same network namespace as the aggregate. |
-| `NG-N026` | warning | Every declared namespace holds at least one interface. |
-| `NG-N027` | info | The two ends of a veth pair are in different network namespaces. |
+| `NV-N020` | error | `spec.netns[].name` is unique within its device. |
+| `NV-N021` | error | `spec.netns[].parent` names another entry of the same table, is not the entry itself, and the nesting chain does not loop. |
+| `NV-N022` | error | `interfaces[].netns` names an entry of the device's `spec.netns`. An `adapter` declares no namespace table, so any value on one is refused. |
+| `NV-N023` | error | `peer` appears only on `type: ethernet`, names another interface of the same element, is not the interface itself, and that interface names it back. An `adapter` has no stack to join, so any value on one is refused. |
+| `NV-N024` | error | No cable terminates on an interface that declares a `peer`. |
+| `NV-N025` | error | Every member of a `bridge` or `lag` is in the same network namespace as the aggregate. |
+| `NV-N026` | warning | Every declared namespace holds at least one interface. |
+| `NV-N027` | info | The two ends of a veth pair are in different network namespaces. |
 
-`NG-N020` to `NG-N023` are checked by the model, on one document, and are
-therefore reported by the schema pass; `NG-N024` to `NG-N027` need the whole
+`NV-N020` to `NV-N023` are checked by the model, on one document, and are
+therefore reported by the schema pass; `NV-N024` to `NV-N027` need the whole
 inventory and are the semantic validator's, as `E049`, `E050`, `W146` and
 `I005`. §10.11 says how to suppress any of them.
 
@@ -5601,7 +5601,7 @@ not a box.** `spec.zones` and `spec.firewall` are available on a `router`, a
 `server` and a `computer` too, because a router with three rules on it filters
 just as truly as a Palo Alto does, and a schema that could only describe the
 appliance would be unable to describe most networks. A `hub` refuses both
-(`NG-H003`): it has no IP stack, so it has nothing to filter with.
+(`NV-H003`): it has no IP stack, so it has nothing to filter with.
 
 ### 24.1 Zones
 
@@ -5621,11 +5621,11 @@ spec:
 
 | Field | Type | Required | Default | Meaning |
 |---|---|---|---|---|
-| `name` | element name | yes | — | Unique within the device, and not `local` (`NG-B001`). |
-| `interfaces` | list of interface names | no | `[]` | Each names an interface of this device (`NG-B002`). |
+| `name` | element name | yes | — | Unique within the device, and not `local` (`NV-B001`). |
+| `interfaces` | list of interface names | no | `[]` | Each names an interface of this device (`NV-B002`). |
 | `description` | string | no | *unset* | Free text. |
 
-**Every interface is in at most one zone** (`NG-B003`). That is not a
+**Every interface is in at most one zone** (`NV-B003`). That is not a
 simplification for netviz's convenience: it is the defining property of a zone
 in every zone-based firewall there is, and it is what makes `from lan` a
 statement about a packet rather than a question. Two zones claiming one
@@ -5646,7 +5646,7 @@ has a netfilter instance of its own that nothing here can see.
 
 `local` is the device itself — the traffic that terminates on the box rather
 than passing through it. It is nameable in `src_zone` and `dst_zone` without
-being declared, and declaring it is `NG-B001`: the machine is not one of the
+being declared, and declaring it is `NV-B001`: the machine is not one of the
 parts the machine's interfaces are divided into.
 
 It is also what turns the two zone fields into a *hook*. `to: local` is the
@@ -5692,16 +5692,16 @@ action is the verb, and `priority` is where in the queue the sentence is read.
 
 **The chain is walked from the lowest `priority` upwards and the first
 *terminal* match decides.** `priority` is therefore the rule's position and its
-identity: unique within the device, per family (`NG-B008`). A tie would leave
+identity: unique within the device, per family (`NV-B008`). A tie would leave
 the document unable to say which of two rules decides, which is the one thing a
 firewall document must never be unable to say.
 
 | Field | Type | Required | Default | Meaning |
 |---|---|---|---|---|
-| `priority` | integer 0–4294967295 | yes | — | Position in the walk, and the rule's identity (`NG-B008`). |
+| `priority` | integer 0–4294967295 | yes | — | Position in the walk, and the rule's identity (`NV-B008`). |
 | `name` | element name | no | *unset* | Label, for the diagram and for a diagnostic. |
-| `src_zone` | element name | no | any | The zone the packet came from, or `local` (`NG-B004`). |
-| `dst_zone` | element name | no | any | The zone it is going to, on the same terms (`NG-B004`). |
+| `src_zone` | element name | no | any | The zone the packet came from, or `local` (`NV-B004`). |
+| `dst_zone` | element name | no | any | The zone it is going to, on the same terms (`NV-B004`). |
 | `family` | `ipv4` \| `ipv6` | no | derived | Which chain the rule is in. Omitted installs in both. |
 | `src` | IP prefix | no | any | Source prefix selector. |
 | `dst` | IP prefix | no | any | Destination prefix selector. |
@@ -5709,11 +5709,11 @@ firewall document must never be unable to say.
 | `src_ports` | list of port selectors | no | `[]` | `443`, `30000-32767`; matched as a set. |
 | `dst_ports` | list of port selectors | no | `[]` | The same; the usual selector, since it names the service. |
 | `ct_state` | list of `new`/`established`/`related`/`invalid` | no | `[]` | Connection-tracking states, matched as a set. |
-| `iif` | interface name | no | any | Ingress interface, for when a zone is too coarse (`NG-B009`). |
-| `oif` | interface name | no | any | Egress interface, on the same terms (`NG-B009`). |
+| `iif` | interface name | no | any | Ingress interface, for when a zone is too coarse (`NV-B009`). |
+| `oif` | interface name | no | any | Egress interface, on the same terms (`NV-B009`). |
 | `invert` | boolean | no | `false` | Match everything the selectors do not. |
 | `action` | see below | **yes** | — | What happens to the packet. |
-| `mark` | firewall mark | conditional | — | Required by `action: mark`, refused otherwise (`NG-B005`). |
+| `mark` | firewall mark | conditional | — | Required by `action: mark`, refused otherwise (`NV-B005`). |
 | `log_prefix` | string ≤ 64 | no | *unset* | The tag on a logged packet, for `action: log` only. |
 | `description` | string | no | *unset* | Free text. |
 
@@ -5738,7 +5738,7 @@ terminated could express neither.
 `ah`, `gre` — rather than a number, because those eight are the ones a policy is
 ever written about and a bare protocol number in a firewall rule is almost
 always a typo for one of them. Only `tcp`, `udp` and `sctp` have ports to select
-on (`NG-B005`). `icmp` and `icmpv6` are separate protocols carried by separate
+on (`NV-B005`). `icmp` and `icmpv6` are separate protocols carried by separate
 families, which is a fact the schema can check — `protocol: icmp` with
 `family: ipv6` is refused — only because they are not one entry called "icmp".
 
@@ -5754,7 +5754,7 @@ and a rule naming neither zone closes the whole chain.
 
 `default_input`, `default_forward` and `default_output` are what a packet no
 rule decided gets, one per hook. Each must decide the packet, so `mark` and
-`log` are refused there (`NG-B007`): the walk would carry on past the end of the
+`log` are refused there (`NV-B007`): the walk would carry on past the end of the
 chain, and there is nothing there.
 
 They default to **deny inbound, deny transit, permit outbound** — the shape every
@@ -5828,7 +5828,7 @@ two would have to answer which happened first for every pair of entries in it.
 | `dnat` | destination | in | **required** | optional |
 | `redirect` | destination | in | **refused** — it is this machine | **required** |
 
-All four are `NG-B006`. Order in the list is the order the translations are
+All four are `NV-B006`. Order in the list is the order the translations are
 tried, first match winning. There is no `priority`: a NAT list is short enough
 that its own order is readable, and a number that only ever repeated the
 position would be one more thing to keep in step.
@@ -5869,10 +5869,10 @@ in it.
 
 ### 24.6 What validates it
 
-`NG-B001` to `NG-B009` are structural — a zone table, its references and the
+`NV-B001` to `NV-B009` are structural — a zone table, its references and the
 rules over them — and every one of them is resolvable from inside a single
 document, because a zone cannot reach outside one. They are therefore reported
-by the schema pass. `NG-B010` to `NG-B014` need the whole device in view and are
+by the schema pass. `NV-B010` to `NV-B014` need the whole device in view and are
 the semantic validator's, as `W150` to `W154`. §10.11 says how to suppress any
 of them.
 

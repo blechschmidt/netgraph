@@ -1,4 +1,4 @@
-# W129 (NG-T014) - two tunnels terminating on one element share a VNI.
+# W129 (NV-T014) - two tunnels terminating on one element share a VNI.
 #
 # Both VXLANs claim virtual network 100 on pc-a and on pc-b, so they will bridge
 # into each other. Nesting them inside an IPsec tunnel is what keeps W127 quiet;

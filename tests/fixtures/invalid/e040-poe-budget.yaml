@@ -1,4 +1,4 @@
-# E040 (NG-E013) - the PoE allocated on a switch's ports exceeds its budget.
+# E040 (NV-E013) - the PoE allocated on a switch's ports exceeds its budget.
 #
 # Two ports reserve 25 W each out of a 30 W pool. An explicit 'budget_watts' is
 # the act of reserving, so both count whether or not anything is plugged in --

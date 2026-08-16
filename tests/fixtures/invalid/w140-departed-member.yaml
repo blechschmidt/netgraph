@@ -1,4 +1,4 @@
-# W140 (NG-S015) - a group still lists somebody who has left.
+# W140 (NV-S015) - a group still lists somebody who has left.
 #
 # Bob's account is marked 'departed' and he is still in 'engineering'. Deleting
 # the user document would have removed him from the group as well, which is

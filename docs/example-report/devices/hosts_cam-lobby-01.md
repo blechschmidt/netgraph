@@ -14,7 +14,7 @@ computer hosts/cam-lobby-01
 | Qualified name | hosts/cam-lobby-01 |
 | Kind | computer |
 | Site | [(inventory root)](../sites/root.md) |
-| Description | Lobby camera, cabled straight to the access switch and powered over that cable. A class-2 PSE port delivers 6.49 W at the powered device, which is what its 5 W draw is checked against (NG-E014). |
+| Description | Lobby camera, cabled straight to the access switch and powered over that cable. A class-2 PSE port delivers 6.49 W at the powered device, which is what its 5 W draw is checked against (NV-E014). |
 | Vendor | Axis |
 | Model | P3265-LV |
 | Serial | — |

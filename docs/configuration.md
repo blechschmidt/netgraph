@@ -8,7 +8,7 @@ what its diagrams look like, and where its parse cache goes.
 # netviz.toml
 [validate]
 strict = false
-ignore = ["W103", "NG-C010"]
+ignore = ["W103", "NV-C010"]
 
 [validate.severity]
 E004 = "warning"
@@ -81,7 +81,7 @@ reason.
 | `ignore` | string or array of strings | `[]` | Rules never reported at all. `"*"` disables validation entirely. |
 | `severity` | table of rule id → `"error"` \| `"warning"` \| `"info"` | `{}` | Re-grade a rule instead of silencing it. |
 
-Rules are named by their short id (`E004`, `W103`, `I002`) or by the `NG-*`
+Rules are named by their short id (`E004`, `W103`, `I002`) or by the `NV-*`
 alias from [`docs/schema.md` §10](schema.md#10-validation-rules); the two are
 interchangeable. `netviz rules` prints the catalogue and
 [`docs/validation-rules.md`](validation-rules.md) explains each one.
@@ -93,7 +93,7 @@ ignore = ["W103"]           # "cable has no length" — we do not record lengths
 
 [validate.severity]
 E004 = "warning"            # duplicate address: a warning while we clean up
-NG-C010 = "info"
+NV-C010 = "info"
 ```
 
 `netviz validate --disable RULE` adds to `ignore` for a single run, and a

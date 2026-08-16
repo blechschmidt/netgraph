@@ -1,4 +1,4 @@
-# E029 (NG-W008) - two radios advertise the same BSSID.
+# E029 (NV-W008) - two radios advertise the same BSSID.
 #
 # Both access points answer to 02:00:5e:10:00:01, so a client cannot tell which
 # of the two it is talking to and a roam between them is invisible.

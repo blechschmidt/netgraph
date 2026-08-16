@@ -1,4 +1,4 @@
-# E046 (NG-S013) - two identities claim one account identifier.
+# E046 (NV-S013) - two identities claim one account identifier.
 #
 # 'alice' and 'bob' were both given uid 1001, which to the filesystem makes them
 # one user: every file either of them creates is owned by the other as well.

@@ -1,4 +1,4 @@
-# E036 (NG-F012) - two routers claim the same router id.
+# E036 (NV-F012) - two routers claim the same router id.
 #
 # A router id names the router itself: OSPF drops an adjacency with a neighbour
 # claiming the local id (RFC 2328 section 10.5), so this pair never forms one.

@@ -494,7 +494,7 @@ def test_a_note_dropped_on_the_canvas_becomes_a_document(session: EditingSession
 def test_dragging_an_unplaced_note_writes_the_whole_geometry_block(
     session: EditingSession,
 ) -> None:
-    """One write, not two, and the reason is NG-G005.
+    """One write, not two, and the reason is NV-G005.
 
     A note anchored to a switch pins no point. Writing ``spec.geometry.x`` onto
     it would leave a position with no ``y`` -- which §21 refuses -- so the first

@@ -1,4 +1,4 @@
-# E022 (NG-P003) - one panel position terminates two cables.
+# E022 (NV-P003) - one panel position terminates two cables.
 #
 # Both 'cbl-one' and 'cbl-two' are patched into 'pp-a:front/1'. A coupler takes
 # one plug per side, so one of the two runs is a patch record that never

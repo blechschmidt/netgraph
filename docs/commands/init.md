@@ -144,7 +144,7 @@ two different networks.
 They are also annotated, because the interesting part of an example is the
 reasoning:
 
-* `rtr-gw` carries a `netviz/ignore: NG-C015` annotation, with a comment
+* `rtr-gw` carries a `netviz/ignore: NV-C015` annotation, with a comment
   explaining that `wan0` faces an ISP which is not an element of this inventory
   and so terminates no cable on purpose. Saying so on the one element that has a
   reason is what an exception looks like; deleting the rule for everybody would

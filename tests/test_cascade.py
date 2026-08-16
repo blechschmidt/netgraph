@@ -373,7 +373,7 @@ def test_a_legend_is_never_touched(campus: Path) -> None:
 def test_deleting_one_of_two_feeds_drops_the_redundancy_it_claimed(tmp_path: Path) -> None:
     """``redundant: true`` on one input is a false statement, not a stale one.
 
-    ``NG-E015`` is a *load* error, so leaving the flag behind does not merely
+    ``NV-E015`` is a *load* error, so leaving the flag behind does not merely
     warn — it takes the device out of the inventory, and every cable that ends
     on it starts reporting a dangling endpoint. That was the whole failure.
     """

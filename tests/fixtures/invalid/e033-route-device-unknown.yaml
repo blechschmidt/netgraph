@@ -1,4 +1,4 @@
-# E033 (NG-F009) - a route sends out of an interface the device has not got.
+# E033 (NV-F009) - a route sends out of an interface the device has not got.
 #
 # 'eth9' is a typo for 'eth0'. The device would refuse to install the route, so
 # 192.168.0.0/16 is unreachable while the inventory says it is served.

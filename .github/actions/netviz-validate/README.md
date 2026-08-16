@@ -65,7 +65,7 @@ permissions:
 |---|---|---|
 | `inventory` | `.` | Root folder of the YAML tree, or a single YAML file. |
 | `strict` | `false` | Promote every warning to an error (`--strict`). |
-| `disable` | *(empty)* | Rule ids to silence, separated by commas or whitespace. Short ids (`E001`) and schema aliases (`NG-C002`) both work. |
+| `disable` | *(empty)* | Rule ids to silence, separated by commas or whitespace. Short ids (`E001`) and schema aliases (`NV-C002`) both work. |
 | `output-format` | `sarif` | `text`, `json`, `sarif` or `github`. |
 | `output-file` | *(derived)* | Where to write the document; defaults to `${RUNNER_TEMP}/netviz-validate.<format>`. Ignored by `github` and `text`, which write to the log. |
 | `fail-on-error` | `true` | Fail the step when the inventory does not validate. |

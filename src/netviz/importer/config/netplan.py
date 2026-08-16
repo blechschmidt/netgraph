@@ -61,8 +61,8 @@ match several links; the key is then all there is, and saying so is a note.
 operator had to hand, and a drift run over a hundred of them must not stop at
 the one that came back truncated: a file that is not YAML, or has no
 ``network:``, is a note and a return. An interface the schema would reject —
-a bond or bridge with no ``interfaces:`` (``NG-I003``), a ``vlans`` entry with
-no ``id:`` or ``link:`` (``NG-I002``) — is dropped with its reason rather than
+a bond or bridge with no ``interfaces:`` (``NV-I003``), a ``vlans`` entry with
+no ``id:`` or ``link:`` (``NV-I002``) — is dropped with its reason rather than
 written into a tree that will not load.
 """
 
@@ -92,7 +92,7 @@ _TYPE_BY_SECTION: Final[dict[str, str]] = {
 }
 
 #: Sections whose entries may state a lower link. ``parent`` is legal on a VLAN
-#: and a tunnel and on nothing else (``NG-I002``), so ``link:`` read anywhere
+#: and a tunnel and on nothing else (``NV-I002``), so ``link:`` read anywhere
 #: else would be a field the models reject.
 _PARENT_SECTIONS: Final[frozenset[str]] = frozenset({"vlans", "tunnels"})
 
@@ -394,7 +394,7 @@ def _apply_stacking(
         if not interface.members:
             draft.note(
                 f"{source}: {interface.name!r} is a {interface.type} whose 'interfaces:' list "
-                "is empty or absent; netviz requires at least one member (NG-I003), so it "
+                "is empty or absent; netviz requires at least one member (NV-I003), so it "
                 "was not imported"
             )
             device.note(
@@ -409,7 +409,7 @@ def _apply_stacking(
     if interface.parent is None or not isinstance(vid, int) or isinstance(vid, bool):
         draft.note(
             f"{source}: {interface.name!r} is in the 'vlans:' section but states no usable "
-            "'link:' or no 'id:'; both are required of a VLAN sub-interface (NG-I002), so it "
+            "'link:' or no 'id:'; both are required of a VLAN sub-interface (NV-I002), so it "
             "was not imported"
         )
         return False

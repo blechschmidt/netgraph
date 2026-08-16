@@ -43,22 +43,22 @@
   var data = JSON.parse(document.getElementById("netviz-data").textContent);
 
   var el = {
-    stage: document.getElementById("ng-stage"),
-    viewport: document.getElementById("ng-viewport"),
-    layer: document.getElementById("ng-layer"),
-    namespace: document.getElementById("ng-namespace"),
-    ips: document.getElementById("ng-ips"),
-    vlans: document.getElementById("ng-vlans"),
-    search: document.getElementById("ng-search"),
-    results: document.getElementById("ng-results"),
-    matches: document.getElementById("ng-matches"),
-    detail: document.getElementById("ng-detail"),
-    counts: document.getElementById("ng-counts"),
-    card: document.getElementById("ng-card"),
-    keys: document.getElementById("ng-keys"),
-    fit: document.getElementById("ng-fit"),
-    reset: document.getElementById("ng-reset"),
-    help: document.getElementById("ng-help")
+    stage: document.getElementById("nv-stage"),
+    viewport: document.getElementById("nv-viewport"),
+    layer: document.getElementById("nv-layer"),
+    namespace: document.getElementById("nv-namespace"),
+    ips: document.getElementById("nv-ips"),
+    vlans: document.getElementById("nv-vlans"),
+    search: document.getElementById("nv-search"),
+    results: document.getElementById("nv-results"),
+    matches: document.getElementById("nv-matches"),
+    detail: document.getElementById("nv-detail"),
+    counts: document.getElementById("nv-counts"),
+    card: document.getElementById("nv-card"),
+    keys: document.getElementById("nv-keys"),
+    fit: document.getElementById("nv-fit"),
+    reset: document.getElementById("nv-reset"),
+    help: document.getElementById("nv-help")
   };
 
   var state = {
@@ -257,18 +257,18 @@
     // hidden, wearing the classes it was last painted with. Clearing them here
     // rather than on the way out means there is one place where what a shape
     // looks like is decided.
-    var stale = el.viewport.querySelectorAll("g.ng-dim, g.ng-match, g.ng-selected");
+    var stale = el.viewport.querySelectorAll("g.nv-dim, g.nv-match, g.nv-selected");
     for (var s = 0; s < stale.length; s++) {
-      stale[s].classList.remove("ng-dim", "ng-match", "ng-selected");
+      stale[s].classList.remove("nv-dim", "nv-match", "nv-selected");
     }
     var all = groups();
     for (var i = 0; i < all.length; i++) {
       var group = all[i];
       var id = idOf(group);
       var hit = Boolean(wanted[id]);
-      group.classList.toggle("ng-dim", filtering && !hit);
-      group.classList.toggle("ng-match", filtering && hit && Boolean(state.query.trim()));
-      group.classList.toggle("ng-selected", id === state.selected);
+      group.classList.toggle("nv-dim", filtering && !hit);
+      group.classList.toggle("nv-match", filtering && hit && Boolean(state.query.trim()));
+      group.classList.toggle("nv-selected", id === state.selected);
     }
   }
 

@@ -1,4 +1,4 @@
-# E003 (NG-I008) - two interfaces share one MAC address.
+# E003 (NV-I008) - two interfaces share one MAC address.
 #
 # The two ports are on different devices and are not a stacking pair, so the
 # exemption for a LAG/member or parent/sub-interface pair does not apply.

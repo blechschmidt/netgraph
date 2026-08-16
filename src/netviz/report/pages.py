@@ -1117,7 +1117,7 @@ def _netns_order(namespaces: Sequence[NetnsDefinition]) -> tuple[tuple[NetnsDefi
     document was written wherever the tree does not decide it. Depth counts from
     the initial namespace, which is depth 0 and is not in this list.
 
-    ``NG-N021`` refuses a cycle and a dangling ``parent``, so a loaded inventory
+    ``NV-N021`` refuses a cycle and a dangling ``parent``, so a loaded inventory
     cannot produce either — but this also runs over a document the editor is
     half-way through rewriting, so an entry the walk never reaches is appended at
     the end rather than dropped. A report that silently omitted a namespace would
@@ -1149,7 +1149,7 @@ def _netns_of_interface(name: str | None, interfaces: Mapping[str, Interface]) -
     The only thing in a document that says which stack a route is installed in:
     a route names an egress interface, an interface names a namespace, and there
     is no third place to look. A name that resolves to nothing — a ``dev``
-    ``NG-F009`` reports — is read as the initial namespace rather than invented;
+    ``NV-F009`` reports — is read as the initial namespace rather than invented;
     this is a document, and the finding belongs in the findings table.
     """
     if not name:
@@ -1253,7 +1253,7 @@ def _netns_section(element: Element, node: Node | None, *, routed: bool) -> Sect
                 for interface in veths
             ),
             note=(
-                "One row per end, so a pair is named from both sides; 'NG-N023' is what "
+                "One row per end, so a pair is named from both sides; 'NV-N023' is what "
                 "makes the two rows agree. A veth end is an ordinary ethernet interface "
                 "whose far side is another interface of this machine rather than a socket, "
                 "which is why no cable terminates on one."

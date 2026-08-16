@@ -1,4 +1,4 @@
-# E050 (NG-N025) - a bridge aggregates a port in another network namespace.
+# E050 (NV-N025) - a bridge aggregates a port in another network namespace.
 #
 # One datapath belongs to one network stack: moving a port into a namespace is
 # precisely the operation that takes it out of the bridge.

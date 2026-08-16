@@ -37,9 +37,9 @@ bridge port, it can be given a VLAN sub-interface — and the only thing that
 distinguishes it from a physical port is that the far end is another interface
 of the same machine rather than a socket a cable plugs into. So a veth is
 modelled as what it is: two ``type: ethernet`` interfaces naming each other with
-``peer`` (§6.2.7). The pairing must be symmetric (``NG-N023``), which is what
+``peer`` (§6.2.7). The pairing must be symmetric (``NV-N023``), which is what
 makes it a *pair* rather than two independent claims, and a cable must not
-terminate on one (``NG-N024``) because there is no socket to plug into.
+terminate on one (``NV-N024``) because there is no socket to plug into.
 
 Nothing here is Linux-only in shape. FreeBSD ``vnet`` jails and the ``epair``
 that joins them are the same two concepts under different names, and the model
@@ -86,15 +86,15 @@ class NetnsDefinition(NetvizModel):
     ``interfaces[].netns``, and that is also what gives the namespace its
     addresses and its routes, because those hang off the interfaces.
 
-    ``NG-N020`` (names are unique per device), ``NG-N021`` (``parent`` resolves
-    and does not loop) and ``NG-N022`` (``interfaces[].netns`` resolves) are all
+    ``NV-N020`` (names are unique per device), ``NV-N021`` (``parent`` resolves
+    and does not loop) and ``NV-N022`` (``interfaces[].netns`` resolves) are all
     checked by the device spec, where the whole table is in view.
     """
 
     name: ElementName
     #: The namespace this one was created inside; unset means the device's
     #: initial namespace. Names another entry of the same ``spec.netns``
-    #: (``NG-N021``), which is what lets namespaces nest arbitrarily deep.
+    #: (``NV-N021``), which is what lets namespaces nest arbitrarily deep.
     parent: ElementName | None = None
     description: str | None = None
 
@@ -104,7 +104,7 @@ class NetnsDefinition(NetvizModel):
         if self.parent == self.name:
             raise field_error(
                 f"namespace {self.name!r} is its own parent",
-                rule="NG-N021",
+                rule="NV-N021",
                 path=("parent",),
             )
         return self
@@ -124,7 +124,7 @@ def resolve_netns_tree(namespaces: list[NetnsDefinition]) -> dict[str, str]:
 def netns_path(name: str, parents: dict[str, str]) -> tuple[str, ...]:
     """The chain from the initial namespace down to ``name``, outermost first.
 
-    ``()`` for the initial namespace itself. A cycle — which ``NG-N021`` refuses,
+    ``()`` for the initial namespace itself. A cycle — which ``NV-N021`` refuses,
     but which this may still be handed by a caller working on a half-built
     document — terminates the walk rather than spinning, so the result is always
     finite and the rule that reports the cycle is the one that reports it.

@@ -1,4 +1,4 @@
-# E002 (NG-C005) - one interface is terminated by two cables.
+# E002 (NV-C005) - one interface is terminated by two cables.
 #
 # 'pc-a:eth0' takes both cbl-one and cbl-two; a physical port takes one cable.
 apiVersion: netviz.dev/v1alpha1

@@ -266,7 +266,7 @@ def test_no_generated_file_holds_key_material(
 
 #: The four things the example inventories have no instance of, in one device:
 #: a bond whose members configure nothing themselves, a radio the inventory
-#: names no SSID on, a blackhole route (which by ``NG-F004`` has neither ``via``
+#: names no SSID on, a blackhole route (which by ``NV-F004`` has neither ``via``
 #: nor ``dev``, so no interface to hang off), and a route whose egress is an
 #: interface a host dialect leaves out.
 AWKWARD_HOST = """\

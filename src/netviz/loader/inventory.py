@@ -210,7 +210,7 @@ class Resolution:
 class Inventory:
     """Every element of a loaded tree, indexed by fully-qualified name.
 
-    The eight element maps preserve load order (``NG-L005``), so iterating an
+    The eight element maps preserve load order (``NV-L005``), so iterating an
     inventory is deterministic and renderers produce stable output.
     """
 
@@ -284,7 +284,7 @@ class Inventory:
 
         Returns:
             The fully-qualified name, or ``None`` when the name is already taken
-            in that namespace. The caller reports the clash (``NG-N002``) and
+            in that namespace. The caller reports the clash (``NV-N002``) and
             the first declaration wins, which keeps loading deterministic.
         """
         fqn = qualify(namespace, element.metadata.name)
@@ -323,7 +323,7 @@ class Inventory:
 
         Returns:
             The fully-qualified name, or ``None`` when a layout of that name is
-            already indexed. The caller reports the clash (``NG-Y002``) and the
+            already indexed. The caller reports the clash (``NV-Y002``) and the
             first declaration wins, which keeps loading deterministic.
         """
         fqn = qualify(namespace, layout.metadata.name)
@@ -344,7 +344,7 @@ class Inventory:
 
         Returns:
             The fully-qualified name, or ``None`` when a suite of that name is
-            already indexed. The caller reports the clash (``NG-K001``) and the
+            already indexed. The caller reports the clash (``NV-K001``) and the
             first declaration wins, which keeps loading deterministic.
         """
         fqn = qualify(namespace, suite.metadata.name)
@@ -403,7 +403,7 @@ class Inventory:
         Returns:
             The fully-qualified name, or ``None`` when an annotation of that kind
             and name is already indexed. The caller reports the clash
-            (``NG-G002``) and the first declaration wins, which keeps loading
+            (``NV-G002``) and the first declaration wins, which keeps loading
             deterministic.
         """
         fqn = qualify(namespace, annotation.metadata.name)

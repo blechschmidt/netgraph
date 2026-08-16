@@ -128,7 +128,7 @@ def sort_endpoints(endpoints: list[InterfaceRef]) -> None:
 class CableSpec(NetvizModel):
     """``spec`` of a ``cable`` document (§7)."""
 
-    #: Exactly two entries (``NG-C001``); sorted for canonical output.
+    #: Exactly two entries (``NV-C001``); sorted for canonical output.
     endpoints: list[InterfaceRef]
     medium: Medium
     #: Negotiated link rate, projected onto ``if:speed`` of both endpoints (§9.4).
@@ -150,7 +150,7 @@ class CableSpec(NetvizModel):
         if len(self.endpoints) != 2:
             raise field_error(
                 f"a cable joins exactly two interfaces, got {len(self.endpoints)}",
-                rule="NG-C001",
+                rule="NV-C001",
                 path=("endpoints",),
             )
         sort_endpoints(self.endpoints)
@@ -160,7 +160,7 @@ class CableSpec(NetvizModel):
                 if getattr(self, key) is not None:
                     raise field_error(
                         f"{key!r} is not allowed on a wireless link",
-                        rule="NG-C007",
+                        rule="NV-C007",
                         path=(key,),
                     )
         return self
@@ -181,7 +181,7 @@ class Cable(ElementBase):
 
     @property
     def is_self_link(self) -> bool:
-        """``NG-C004``: both endpoints sit on the same element."""
+        """``NV-C004``: both endpoints sit on the same element."""
         return self.spec.endpoints[0].device == self.spec.endpoints[1].device
 
     def other_end(self, ref: InterfaceRef) -> InterfaceRef:

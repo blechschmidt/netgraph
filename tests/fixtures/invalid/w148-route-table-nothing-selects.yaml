@@ -1,4 +1,4 @@
-# W148 (NG-F023) - a routing table no policy rule ever looks up.
+# W148 (NV-F023) - a routing table no policy rule ever looks up.
 #
 # A table is consulted only when something selects it, so this one is inert and
 # the route placed in it is a statement about the device that the device does

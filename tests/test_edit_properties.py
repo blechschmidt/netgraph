@@ -248,7 +248,7 @@ def graph_of(root: Path) -> dict[str, Any]:
     """The layer-1 graph of an inventory, as data two trees can be compared by.
 
     Nodes and edges are sorted by id. Their *order* in the document is load
-    order, which is the byte order of the file names (``NG-L005``) — a fact
+    order, which is the byte order of the file names (``NV-L005``) — a fact
     about the layout, and the one thing two trees in the same end state are
     allowed to disagree about.
     """
@@ -341,7 +341,7 @@ def test_a_cable_whose_endpoints_are_written_out_of_canonical_order(tmp_path: Pa
 
 
 def test_removing_a_port_takes_the_bridge_membership_with_it(tmp_path: Path) -> None:
-    """Found by the property above: a dangling ``members`` entry (``NG-I003``).
+    """Found by the property above: a dangling ``members`` entry (``NV-I003``).
 
     Removing a port that a bridge lists left the bridge naming an interface that
     no longer existed, which does not merely warn — the document stops loading,

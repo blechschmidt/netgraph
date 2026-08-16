@@ -250,7 +250,7 @@ window.netvizLinks = (function () {
     // overlay is still in it and has to go, or every repaint would leave
     // another set of handles behind.
     if (graph) {
-      Array.prototype.forEach.call(graph.querySelectorAll("g.ng-links"), function (stale) {
+      Array.prototype.forEach.call(graph.querySelectorAll("g.nv-links"), function (stale) {
         stale.remove();
       });
     }
@@ -258,7 +258,7 @@ window.netvizLinks = (function () {
     frame.offset = measureOffset(graph, geometry, details);
     frame.links = geometry.links;
     host = document.createElementNS(SVG_NS, "g");
-    host.setAttribute("class", "ng-links");
+    host.setAttribute("class", "nv-links");
     graph.appendChild(host);
     // A link that was selected before the repaint stays selected, so a bend
     // dropped, written and re-rendered leaves the handles where they were.
@@ -333,7 +333,7 @@ window.netvizLinks = (function () {
     var link = frame.links[picked];
     if (!link) { return; }
     var points = live(picked);
-    host.appendChild(path(points, "ng-link-route"));
+    host.appendChild(path(points, "nv-link-route"));
     if (!ctx || !ctx.writable()) { return; }
     (link.waypoints || []).forEach(function (point, index) {
       host.appendChild(handle([point.x, point.y], "bend", index));
@@ -358,7 +358,7 @@ window.netvizLinks = (function () {
 
   /** A wide, invisible band along a link, so a click on it lands somewhere. */
   function hitBand(id) {
-    var band = path(live(id), "ng-link-hit");
+    var band = path(live(id), "nv-link-hit");
     band.setAttribute("data-link", id);
     return band;
   }
@@ -368,7 +368,7 @@ window.netvizLinks = (function () {
     element.setAttribute("class", className);
     element.setAttribute("d", pathData(points));
     element.setAttribute("fill", "none");
-    if (className === "ng-link-hit") { element.setAttribute("stroke-width", String(HIT_WIDTH)); }
+    if (className === "nv-link-hit") { element.setAttribute("stroke-width", String(HIT_WIDTH)); }
     return element;
   }
 
@@ -385,7 +385,7 @@ window.netvizLinks = (function () {
   function handle(point, kind, index) {
     var at = toSvg(point);
     var element = document.createElementNS(SVG_NS, "circle");
-    element.setAttribute("class", "ng-handle ng-handle-" + kind);
+    element.setAttribute("class", "nv-handle nv-handle-" + kind);
     element.setAttribute("cx", String(round(at[0])));
     element.setAttribute("cy", String(round(at[1])));
     element.setAttribute("r", String(kind === "add" ? HANDLE - 1 : HANDLE));
@@ -400,7 +400,7 @@ window.netvizLinks = (function () {
   function grab(event) {
     if (!ctx || !ctx.writable() || !host) { return false; }
     var target = event.target;
-    if (target && target.classList && target.classList.contains("ng-handle")) {
+    if (target && target.classList && target.classList.contains("nv-handle")) {
       begin(target, event);
       return true;
     }
@@ -548,7 +548,7 @@ window.netvizLinks = (function () {
   function remove(event) {
     if (!ctx || !ctx.writable() || !picked) { return false; }
     var target = event.target;
-    if (!target || !target.classList || !target.classList.contains("ng-handle-bend")) {
+    if (!target || !target.classList || !target.classList.contains("nv-handle-bend")) {
       return false;
     }
     var link = frame.links[picked];
@@ -563,7 +563,7 @@ window.netvizLinks = (function () {
   /** The link an SVG element belongs to, whether ours or Graphviz's. */
   function linkAt(target) {
     if (!target || !target.closest) { return null; }
-    var band = target.closest(".ng-link-hit");
+    var band = target.closest(".nv-link-hit");
     if (band) { return band.getAttribute("data-link"); }
     var group = target.closest("g.edge");
     if (!group) { return null; }

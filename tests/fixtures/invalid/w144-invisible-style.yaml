@@ -1,4 +1,4 @@
-# W144 (NG-Z003) - a style fades an element to nothing.
+# W144 (NV-Z003) - a style fades an element to nothing.
 #
 # `opacity: 0` is legal on its own: it is the bottom of a legal range, and an
 # editor dragging a slider passes through it on the way to something visible.

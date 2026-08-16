@@ -167,16 +167,16 @@ _CABLE_TARGET_TYPES: Final = (Device, Adapter, PatchPanel)
 #: (``W115``). An adapter is one: it is a port of the host it hangs off.
 _HOST_TYPES: Final = (Computer, Server, Adapter)
 
-#: Interface types a cable can terminate on (``NG-C009``), as an enum set.
+#: Interface types a cable can terminate on (``NV-C009``), as an enum set.
 _CABLEABLE_TYPES: Final[frozenset[InterfaceType]] = frozenset(
     itype for itype in InterfaceType if itype.is_cableable
 )
 
-#: Element kinds an adapter must not hang off (``NG-X007``). An adapter is a
+#: Element kinds an adapter must not hang off (``NV-X007``). An adapter is a
 #: port of the host it plugs into; network gear takes a cable.
 _NOT_A_HOST_TYPES: Final = (Hub, Switch)
 
-#: One port cabled into a hub's collision domain (``NG-H005``): the element that
+#: One port cabled into a hub's collision domain (``NV-H005``): the element that
 #: owns it, the port as ``element:interface``, and the prefixes it is in.
 _HubPeer: TypeAlias = tuple[str, str, frozenset["IPNetwork"]]
 
@@ -818,7 +818,7 @@ def _build_context(inventory: Inventory) -> _Context:
     # Built before anything resolves a reference, because that is what a
     # reference resolves *through*: ``Device.interface`` is a linear scan of
     # ``spec.interfaces``, which on a 48-port switch is 48 string comparisons
-    # per cable end. ``NG-I001`` makes interface names unique within an element,
+    # per cable end. ``NV-I001`` makes interface names unique within an element,
     # so the map and the scan cannot disagree.
     by_name: dict[str, dict[str, Interface]] = {}
     for fqn, owner in owners.items():
@@ -1239,7 +1239,7 @@ def _lag_masters(owner: InterfaceOwner) -> dict[str, Interface]:
 
 
 def _aggregated_by(owner: InterfaceOwner) -> dict[str, tuple[str, ...]]:
-    """Map each member to every ``lag``/``bridge`` that lists it (``NG-I005``)."""
+    """Map each member to every ``lag``/``bridge`` that lists it (``NV-I005``)."""
     claims: dict[str, list[str]] = {}
     for interface in owner.interfaces:
         if interface.type in AGGREGATE_TYPES:
@@ -1522,7 +1522,7 @@ def _check_gateway_on_link(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_route_next_hop(ctx: _Context) -> Iterator[_Draft]:
-    """E032 — a route's next hop is in no prefix the device holds (``NG-F008``).
+    """E032 — a route's next hop is in no prefix the device holds (``NV-F008``).
 
     A next hop is reached by ARP or neighbour discovery, never by routing, so it
     has to be on-link: inside a prefix configured on an interface of this device,
@@ -1597,7 +1597,7 @@ def _check_route_device(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_ospf_interfaces(ctx: _Context) -> Iterator[_Draft]:
-    """E034 — OSPF is enabled on an interface the device does not have (``NG-F010``).
+    """E034 — OSPF is enabled on an interface the device does not have (``NV-F010``).
 
     An area is only as big as the interfaces that run it, so a name that resolves
     to nothing is an adjacency that will never come up — and, in an inventory,
@@ -1620,7 +1620,7 @@ def _check_ospf_interfaces(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_bgp_asn(ctx: _Context) -> Iterator[_Draft]:
-    """E035 — the two ends of a resolved session disagree about an AS (``NG-F011``).
+    """E035 — the two ends of a resolved session disagree about an AS (``NV-F011``).
 
     ``remote_asn`` is a claim about the peer, and the peer states its own
     ``asn``: when the two differ, the OPEN message carries an AS the far end does
@@ -1654,7 +1654,7 @@ def _check_bgp_asn(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_router_ids(ctx: _Context) -> Iterator[_Draft]:
-    """E036 — two elements claim the same router id (``NG-F012``).
+    """E036 — two elements claim the same router id (``NV-F012``).
 
     A router id names the router itself: OSPF drops adjacencies with a neighbour
     that claims the local id (RFC 2328 §10.5) and BGP refuses a session with a
@@ -1680,7 +1680,7 @@ def _check_router_ids(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_bgp_neighbour_resolves(ctx: _Context) -> Iterator[_Draft]:
-    """W135 — a neighbour address is nowhere in the inventory (``NG-F013``).
+    """W135 — a neighbour address is nowhere in the inventory (``NV-F013``).
 
     A warning, not an error, and deliberately so: an eBGP session towards a
     transit provider points at an address on *their* router, which is not an
@@ -1703,7 +1703,7 @@ def _check_bgp_neighbour_resolves(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_empty_vrf(ctx: _Context) -> Iterator[_Draft]:
-    """W136 — a VRF nothing is bound to (``NG-F014``).
+    """W136 — a VRF nothing is bound to (``NV-F014``).
 
     A routing instance is a table plus the interfaces that feed it. With no
     interface bound, it holds no address and no connected route, so every address
@@ -1729,7 +1729,7 @@ def _check_empty_vrf(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_policy_empty_table(ctx: _Context) -> Iterator[_Draft]:
-    """W147 — a policy rule selects a table nothing is in (``NG-F022``).
+    """W147 — a policy rule selects a table nothing is in (``NV-F022``).
 
     Policy-based routing is two halves that have to meet: a rule that says
     *route this by table X*, and a route placed in X. With the second half
@@ -1759,7 +1759,7 @@ def _check_policy_empty_table(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_unselected_route_table(ctx: _Context) -> Iterator[_Draft]:
-    """W148 — a declared table no rule ever looks up (``NG-F023``).
+    """W148 — a declared table no rule ever looks up (``NV-F023``).
 
     The other half of ``W147``, and the more common mistake: the routes are
     written, the table is declared, and the rule that would reach it was never
@@ -1787,7 +1787,7 @@ def _check_unselected_route_table(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_shadowed_policy(ctx: _Context) -> Iterator[_Draft]:
-    """W149 — a rule below one that matches everything (``NG-F024``).
+    """W149 — a rule below one that matches everything (``NV-F024``).
 
     The policy database is walked from the lowest priority upwards and the first
     match decides, so a rule with no selector at all ends the walk: everything
@@ -1833,7 +1833,7 @@ def _check_shadowed_policy(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_empty_zone(ctx: _Context) -> Iterator[_Draft]:
-    """W150 — a declared zone holds no interface (``NG-B010``).
+    """W150 — a declared zone holds no interface (``NV-B010``).
 
     A zone is a partition of the device's interfaces, so one holding none is
     empty in the strongest sense: no packet can ever be in it, and every rule
@@ -1863,7 +1863,7 @@ def _check_empty_zone(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_unzoned_interface(ctx: _Context) -> Iterator[_Draft]:
-    """W151 — an interface in no zone, on a device that has zones (``NG-B011``).
+    """W151 — an interface in no zone, on a device that has zones (``NV-B011``).
 
     Only on a device that declares zones at all: a machine with no zones has
     every interface outside one, which is the ordinary case and says nothing.
@@ -1894,7 +1894,7 @@ def _check_unzoned_interface(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_mark_nothing_reads(ctx: _Context) -> Iterator[_Draft]:
-    """W152 — the firewall writes a mark the routing policy never matches (``NG-B012``).
+    """W152 — the firewall writes a mark the routing policy never matches (``NV-B012``).
 
     One half of §16.9. Policy-based routing has no layer-4 selector on purpose:
     the portable way to route by port is to mark the packet in the firewall and
@@ -1929,7 +1929,7 @@ def _check_mark_nothing_reads(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_mark_nothing_writes(ctx: _Context) -> Iterator[_Draft]:
-    """W153 — the routing policy matches a mark the firewall never writes (``NG-B013``).
+    """W153 — the routing policy matches a mark the firewall never writes (``NV-B013``).
 
     The other half of ``W152``, and the more common shape: the routing is done,
     the table is filled, and the rule that would mark the traffic is the line
@@ -1963,7 +1963,7 @@ def _check_mark_nothing_writes(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_shadowed_firewall_rule(ctx: _Context) -> Iterator[_Draft]:
-    """W154 — a filter rule below one that already decided its traffic (``NG-B014``).
+    """W154 — a filter rule below one that already decided its traffic (``NV-B014``).
 
     The chain is walked from the lowest priority upwards and the first *terminal*
     match decides, so a rule with no selector and a terminal action ends the walk
@@ -2049,7 +2049,7 @@ def _covers(blocker: FirewallRule, rule: FirewallRule) -> bool:
 
 
 def _check_vlan_mismatch(ctx: _Context) -> Iterator[_Draft]:
-    """E005 — the two ends of a link disagree about VLANs (``NG-C011``).
+    """E005 — the two ends of a link disagree about VLANs (``NV-C011``).
 
     Three shapes of disagreement, all of which leave a link that looks perfectly
     cabled while carrying nothing the operator meant it to: two access ports in
@@ -2443,7 +2443,7 @@ def _check_stacking_cycle(ctx: _Context) -> Iterator[_Draft]:
     """E007 — ``parent``/``members`` stacking contains a cycle.
 
     The schema already rejects the one-step case: an interface cannot be its own
-    ``parent`` (``NG-I002``) nor list itself as a member (``NG-I003``). A longer
+    ``parent`` (``NV-I002``) nor list itself as a member (``NV-I003``). A longer
     loop — ``bond0`` aggregating ``bond1`` aggregating ``bond0`` — passes every
     per-document check and is only visible once the whole element is in view.
     """
@@ -2488,7 +2488,7 @@ def _stacking_cycles(owner: InterfaceOwner) -> list[list[str]]:
                 state[node] = done
                 path.pop()
             elif following not in state:
-                continue  # NG-I002/NG-I003 already rejected the dangling reference
+                continue  # NV-I002/NV-I003 already rejected the dangling reference
             elif state[following] is active:
                 # A back edge closes exactly one cycle, and its own endpoints fix
                 # that cycle's first and last interface, so no two back edges can
@@ -2521,7 +2521,7 @@ def _check_member_is_aggregated(ctx: _Context) -> Iterator[_Draft]:
         for member, aggregates in claims.items():
             interface = by_name.get(member)
             if interface is None:
-                continue  # NG-I003 already rejected the dangling member
+                continue  # NV-I003 already rejected the dangling member
             port = f"{fqn}:{member}"
             path = _index_path(owner, member)
             if len(aggregates) > 1:
@@ -2618,8 +2618,8 @@ def _check_mac_on_loopback(ctx: _Context) -> Iterator[_Draft]:
 def _check_no_cableable_interface(ctx: _Context) -> Iterator[_Draft]:
     """W109 — a device declares no ``ethernet``, ``wifi`` or ``lag`` interface.
 
-    Only those three can terminate a cable (``NG-C009``), so such a device can
-    never appear on a link. Adapters are exempt: ``NG-X003`` already restricts
+    Only those three can terminate a cable (``NV-C009``), so such a device can
+    never appear on a link. Adapters are exempt: ``NV-X003`` already restricts
     them to exactly those types at schema time.
     """
     for fqn, device in ctx.inventory.devices.items():
@@ -2917,7 +2917,7 @@ def _check_sub_interface_vlan(ctx: _Context) -> Iterator[_Draft]:
             if interface.type is not InterfaceType.VLAN or interface.vlan is None:
                 continue
             parent = by_name.get(interface.parent or "")
-            if parent is None:  # pragma: no cover - NG-I002 rejects a dangling parent
+            if parent is None:  # pragma: no cover - NV-I002 rejects a dangling parent
                 continue
             vid = interface.vlan.pvid
             carried = _carried_vlans(parent, by_name)
@@ -3054,7 +3054,7 @@ def _describe_carried(vlan: VlanConfig) -> str:
     four thousand ids.
     """
     trunk_vlans = vlan.trunk_vlans
-    if trunk_vlans is None:  # pragma: no cover - NG-V002 requires it in trunk mode
+    if trunk_vlans is None:  # pragma: no cover - NV-V002 requires it in trunk mode
         return "no VLAN"
     return f"VLANs {trunk_vlans}"
 
@@ -3102,7 +3102,7 @@ def _describe_scope(scope: int | None) -> str:
 
 
 def _check_self_link(ctx: _Context) -> Iterator[_Draft]:
-    """W117 — both endpoints of one cable land on the same element (``NG-C004``).
+    """W117 — both endpoints of one cable land on the same element (``NV-C004``).
 
     Legal — a loopback plug and an MLAG peer-link on one logical switch both
     look like this — but far more often it is a copy-pasted cable document whose
@@ -3125,7 +3125,7 @@ def _check_self_link(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_wireless_medium(ctx: _Context) -> Iterator[_Draft]:
-    """E011 — the cable's medium disagrees with an endpoint's type (``NG-C006``).
+    """E011 — the cable's medium disagrees with an endpoint's type (``NV-C006``).
 
     ``medium: wireless`` models an *association* rather than a wire, so both
     ends must be radios; conversely a wire cannot be plugged into a radio. Each
@@ -3164,7 +3164,7 @@ def _is_radio(endpoint: _Endpoint) -> bool:
 
 
 def _check_speed_mismatch(ctx: _Context) -> Iterator[_Draft]:
-    """W118 — a cable's ``speed`` disagrees with an endpoint's own (``NG-C008``).
+    """W118 — a cable's ``speed`` disagrees with an endpoint's own (``NV-C008``).
 
     §9.4 projects ``cable.speed`` onto ``if:speed`` at both ends, so the two
     cannot both be true. An interface has no ``speed`` of its own in this
@@ -3189,7 +3189,7 @@ def _check_speed_mismatch(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_uncableable_endpoint(ctx: _Context) -> Iterator[_Draft]:
-    """E012 — an endpoint is a loopback, vlan or bridge interface (``NG-C009``).
+    """E012 — an endpoint is a loopback, vlan or bridge interface (``NV-C009``).
 
     Those three are software constructs: a loopback has no medium, and an SVI or
     a bridge sits *above* the ports that do. A cable drawn to one describes a
@@ -3218,7 +3218,7 @@ def _check_uncableable_endpoint(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_aggregate_endpoint(ctx: _Context) -> Iterator[_Draft]:
-    """W119 — an endpoint is a LAG aggregate rather than a member (``NG-C012``).
+    """W119 — an endpoint is a LAG aggregate rather than a member (``NV-C012``).
 
     A bundle is logical: the wires land on its members. Cabling the aggregate
     draws one link where the inventory means several, so the diagram understates
@@ -3239,7 +3239,7 @@ def _check_aggregate_endpoint(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_half_duplex(ctx: _Context) -> Iterator[_Draft]:
-    """W120 — ``duplex: half`` on a link that involves no hub (``NG-C013``).
+    """W120 — ``duplex: half`` on a link that involves no hub (``NV-C013``).
 
     Half duplex means the two ends share the medium and must arbitrate for it,
     which is what a repeater's collision domain requires. Between two switched
@@ -3262,7 +3262,7 @@ def _check_half_duplex(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_disconnected_topology(ctx: _Context) -> Iterator[_Draft]:
-    """W121 — the topology falls into separate islands (``NG-C014``).
+    """W121 — the topology falls into separate islands (``NV-C014``).
 
     Reported once for the whole inventory, naming each island's smallest member
     so a reader can find them on the diagram. Islands of **one** element are
@@ -3334,7 +3334,7 @@ def _coupler_node(endpoint: _Endpoint) -> str | None:
     and 24 of one panel are two runs, and nothing joins them (§15.2). Naming the
     panel instead would silently merge every island that happens to cross it.
 
-    A position the panel has not got is ``NG-P001`` and keeps the panel's own
+    A position the panel has not got is ``NV-P001`` and keeps the panel's own
     name: there is no coupler to belong to, and the link is left where the
     reference put it.
     """
@@ -3379,7 +3379,7 @@ def _components(nodes: Iterable[str], links: Iterable[tuple[str, str]]) -> list[
 
 
 def _check_uncabled_interface(ctx: _Context) -> Iterator[_Draft]:
-    """I002 — an interface is ``enabled: true`` but terminates no cable (``NG-C015``).
+    """I002 — an interface is ``enabled: true`` but terminates no cable (``NV-C015``).
 
     Information rather than a complaint: a spare port is a normal thing to own,
     and an uplink whose far end is outside the inventory (an ISP hand-off) is
@@ -3387,8 +3387,8 @@ def _check_uncabled_interface(ctx: _Context) -> Iterator[_Draft]:
     the cable document was never written — and because a port list with the
     unused ports marked is what makes a patching decision possible.
 
-    Only the types a cable *can* terminate on are considered (``NG-C009``), and
-    lag aggregates are excluded: ``NG-C012`` says the wires land on the members,
+    Only the types a cable *can* terminate on are considered (``NV-C009``), and
+    lag aggregates are excluded: ``NV-C012`` says the wires land on the members,
     so an aggregate that terminates no cable is correct by construction. Saying
     ``enabled: false`` silences the finding and documents the port at the same
     time.
@@ -3421,7 +3421,7 @@ def _check_uncabled_interface(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_hub_subnets(ctx: _Context) -> Iterator[_Draft]:
-    """W122 — elements on one hub are addressed in different subnets (``NG-H005``).
+    """W122 — elements on one hub are addressed in different subnets (``NV-H005``).
 
     A hub is a repeater: every port sees every frame, so everything plugged into
     one is in a single broadcast domain and belongs in a single prefix. Ports in
@@ -3579,7 +3579,7 @@ def _link_radios(ctx: _Context) -> Iterator[tuple[str, tuple[_Radio, _Radio]]]:
 
 
 def _check_wireless_association(ctx: _Context) -> Iterator[_Draft]:
-    """E028 — a wireless link is not an AP-to-client association (``NG-W007``).
+    """E028 — a wireless link is not an AP-to-client association (``NV-W007``).
 
     An 802.11 link has a direction that a cable does not: one radio beacons and
     the other joins it. Two access points on one link is a document describing
@@ -3616,12 +3616,12 @@ def _check_wireless_association(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_duplicate_bssid(ctx: _Context) -> Iterator[_Draft]:
-    """E029 — two radios advertise the same BSSID (``NG-W008``).
+    """E029 — two radios advertise the same BSSID (``NV-W008``).
 
     A BSSID identifies one basic service set to every client in earshot. Two of
     them answering to one address is the wireless equivalent of ``E003``: frames
     for one arrive at the other, and a client that roams between them never
-    knows it moved. Repeats *within* one radio are ``NG-W005``, at schema time.
+    knows it moved. Repeats *within* one radio are ``NV-W005``, at schema time.
 
     Only ``ap`` radios are compared. A client's BSS entry records the BSSID it
     joined, so it is *supposed* to repeat the access point's — that is what
@@ -3651,7 +3651,7 @@ def _check_duplicate_bssid(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_bss_vlan_carried(ctx: _Context) -> Iterator[_Draft]:
-    """E030 — an SSID's VLAN is carried nowhere on the AP (``NG-W009``).
+    """E030 — an SSID's VLAN is carried nowhere on the AP (``NV-W009``).
 
     An SSID that maps to a VLAN is a bridge between the air and that VLAN. If
     no interface of the access point is a member of it, the far side of that
@@ -3690,7 +3690,7 @@ def _check_bss_vlan_carried(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_associated_ssid(ctx: _Context) -> Iterator[_Draft]:
-    """E031 — a client joins an SSID its AP does not advertise (``NG-W010``).
+    """E031 — a client joins an SSID its AP does not advertise (``NV-W010``).
 
     The association names a BSS, and the BSS is the access point's to define.
     An SSID that appears on the client and nowhere on the AP is either a typo or
@@ -3722,7 +3722,7 @@ def _check_associated_ssid(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_cochannel_aps(ctx: _Context) -> Iterator[_Draft]:
-    """W134 — two APs in one broadcast domain overlap in frequency (``NG-W011``).
+    """W134 — two APs in one broadcast domain overlap in frequency (``NV-W011``).
 
     Two access points bridging the same domain are meant to extend each other's
     coverage, which only works if they are on different frequencies: radios that
@@ -3807,7 +3807,7 @@ def _domain_sort(domain: int | None) -> tuple[int, int]:
 
 
 def _check_attachment_target(ctx: _Context) -> Iterator[_Draft]:
-    """E015 — an ``attached_to`` names nothing that could host the adapter (``NG-X001``).
+    """E015 — an ``attached_to`` names nothing that could host the adapter (``NV-X001``).
 
     Pass 2 checks the *grammar* of the reference — a bare element name, never a
     ``device:interface``. Whether it lands on anything is a question about the
@@ -3846,7 +3846,7 @@ def _check_attachment_target(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_attachment_and_cable(ctx: _Context) -> Iterator[_Draft]:
-    """E013 — an adapter's upstream port is both attached and cabled (``NG-X005``).
+    """E013 — an adapter's upstream port is both attached and cabled (``NV-X005``).
 
     §8.2 declares the host attachment exactly once: ``attached_to`` *is* the
     edge, and no cable document is needed or permitted for it. Both spellings at
@@ -3873,7 +3873,7 @@ def _check_attachment_and_cable(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_attachment_cycle(ctx: _Context) -> Iterator[_Draft]:
-    """E014 — ``attached_to`` attachments form a cycle (``NG-X006``).
+    """E014 — ``attached_to`` attachments form a cycle (``NV-X006``).
 
     A dock plugged into a dongle plugged back into the dock is not hardware
     anybody can build, and every consumer that walks the chain to find the host
@@ -3923,7 +3923,7 @@ def _attachment_cycles(upstream: Mapping[str, str]) -> list[list[str]]:
 
 
 def _check_unattached_adapter(ctx: _Context) -> Iterator[_Draft]:
-    """W123 — an adapter is cabled downstream but has no host (``NG-X002``).
+    """W123 — an adapter is cabled downstream but has no host (``NV-X002``).
 
     §8.2 calls a free-standing adapter a spare in a drawer or a media converter
     in a run. Once something is patched into its downstream ports it is neither:
@@ -3952,7 +3952,7 @@ def _check_unattached_adapter(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_attachment_is_a_host(ctx: _Context) -> Iterator[_Draft]:
-    """W124 — ``attached_to`` points at a hub or a switch (``NG-X007``).
+    """W124 — ``attached_to`` points at a hub or a switch (``NV-X007``).
 
     An adapter is a port of the machine it plugs into, so its host is a computer,
     a server, a router — something with a bus. Network gear takes a cable. A
@@ -4017,7 +4017,7 @@ def _check_tunnel_endpoints(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_tunnel_endpoint_type(ctx: _Context) -> Iterator[_Draft]:
-    """E017 — a tunnel endpoint is not a ``tunnel`` interface (``NG-T003``).
+    """E017 — a tunnel endpoint is not a ``tunnel`` interface (``NV-T003``).
 
     The endpoint of a tunnel is the *virtual* interface the operating system
     presents — ``wg0``, ``ipsec0``, ``vxlan100`` — not the physical port its
@@ -4042,7 +4042,7 @@ def _check_tunnel_endpoint_type(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_encapsulation_target(ctx: _Context) -> Iterator[_Draft]:
-    """E018 — a tunnel's ``over`` names no tunnel (``NG-T004``)."""
+    """E018 — a tunnel's ``over`` names no tunnel (``NV-T004``)."""
     for step in ctx.encapsulations:
         if step.ambiguous:
             yield _Draft(
@@ -4069,7 +4069,7 @@ def _check_encapsulation_target(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_encapsulation_cycle(ctx: _Context) -> Iterator[_Draft]:
-    """E019 — the ``over`` references loop (``NG-T005``).
+    """E019 — the ``over`` references loop (``NV-T005``).
 
     A tunnel carried by a tunnel carried by the first is not a deep stack, it is
     a definition with no bottom: nothing in it ever reaches a real packet.
@@ -4112,7 +4112,7 @@ def _check_underlay_reach(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_tunnel_mtu(ctx: _Context) -> Iterator[_Draft]:
-    """W126 — an overlay MTU does not fit inside its underlay (``NG-T011``).
+    """W126 — an overlay MTU does not fit inside its underlay (``NV-T011``).
 
     Encapsulation is not free: every header in the stack comes off the payload
     the overlay can carry. An overlay MTU that ignores it produces packets the
@@ -4141,7 +4141,7 @@ def _check_tunnel_mtu(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_cleartext_tunnel(ctx: _Context) -> Iterator[_Draft]:
-    """W127 — a tunnel carries traffic in the clear (``NG-T012``).
+    """W127 — a tunnel carries traffic in the clear (``NV-T012``).
 
     GRE, VXLAN, Geneve, L2TP and PPTP encrypt nothing — PPTP's MPPE is broken,
     so it counts as cleartext however it is configured. That is perfectly
@@ -4185,7 +4185,7 @@ def _encrypting_underlay(
 
 
 def _check_unused_tunnel_interface(ctx: _Context) -> Iterator[_Draft]:
-    """W128 — a ``tunnel`` interface is the endpoint of no tunnel (``NG-T013``).
+    """W128 — a ``tunnel`` interface is the endpoint of no tunnel (``NV-T013``).
 
     The counterpart of ``I002`` for the overlay: a ``tunnel`` interface with no
     ``tunnel`` document naming it describes one end of something the inventory
@@ -4206,7 +4206,7 @@ def _check_unused_tunnel_interface(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_vni_clash(ctx: _Context) -> Iterator[_Draft]:
-    """W129 — two tunnels on one element share a VNI (``NG-T014``).
+    """W129 — two tunnels on one element share a VNI (``NV-T014``).
 
     A VXLAN identifier names a virtual network *on a VTEP*. Two tunnels reusing
     one on the same element are either the same overlay written twice or two
@@ -4268,7 +4268,7 @@ def _check_nonstandard_port(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_panel_position(ctx: _Context) -> Iterator[_Draft]:
-    """E021 — a cable terminates on a position the panel does not have (``NG-P001``).
+    """E021 — a cable terminates on a position the panel does not have (``NV-P001``).
 
     A panel's positions come from ``spec.ports``, so ``front/25`` on a 24-port
     panel is not a typo the reader can see by looking at the panel document —
@@ -4292,7 +4292,7 @@ def _check_panel_position(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_panel_double_termination(ctx: _Context) -> Iterator[_Draft]:
-    """E022 — a panel position terminates more than one cable (``NG-P003``).
+    """E022 — a panel position terminates more than one cable (``NV-P003``).
 
     A coupler is a hole with one plug in it on each side. Two cables in one
     position is a patch record that cannot be true, and it is worse than the
@@ -4322,7 +4322,7 @@ def _check_panel_double_termination(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_panel_as_active_element(ctx: _Context) -> Iterator[_Draft]:
-    """E023 — a panel is named where an active element is required (``NG-P004``).
+    """E023 — a panel is named where an active element is required (``NV-P004``).
 
     A panel has no bus to plug an adapter into and no operating system to
     terminate a tunnel on. Both spellings are the same mistake — reading the
@@ -4354,7 +4354,7 @@ def _check_panel_as_active_element(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_panel_loop(ctx: _Context) -> Iterator[_Draft]:
-    """E024 — a run leaves a panel and is patched back into it (``NG-P005``).
+    """E024 — a run leaves a panel and is patched back into it (``NV-P005``).
 
     Follow a run through the couplers and it must reach an active port. A run
     that arrives back at a segment it has already crossed never will: it is a
@@ -4414,7 +4414,7 @@ def _far_end(endpoint: _Endpoint, ctx: _Context) -> _Endpoint | None:
 
 
 def _check_dangling_patch(ctx: _Context) -> Iterator[_Draft]:
-    """W133 — a cabled position is coupled to one nothing is patched into (``NG-P002``).
+    """W133 — a cabled position is coupled to one nothing is patched into (``NV-P002``).
 
     Half a run. The cable exists, the coupler exists, and the far side of the
     panel is empty — so the port at the near end is *not* connected to anything,
@@ -4460,7 +4460,7 @@ def _by_rack(ctx: _Context) -> Iterator[tuple[tuple[str, str, str], tuple[_Place
 
 
 def _check_rack_overlap(ctx: _Context) -> Iterator[_Draft]:
-    """E025 — two elements occupy the same unit of one rack (``NG-U001``).
+    """E025 — two elements occupy the same unit of one rack (``NV-U001``).
 
     Two things cannot be bolted to the same four screw holes. In practice this
     catches the position that was copied from the row above and never changed,
@@ -4495,7 +4495,7 @@ def _check_rack_overlap(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_rack_height(ctx: _Context) -> Iterator[_Draft]:
-    """E026 — an element extends past the top of its rack (``NG-U002``).
+    """E026 — an element extends past the top of its rack (``NV-U002``).
 
     ``position`` is the *lowest* unit and ``height`` counts upwards, so a 4U
     panel at U40 of a 42U cabinet ends at U43 and does not fit. The arithmetic
@@ -4525,7 +4525,7 @@ def _check_rack_height(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_rack_height_agreement(ctx: _Context) -> Iterator[_Draft]:
-    """E027 — one rack is declared with two different heights (``NG-U003``).
+    """E027 — one rack is declared with two different heights (``NV-U003``).
 
     A rack has one height. Two elements that disagree about it mean either that
     one of them is in a different cabinet than its ``rack`` says, or that the
@@ -4611,7 +4611,7 @@ def _geometry_key_exists(
     A derived id — ``subnet:10.0.0.0/24`` for a prefix node, ``adp#upstream``
     for an adapter's attachment, ``sw:eth0#10.0.0.0/24`` for a membership — is a
     fact about a *drawing*, and only a drawing can say whether it still exists.
-    Both punctuation marks are refused from an element name by ``NG-N001``, so
+    Both punctuation marks are refused from an element name by ``NV-N001``, so
     finding either is proof the key is not one.
     """
     if section == "groups":
@@ -4717,7 +4717,7 @@ def _styled(ctx: _Context) -> Iterator[tuple[str, Style]]:
 
 
 def _check_invisible_style(ctx: _Context) -> Iterator[_Draft]:
-    """W144 — a style fades an element to nothing (``NG-Z003``).
+    """W144 — a style fades an element to nothing (``NV-Z003``).
 
     ``opacity: 0`` is legal on its own — it is the bottom of a legal range, and
     an editor dragging a slider passes through it — but an element drawn fully
@@ -4739,7 +4739,7 @@ def _check_invisible_style(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_unreadable_label(ctx: _Context) -> Iterator[_Draft]:
-    """W145 — a label the same colour as the box behind it (``NG-Z005``).
+    """W145 — a label the same colour as the box behind it (``NV-Z005``).
 
     Reported only when *both* colours are written on the same element, so this
     never fires on an inherited value: a theme setting one and an element the
@@ -4768,7 +4768,7 @@ def _check_unreadable_label(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_outlet_claimed_twice(ctx: _Context) -> Iterator[_Draft]:
-    """E037 — one PDU outlet feeds two power supplies (``NG-E010``).
+    """E037 — one PDU outlet feeds two power supplies (``NV-E010``).
 
     An outlet takes one plug. Two cords in one is a load schedule that cannot be
     true, and unlike the patch-panel version of the same mistake (``E022``) it is
@@ -4777,7 +4777,7 @@ def _check_outlet_claimed_twice(ctx: _Context) -> Iterator[_Draft]:
     prevent.
 
     Two inputs of the *same* device naming one outlet is caught earlier, by the
-    model (``NG-E002``), so everything reported here involves two elements.
+    model (``NV-E002``), so everything reported here involves two elements.
     """
     for (pdu, outlet), feeds in ctx.power.outlet_claims().items():
         elements = list(dict.fromkeys(feed.element for feed in feeds))
@@ -4793,7 +4793,7 @@ def _check_outlet_claimed_twice(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_power_input_resolves(ctx: _Context) -> Iterator[_Draft]:
-    """E038 — a power input names no outlet that exists (``NG-E011``).
+    """E038 — a power input names no outlet that exists (``NV-E011``).
 
     Four ways to get there, reported apart because the fix differs: the PDU is
     not in the inventory, the name is ambiguous, the name resolves to something
@@ -4837,7 +4837,7 @@ def _check_power_input_resolves(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_pdu_capacity(ctx: _Context) -> Iterator[_Draft]:
-    """E039 — the declared load on a PDU exceeds its capacity (``NG-E012``).
+    """E039 — the declared load on a PDU exceeds its capacity (``NV-E012``).
 
     Summed over the *normal-operation* share of each load: a dual-corded server
     draws half its watts through each cord, so a pair of PDUs each sized for half
@@ -4864,7 +4864,7 @@ def _check_pdu_capacity(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_poe_budget(ctx: _Context) -> Iterator[_Draft]:
-    """E040 — the PoE allocated on a device's ports exceeds its budget (``NG-E013``).
+    """E040 — the PoE allocated on a device's ports exceeds its budget (``NV-E013``).
 
     Only ports that hold budget are counted — one that feeds something, and one
     whose ``budget_watts`` was written down. A ``poe`` block on an empty port is a
@@ -4894,7 +4894,7 @@ def _check_poe_budget(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_poe_uplink(ctx: _Context) -> Iterator[_Draft]:
-    """E041 — a PoE-powered device's uplink offers no PoE, or too little (``NG-E014``).
+    """E041 — a PoE-powered device's uplink offers no PoE, or too little (``NV-E014``).
 
     ``powered_by: poe`` says the device has no power cord, so the run carrying its
     traffic is its *only* power path. Three ways for that to be wrong, and all
@@ -4942,7 +4942,7 @@ def _describe_uplinks(uplinks: Sequence[Uplink]) -> str:
 
 
 def _check_power_redundancy(ctx: _Context) -> Iterator[_Draft]:
-    """E042 — redundant power that is not redundant (``NG-E015``).
+    """E042 — redundant power that is not redundant (``NV-E015``).
 
     ``redundant: true`` is a claim that losing one feed does not lose the device.
     Two cords into one PDU do not make that true — the strip, its breaker and its
@@ -4960,7 +4960,7 @@ def _check_power_redundancy(ctx: _Context) -> Iterator[_Draft]:
         feeds = [feed for feed in ctx.power.feeds_into(fqn) if feed.kind is FeedKind.OUTLET]
         if len(feeds) < 2:
             # Fewer than two *resolved* feeds: the model already refused fewer
-            # than two declared ones (``NG-E002``), so what is left is a feed
+            # than two declared ones (``NV-E002``), so what is left is a feed
             # that did not resolve -- reported by ``E038``, and reporting it
             # twice would blame the redundancy claim for someone else's typo.
             continue
@@ -4988,7 +4988,7 @@ def _check_power_redundancy(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_missing_power_path(ctx: _Context) -> Iterator[_Draft]:
-    """W137 — a device declares a draw but no power path (``NG-E016``).
+    """W137 — a device declares a draw but no power path (``NV-E016``).
 
     A warning rather than an error, deliberately. Recording draws before
     recording the outlets they are plugged into is the normal order in which an
@@ -5300,7 +5300,7 @@ def _check_unknown_expectation(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_member_resolves(ctx: _Context) -> Iterator[_Draft]:
-    """E043 — a group names a member that does not exist (``NG-S010``).
+    """E043 — a group names a member that does not exist (``NV-S010``).
 
     The same two failures every reference in this schema can have, reported
     apart because the fix differs: nothing of that name, or several things of
@@ -5330,7 +5330,7 @@ def _check_member_resolves(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_member_is_identity(ctx: _Context) -> Iterator[_Draft]:
-    """E044 — a group member is not a user or a group (``NG-S011``).
+    """E044 — a group member is not a user or a group (``NV-S011``).
 
     A group holds identities. A switch is not one, and a membership naming one is
     almost always a name collision rather than a statement about the switch —
@@ -5351,12 +5351,12 @@ def _check_member_is_identity(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_membership_cycle(ctx: _Context) -> Iterator[_Draft]:
-    """E045 — group membership forms a cycle (``NG-S012``).
+    """E045 — group membership forms a cycle (``NV-S012``).
 
     Nesting is the point of groups, so the loop it makes possible has to be
     refused: ``everyone`` inside ``engineering`` inside ``everyone`` has no
     membership list at all, because expanding it never terminates. A group naming
-    *itself* is refused earlier, by the model (``NG-S003``), which can see it
+    *itself* is refused earlier, by the model (``NV-S003``), which can see it
     without an inventory and can therefore point at the line.
     """
     for cycle in ctx.identities.cycles():
@@ -5371,7 +5371,7 @@ def _check_membership_cycle(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_account_identifiers(ctx: _Context) -> Iterator[_Draft]:
-    """E046 — two identities claim one login, uid or gid (``NG-S013``).
+    """E046 — two identities claim one login, uid or gid (``NV-S013``).
 
     All three are *the* key of an account in the system that consumes them: two
     users with one login are one account with two owners, and two POSIX ids that
@@ -5423,7 +5423,7 @@ def _check_account_identifiers(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_empty_group(ctx: _Context) -> Iterator[_Draft]:
-    """W139 — a group has no members (``NG-S014``).
+    """W139 — a group has no members (``NV-S014``).
 
     A warning, not an error: a group created before the people who will be in it
     is a normal intermediate state, and so is one that has been emptied on purpose
@@ -5442,7 +5442,7 @@ def _check_empty_group(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_departed_member(ctx: _Context) -> Iterator[_Draft]:
-    """W140 — a group still lists a user who has left (``NG-S015``).
+    """W140 — a group still lists a user who has left (``NV-S015``).
 
     This is the rule the ``status`` field exists for. Deleting the ``user``
     document would make the person disappear from the inventory *and* from every
@@ -5467,7 +5467,7 @@ def _check_departed_member(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_ungrouped_user(ctx: _Context) -> Iterator[_Draft]:
-    """I004 — a person's account is a member of no group (``NG-S016``).
+    """I004 — a person's account is a member of no group (``NV-S016``).
 
     Info, because it is a fact rather than a fault: plenty of estates grant a
     person access directly and never put them in anything. It is reported at all
@@ -5499,7 +5499,7 @@ def _check_ungrouped_user(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_cable_on_veth(ctx: _Context) -> Iterator[_Draft]:
-    """E049 — a cable terminates on one end of a veth pair (``NG-N024``).
+    """E049 — a cable terminates on one end of a veth pair (``NV-N024``).
 
     A veth end is ``ethernet`` by type, so ``E012`` waves it through: the type
     check cannot tell it apart from the port on the back of the machine, and
@@ -5531,7 +5531,7 @@ def _check_cable_on_veth(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_aggregate_spans_netns(ctx: _Context) -> Iterator[_Draft]:
-    """E050 — a bridge or lag aggregates a member in another namespace (``NG-N025``).
+    """E050 — a bridge or lag aggregates a member in another namespace (``NV-N025``).
 
     A bridge forwards frames between its ports and a bond schedules them across
     its slaves; both are one datapath, and a datapath belongs to exactly one
@@ -5564,7 +5564,7 @@ def _check_aggregate_spans_netns(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_empty_netns(ctx: _Context) -> Iterator[_Draft]:
-    """W146 — a declared namespace holds no interface (``NG-N026``).
+    """W146 — a declared namespace holds no interface (``NV-N026``).
 
     The same shape as ``W136`` and for the same reason: a namespace is a stack,
     and a stack with no interface in it has no address, no route and no way in
@@ -5600,7 +5600,7 @@ def _check_empty_netns(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_veth_inside_one_netns(ctx: _Context) -> Iterator[_Draft]:
-    """I005 — both ends of a veth pair are in one namespace (``NG-N027``).
+    """I005 — both ends of a veth pair are in one namespace (``NV-N027``).
 
     Legal, and occasionally meant: a veth pair is the standard way to join two
     bridges inside one stack. Reported anyway, as information, because the far
@@ -5799,7 +5799,7 @@ def _pair_endpoints(
 ) -> tuple[tuple[str, _Endpoint, _Endpoint], ...]:
     """Group resolved endpoints by the cable they belong to, in load order.
 
-    ``NG-C001`` guarantees the pair at schema time; the guard is here so a
+    ``NV-C001`` guarantees the pair at schema time; the guard is here so a
     document that somehow escaped it cannot make a rule raise.
     """
     by_cable: dict[str, list[_Endpoint]] = {}
@@ -5808,7 +5808,7 @@ def _pair_endpoints(
     return tuple(
         (cable_fqn, pair[0], pair[1])
         for cable_fqn, pair in by_cable.items()
-        if len(pair) == 2  # NG-C001 guarantees it; a stray document must not raise
+        if len(pair) == 2  # NV-C001 guarantees it; a stray document must not raise
     )
 
 
@@ -5847,7 +5847,7 @@ def _by_port(entries: Sequence[tuple[str, Interface]]) -> list[tuple[str, Interf
     Sorting by ``element:interface`` makes all three a function of what the
     inventory *says* and of nothing else. Only use it where the members really
     are interchangeable; a rule with a genuine "first declaration wins" ordering
-    (``NG-N002``) must keep it.
+    (``NV-N002``) must keep it.
     """
     return sorted(entries, key=lambda entry: (entry[0], entry[1].name))
 

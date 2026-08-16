@@ -1739,7 +1739,7 @@
             },
             {
               "label": "Description",
-              "value": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n"
+              "value": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NV-X005).\n"
             },
             {
               "label": "Vendor",
@@ -3647,7 +3647,7 @@
               "rows": [
                 [
                   "netviz/ignore",
-                  "NG-C015"
+                  "NV-C015"
                 ]
               ],
               "note": ""

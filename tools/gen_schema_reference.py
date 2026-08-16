@@ -173,7 +173,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "is chosen by `kind`.",
         notes=(
             "`spec` is required and its model is listed in the kind table above.",
-            "Unknown keys are rejected anywhere in the document (`NG-D005`). A misspelt key that "
+            "Unknown keys are rejected anywhere in the document (`NV-D005`). A misspelt key that "
             "was silently ignored would produce a diagram disagreeing with the file, which is "
             "the one failure mode this tool exists to prevent.",
         ),
@@ -192,9 +192,9 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "`position` is the **lowest** rack unit the element occupies and `height` how many "
             "it takes, counting upwards; units are numbered from 1 at the bottom of the "
             "cabinet, which is how a rack is labelled.",
-            "`site`, `room` and `rack` together identify a rack (`NG-U001`). Two elements that "
+            "`site`, `room` and `rack` together identify a rack (`NV-U001`). Two elements that "
             "name the same three share a cabinet and may not overlap; naming `position` or "
-            "`rack_height` without `rack` is `NG-U004`.",
+            "`rack_height` without `rack` is `NV-U004`.",
             "`netviz render --layer rack` draws one front elevation per rack, empty units "
             "included.",
         ),
@@ -232,7 +232,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         VlanDefinition,
         "`spec.vlans[]`",
         "The device VLAN database. A port may reference a VLAN this list does not declare; that "
-        "is `NG-V004`, not an error.",
+        "is `NV-V004`, not an error.",
     ),
     Section(
         Interface,
@@ -256,7 +256,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "encapsulation VID.",
             "`type: lag` and `type: bridge` require `members`, which must be non-empty, free of "
             "duplicates, and must not name the interface itself.",
-            "An interface carrying IPv6 addresses must have an MTU of at least 1280 (`NG-I011`).",
+            "An interface carrying IPv6 addresses must have an MTU of at least 1280 (`NV-I011`).",
         ),
     ),
     Section(
@@ -271,7 +271,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
     Section(
         IPv4Address,
         "`spec.interfaces[].ipv4.addresses[]`",
-        "One IPv4 address. Addresses are unique within the interface (`NG-A002`).",
+        "One IPv4 address. Addresses are unique within the interface (`NV-A002`).",
         notes=(
             "`10.0.0.1/24` is shorthand for the mapping form.",
             "`netmask: 255.255.255.0` may be written instead of `prefix_length`, but not as well "
@@ -294,7 +294,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "The 802.1Q bridge-port configuration of one interface.",
         notes=(
             "In `access` mode: `access_vlan` is allowed and defaults to 1; `trunk_vlans` and "
-            "`native_vlan` are rejected (`NG-V002`, `NG-V003`).",
+            "`native_vlan` are rejected (`NV-V002`, `NV-V003`).",
             "In `trunk` mode: `trunk_vlans` is required and `access_vlan` is rejected.",
             '`trunk_vlans` accepts an id, a list, `"10,20,100-110"`, `all` (1–4094) or `none`, '
             "and always serialises back to the coalesced string form.",
@@ -307,9 +307,9 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "is on, where on the air it is, and which networks it serves.",
         notes=(
             "`channel` and `width_mhz` both require `band`: channel numbers repeat between the "
-            "2.4 GHz and 6 GHz plans, and 320 MHz exists only at 6 GHz (`NG-W003`, `NG-W004`).",
+            "2.4 GHz and 6 GHz plans, and 320 MHz exists only at 6 GHz (`NV-W003`, `NV-W004`).",
             "A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` "
-            "radio (`NG-W007`); that association is what the layer-2 view labels with "
+            "radio (`NV-W007`); that association is what the layer-2 view labels with "
             "`SSID @ channel/band`.",
         ),
     ),
@@ -320,9 +320,9 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "is associated to.",
         notes=(
             "An `ap` radio lists one entry per SSID it serves; a `station` or `mesh` radio "
-            "lists at most one (`NG-W006`).",
+            "lists at most one (`NV-W006`).",
             "`vlan` is where the SSID's traffic goes on the wired side. It has to be a VLAN the "
-            "access point carries somewhere (`NG-W009`), or clients associate and reach nothing.",
+            "access point carries somewhere (`NV-W009`), or clients associate and reach nothing.",
         ),
     ),
     Section(
@@ -334,14 +334,14 @@ SECTIONS: Final[tuple[Section, ...]] = (
         notes=(
             "`parent` names another entry of the same table, which is how namespaces nest: a "
             "namespace is created from inside exactly one other, so the nesting is a tree "
-            "(`NG-N021`). Unset means the machine's initial namespace, which no document "
+            "(`NV-N021`). Unset means the machine's initial namespace, which no document "
             "declares.",
             "Not a VRF. A VRF partitions the routing table of one stack; a namespace *is* a "
             "second stack, so it partitions the interface names, the addresses and the "
             "sockets as well. An interface can be in both.",
             "Namespaces are joined by veth pairs, which are ordinary `type: ethernet` "
             "interfaces naming each other with `peer` (§23.2).",
-            "A namespace no interface is in holds nothing, which is `NG-N026`.",
+            "A namespace no interface is in holds nothing, which is `NV-N026`.",
         ),
     ),
     Section(
@@ -352,7 +352,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         notes=(
             "Two devices that use the same `name` are taken to mean the same VRF; the route "
             "distinguisher is recorded because MPLS needs it, not to identify the instance.",
-            "A VRF no interface binds to holds nothing, which is `NG-F014`.",
+            "A VRF no interface binds to holds nothing, which is `NV-F014`.",
         ),
     ),
     Section(
@@ -362,9 +362,9 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "routes are placed in; what reaches it is a rule in `routing_policy`.",
         notes=(
             "`main`, `local` and `default` exist without being declared and may not be "
-            "declared, by either name or number (`NG-F015`).",
-            "A table nothing looks up is consulted by nothing (`NG-F023`); a rule looking up "
-            "a table nothing is placed in falls through (`NG-F022`).",
+            "declared, by either name or number (`NV-F015`).",
+            "A table nothing looks up is consulted by nothing (`NV-F023`); a rule looking up "
+            "a table nothing is placed in falls through (`NV-F022`).",
         ),
     ),
     Section(
@@ -373,11 +373,11 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "One configured static route (§16.3).",
         notes=(
             "At least one of `via`, `dev` and `blackhole` is required, and `blackhole` excludes "
-            "the other two (`NG-F004`).",
-            "`via` is of the same family as `prefix` (`NG-F003`) and must be on-link: inside a "
-            "prefix the device configures, in the same VRF (`NG-F008`).",
+            "the other two (`NV-F004`).",
+            "`via` is of the same family as `prefix` (`NV-F003`) and must be on-link: inside a "
+            "prefix the device configures, in the same VRF (`NV-F008`).",
             "`vrf` and `table` are alternatives, not a pair: a VRF is a routing table of its "
-            "own (`NG-F018`).",
+            "own (`NV-F018`).",
         ),
     ),
     Section(
@@ -388,9 +388,9 @@ SECTIONS: Final[tuple[Section, ...]] = (
         notes=(
             "The database is walked from the lowest `priority` upwards and the first match "
             "decides, so `priority` is the rule's position and its identity: unique within the "
-            "device, per family (`NG-F020`).",
+            "device, per family (`NV-F020`).",
             "A rule with no selector matches every packet, which terminates the database — and "
-            "makes every rule after it in that family unreachable (`NG-F024`).",
+            "makes every rule after it in that family unreachable (`NV-F024`).",
             "There is no layer-4 selector. Mark the packet in the firewall and match `fwmark` "
             "here; see §16.7.",
         ),
@@ -424,9 +424,9 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "with — never an element name (§16.6).",
         notes=(
             "The address is resolved against every address the inventory configures. A peer "
-            "that resolves to nothing is a warning (`NG-F013`), because an eBGP peer may be a "
+            "that resolves to nothing is a warning (`NV-F013`), because an eBGP peer may be a "
             "transit provider nobody declares here; a peer whose own `asn` contradicts "
-            "`remote_asn` is an error (`NG-F011`).",
+            "`remote_asn` is an error (`NV-F011`).",
         ),
     ),
     Section(
@@ -435,10 +435,10 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "One security zone (§24.1): a name, and the interfaces in it. Policy is written between "
         "zones rather than between interfaces, so a rule survives a port being renamed.",
         notes=(
-            "An interface is in at most one zone (`NG-B003`). That is the defining property of "
+            "An interface is in at most one zone (`NV-B003`). That is the defining property of "
             "a zone, and what makes `from lan` a statement about a packet rather than a "
             "question.",
-            "`local` is the machine itself and may not be declared (`NG-B001`); it is nameable "
+            "`local` is the machine itself and may not be declared (`NV-B001`); it is nameable "
             "in a rule without being declared.",
             "A zone holding no interface is inert (`W150`); an interface in no zone, on a "
             "device that declares zones at all, is worth a second look (`W151`).",
@@ -451,10 +451,10 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "policy and the address translations.",
         notes=(
             "The defaults are *deny inbound, deny transit, permit outbound*. Each has to decide "
-            "the packet, so `mark` and `log` are refused there (`NG-B007`).",
+            "the packet, so `mark` and `log` are refused there (`NV-B007`).",
             "Available on every layer-3 kind, not only on `kind: firewall`: a router with three "
             "rules on it filters, and that is what most networks run. A `hub` has no IP stack "
-            "and refuses both this and `zones` (`NG-H003`).",
+            "and refuses both this and `zones` (`NV-H003`).",
         ),
     ),
     Section(
@@ -466,7 +466,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         notes=(
             "The chain is walked from the lowest `priority` upwards and the first *terminal* "
             "match decides, so `priority` is the rule's position and its identity: unique "
-            "within the device, per family (`NG-B008`).",
+            "within the device, per family (`NV-B008`).",
             "`accept`, `drop` and `reject` are terminal; `mark` and `log` do something to the "
             "packet and carry on walking, which is what makes them useful.",
             "The hook is derived, never written: `dst_zone: local` is input, `src_zone: local` "
@@ -490,7 +490,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "more thing to keep in step.",
             "`snat` and `dnat` state the address they translate to; `masquerade` cannot (it is "
             "the egress interface's, unknown until the packet leaves) and `redirect` need not "
-            "(it is this machine) — `NG-B006`.",
+            "(it is this machine) — `NV-B006`.",
         ),
     ),
     Section(
@@ -516,7 +516,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "`spec.upstream`",
         "The host-facing port of an adapter.",
         notes=(
-            "Declaring `attached_to` **and** cabling the upstream port is an error (`NG-X005`): "
+            "Declaring `attached_to` **and** cabling the upstream port is an error (`NV-X005`): "
             "the host attachment is declared exactly once.",
         ),
     ),
@@ -528,15 +528,15 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "first-class element for the same reason.",
         notes=(
             "`endpoints` uses the same `device:interface` form a cable does, and each one must "
-            "name an interface of `type: tunnel` (`NG-T003`) — the virtual interface the tunnel "
+            "name an interface of `type: tunnel` (`NV-T003`) — the virtual interface the tunnel "
             "presents, not the physical port its outer packets leave by.",
             "`over` nests one tunnel inside another: `vxlan` over `ipsec` is written by naming "
-            "the IPsec tunnel there. The chain must not loop (`NG-T005`).",
+            "the IPsec tunnel there. The chain must not loop (`NV-T005`).",
             "`type` supplies the defaults for `port`, `encrypted` and `mode`, and the "
-            "encapsulation overhead `NG-T011` measures an MTU against. Materialised on load, so "
+            "encapsulation overhead `NV-T011` measures an MTU against. Materialised on load, so "
             "a loaded document states them explicitly.",
             "There is nowhere to put a key, a password or a certificate, and the fields people "
-            "reach for are rejected by name (`NG-T010`). `auth` records the *method*.",
+            "reach for are rejected by name (`NV-T010`). `auth` records the *method*.",
         ),
     ),
     Section(
@@ -547,7 +547,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         notes=(
             "`ports` is the only required key. Each position it names becomes two interfaces, "
             "`front/<n>` and `rear/<n>`, which a cable terminates on exactly as it terminates "
-            "on a device port (`NG-P001`).",
+            "on a device port (`NV-P001`).",
             "A panel is not a hop. `netviz render --layer physical` draws it and both cable "
             "segments; every other layer splices the run into the single edge it electrically "
             "is, between the two active ports.",
@@ -567,7 +567,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "A PDU is placed on a rack elevation through `metadata.location`, exactly as a "
             "switch is, and `netviz render --layer rack` annotates it with its utilisation.",
             "`input_feed` is free text and is compared only for equality. It is what makes A/B "
-            "redundancy checkable: two units on one feed fail together (`NG-E015`).",
+            "redundancy checkable: two units on one feed fail together (`NV-E015`).",
         ),
     ),
     Section(
@@ -578,10 +578,10 @@ SECTIONS: Final[tuple[Section, ...]] = (
         notes=(
             "`draw_watts` accepts a bare number as shorthand for `{typical: n}`. The typical "
             "figure is what a load schedule sums; `maximum` is what a breaker has to survive.",
-            "`redundant: true` needs at least two `inputs` (`NG-E002`), and they have to land on "
-            "different units *and* different `input_feed`s for the claim to hold (`NG-E015`).",
-            "`powered_by: poe` excludes `inputs` (`NG-E005`): a device fed over its uplink has "
-            "no cord. `NG-E014` then checks the far end of that uplink actually sources power.",
+            "`redundant: true` needs at least two `inputs` (`NV-E002`), and they have to land on "
+            "different units *and* different `input_feed`s for the claim to hold (`NV-E015`).",
+            "`powered_by: poe` excludes `inputs` (`NV-E005`): a device fed over its uplink has "
+            "no cord. `NV-E014` then checks the far end of that uplink actually sources power.",
         ),
     ),
     Section(
@@ -600,14 +600,14 @@ SECTIONS: Final[tuple[Section, ...]] = (
         PoeConfig,
         "`interfaces[].poe`",
         "This port is power sourcing equipment: it hands power down the cable. Only on a type a "
-        "cable terminates on — `ethernet` or `lag` (`NG-E006`).",
+        "cable terminates on — `ethernet` or `lag` (`NV-E006`).",
         notes=(
             "How much the port reserves is said once: a `class`, or a `budget_watts`, never both "
-            "(`NG-E004`). With neither, the port reserves its standard's maximum, which is what "
+            "(`NV-E004`). With neither, the port reserves its standard's maximum, which is what "
             "a switch with no per-port configuration does.",
             "A `poe` block on a port with nothing on it is a *capability* and takes no budget. A "
             "port that feeds something, or one with an explicit `budget_watts`, does — see "
-            "`NG-E013`.",
+            "`NV-E013`.",
         ),
     ),
     # Identity (§19). After the hardware and before the geometry: it is a fact
@@ -624,10 +624,10 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "Absent means the two are the same; everything downstream reads the materialised "
             "value, so nothing has to re-apply the default.",
             "A `departed` account is *kept*, not deleted: the group memberships still to be "
-            "revoked are what `NG-S015` reports, and deleting the document would delete them "
+            "revoked are what `NV-S015` reports, and deleting the document would delete them "
             "too.",
             "Only public keys. A pasted private key is refused with an explanation "
-            "(`NG-S002`), which is the point of checking the shape at all.",
+            "(`NV-S002`), which is the point of checking the shape at all.",
         ),
     ),
     Section(
@@ -640,10 +640,10 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "groups: two spellings of one fact are how an inventory starts disagreeing with "
             "itself.",
             "A member is an ordinary element reference (§4.1), resolved outwards from the "
-            "group's own namespace. It must resolve (`NG-S010`) and must be an identity "
-            "(`NG-S011`).",
+            "group's own namespace. It must resolve (`NV-S010`) and must be an identity "
+            "(`NV-S011`).",
             "A group naming itself is refused by the model; a longer loop needs the whole tree "
-            "and is `NG-S012`.",
+            "and is `NV-S012`.",
         ),
     ),
     # Diagram geometry (§18). Listed after the elements because it describes the
@@ -661,7 +661,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "A key is an address, resolved like any other reference. A node the inventory does "
             "not declare is keyed by its graph id instead: `subnet:10.0.0.0/24`, "
             "`tunnel:site/wg0`, `rack:hq/comms/r1`.",
-            "A key naming something the inventory no longer has is `NG-Y001`, a warning; "
+            "A key naming something the inventory no longer has is `NV-Y001`, a warning; "
             "`netviz layout --prune` drops it.",
         ),
     ),
@@ -727,7 +727,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "Named claims about the network the other documents describe. `netviz test` grades "
         "them and exits non-zero when one does not hold.",
         notes=(
-            "A suite must assert something (`NG-K002`). A suite that checked nothing would "
+            "A suite must assert something (`NV-K002`). A suite that checked nothing would "
             "report a green run, which is worse than having no suite at all.",
             "Assertions are graded in the order they are written, and a failure names the "
             "file and line of the assertion so an editor can jump to it.",
@@ -737,7 +737,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         Assertion,
         "One assertion",
         "`assert` chooses the claim; every other key is read in its light. A key that belongs "
-        "to a different assertion is rejected by name (`NG-K003`) rather than ignored.",
+        "to a different assertion is rejected by name (`NV-K003`) rather than ignored.",
         notes=(
             "`reachable`, `not-reachable` and `path-shorter-than` take `from` and `to` in the "
             "spellings `netviz path` accepts: an element, `element:interface`, an IP address, "
@@ -763,7 +763,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "`y`. Both is the shape dragging an anchored note produces — the point places it, "
             "the anchor is what the leader line points at.",
             "`views` scopes the note to the drawings it makes sense in; empty means all of "
-            "them. A note naming an element the inventory no longer has is `NG-G001`, a "
+            "them. A note naming an element the inventory no longer has is `NV-G001`, a "
             "warning, exactly as a stale layout key is.",
         ),
     ),
@@ -792,7 +792,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "`members` and `selector` box wherever the elements were drawn, so the zone follows "
             "them; `geometry` boxes a region of the canvas instead, for a zone that is about "
             "the paper rather than about devices.",
-            "An area matching nothing is `NG-G004`, a warning: an empty box on a diagram reads "
+            "An area matching nothing is `NV-G004`, a warning: an empty box on a diagram reads "
             "as a claim that the zone is empty.",
         ),
     ),
@@ -834,7 +834,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "The vocabulary is closed. A colour is a hex literal or one of the named colours, "
             "and every other field is a small enum or a bounded number, because these values "
             "end up inside Graphviz attributes and mxGraph style strings and a free-form "
-            "pass-through would be an injection (`NG-Z001`).",
+            "pass-through would be an injection (`NV-Z001`).",
             "`shape` is ignored on a cable and a tunnel, which have no shape to set. `icon` "
             "names a picture inside the `--icons` theme and is ignored when no theme is in "
             "use; `icon: none` draws this one element as a plain shape.",
@@ -847,7 +847,7 @@ ENUMS: Final[tuple[tuple[type[enum.Enum], str, str], ...]] = (
     (
         InterfaceType,
         "`interfaces[].type`",
-        "Only `ethernet`, `wifi` and `lag` can terminate a cable (`NG-C009`).",
+        "Only `ethernet`, `wifi` and `lag` can terminate a cable (`NV-C009`).",
     ),
     (VlanMode, "`vlan.mode`", "A netviz abstraction; 802.1Q has no equivalent leaf."),
     (
@@ -885,7 +885,7 @@ ENUMS: Final[tuple[tuple[type[enum.Enum], str, str], ...]] = (
         Protocol,
         "`firewall.rules[].protocol`",
         "Only `tcp`, `udp` and `sctp` have ports to select on. `icmp` is IPv4 and `icmpv6` is "
-        "IPv6, so stating either against the other family is refused (`NG-B005`).",
+        "IPv6, so stating either against the other family is refused (`NV-B005`).",
     ),
     (
         ConnState,
@@ -920,13 +920,13 @@ ENUMS: Final[tuple[tuple[type[enum.Enum], str, str], ...]] = (
     (
         TunnelAuth,
         "`tunnel.auth`",
-        "The authentication *method*. netviz never stores key material (`NG-T010`).",
+        "The authentication *method*. netviz never stores key material (`NV-T010`).",
     ),
     (
         UserType,
         "`user.type`",
-        "Decides which identity rules apply: only a `person` can depart (`NG-S015`), and only "
-        "a `person` is expected to be in a group (`NG-S016`).",
+        "Decides which identity rules apply: only a `person` can depart (`NV-S015`), and only "
+        "a `person` is expected to be in a group (`NV-S016`).",
     ),
     (
         UserStatus,

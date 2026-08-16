@@ -1,4 +1,4 @@
-# E045 (NG-S012) - group membership closes a loop.
+# E045 (NV-S012) - group membership closes a loop.
 #
 # 'everyone' holds 'engineering', which holds 'everyone' back. Neither group has
 # a membership that can be listed: expanding either one does not terminate, so

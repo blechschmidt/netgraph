@@ -309,8 +309,8 @@ def test_an_option_that_is_off_has_no_drawing_that_prints_it(graph: Graph) -> No
             assert "addresses" not in port
     assert "10.0.10.1" not in page
     # The toggle for an option nobody can turn on is not offered.
-    assert 'id="ng-ips"' not in page
-    assert 'id="ng-vlans"' not in page
+    assert 'id="nv-ips"' not in page
+    assert 'id="nv-vlans"' not in page
 
 
 @requires_dot
@@ -436,9 +436,9 @@ def test_an_icon_is_stored_once_however_many_views_draw_it(home_lab: Inventory) 
     assert uris, "the theme reached the page"
     assert len(uris) == len(set(uris)), "an icon is spelled out more than once"
     # …and every drawing that wants one names it rather than repeating it.
-    uses = re.findall(r'<use [^>]*xlink:href="#(ng-icon-\d+)"', page)
+    uses = re.findall(r'<use [^>]*xlink:href="#(nv-icon-\d+)"', page)
     assert len(uses) > len(uris), "the nodes draw more icons than the page holds copies of"
-    assert set(uses) <= set(re.findall(r'<symbol id="(ng-icon-\d+)"', page))
+    assert set(uses) <= set(re.findall(r'<symbol id="(nv-icon-\d+)"', page))
 
 
 def test_a_picture_that_is_not_an_inlined_icon_is_left_where_it_is() -> None:
@@ -613,7 +613,7 @@ def test_several_layers_become_a_switcher(layered: str) -> None:
     assert [layer["layer"] for layer in data["layers"]] == ["l1", "l2", "l3"]
     assert data["layers"][0]["label"] == "l1 — physical"
     document = parse(layered)
-    assert "ng-layer" in document.ids()
+    assert "nv-layer" in document.ids()
     assert document.tags.count("option") >= 3
     # Layer 3 draws prefixes the physical view has no node for.
     assert any(record["type"] == "subnet" for record in records_of(layered, 2).values())
@@ -621,7 +621,7 @@ def test_several_layers_become_a_switcher(layered: str) -> None:
 
 @requires_dot
 def test_one_layer_has_no_switcher(page: str) -> None:
-    assert "ng-layer" not in parse(page).ids()
+    assert "nv-layer" not in parse(page).ids()
 
 
 @requires_dot

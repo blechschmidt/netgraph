@@ -24,7 +24,7 @@ spec:
   email: kit@example.invalid
   uid: 1001
 ---
-# A service account, so it is exempt from NG-S016: an account nobody logs in as
+# A service account, so it is exempt from NV-S016: an account nobody logs in as
 # belonging to no group is the normal shape of one, and saying so on each of
 # them would drown the people the rule is about.
 apiVersion: netviz.dev/v1alpha1

@@ -458,7 +458,7 @@ def test_read_documents_yields_the_same_shape(reader: type[NodeLoader], tmp_path
     docs = list(read_documents(path, relative=PurePosixPath("multi.yaml")))
 
     # The empty document keeps its slot so the index still matches the ``---``
-    # separators (NG-L004), and both bases put its null node on line 4.
+    # separators (NV-L004), and both bases put its null node on line 4.
     assert [(d.index, d.data, d.line) for d in docs] == [
         (0, {"a": 1}, 1),
         (1, None, 4),

@@ -122,7 +122,7 @@ class TemplateRegistry:
         self._resolving: list[str] = []
 
     def add(self, template: Template, *, document: RawDocument, namespace: str) -> str | None:
-        """Index ``template``; ``None`` when the name is taken (``NG-M002``)."""
+        """Index ``template``; ``None`` when the name is taken (``NV-M002``)."""
         name = template.metadata.name
         fqn = f"{namespace}/{name}" if namespace else name
         if fqn in self._entries:
@@ -189,7 +189,7 @@ class TemplateRegistry:
         """
         if fqn in self._resolved:
             return self._resolved[fqn]
-        if fqn in self._resolving:  # NG-M003
+        if fqn in self._resolving:  # NV-M003
             cycle = " -> ".join((*self._resolving[self._resolving.index(fqn) :], fqn))
             entry = self._entries[fqn]
             problems.append(
@@ -198,7 +198,7 @@ class TemplateRegistry:
                     SchemaIssue(
                         path=("spec", INHERIT_KEY),
                         message=f"template inheritance is cyclic: {cycle}",
-                        rule="NG-M003",
+                        rule="NV-M003",
                     ),
                 )
             )
@@ -266,7 +266,7 @@ class TemplateRegistry:
         fqn, _ = self.lookup(reference, namespace=namespace)
         assert fqn is not None
         template = self.resolve(fqn, [])
-        if template is None:  # NG-M004
+        if template is None:  # NV-M004
             return (
                 body,
                 provenance,
@@ -277,7 +277,7 @@ class TemplateRegistry:
                             f"template {fqn!r} is itself invalid, so it cannot be merged "
                             "here; fix the errors reported against the template"
                         ),
-                        rule="NG-M004",
+                        rule="NV-M004",
                     )
                 ],
                 fqn,
@@ -315,7 +315,7 @@ class TemplateRegistry:
                             f"template {fqn!r} could not be resolved, so this template "
                             "cannot be either"
                         ),
-                        rule="NG-M004",
+                        rule="NV-M004",
                     ),
                 )
             )
@@ -323,12 +323,12 @@ class TemplateRegistry:
 
 
 def _bad_reference(ref: Any, registry: TemplateRegistry, *, namespace: str) -> SchemaIssue | None:
-    """``NG-M001`` — why ``spec.from`` does not name exactly one template."""
+    """``NV-M001`` — why ``spec.from`` does not name exactly one template."""
     if not isinstance(ref, str):
         return SchemaIssue(
             path=("spec", INHERIT_KEY),
             message=f"'from' must name a template, got {type(ref).__name__}",
-            rule="NG-M001",
+            rule="NV-M001",
         )
     fqn, ambiguous = registry.lookup(ref, namespace=namespace)
     if fqn is not None:
@@ -340,7 +340,7 @@ def _bad_reference(ref: Any, registry: TemplateRegistry, *, namespace: str) -> S
                 f"template reference {echo_value(ref)} is ambiguous; it matches "
                 f"{', '.join(ambiguous)}. Use the fully-qualified name."
             ),
-            rule="NG-M001",
+            rule="NV-M001",
         )
     known = registry.names()
     hint = (
@@ -351,7 +351,7 @@ def _bad_reference(ref: Any, registry: TemplateRegistry, *, namespace: str) -> S
     return SchemaIssue(
         path=("spec", INHERIT_KEY),
         message=f"no template named {echo_value(ref)}.{hint}",
-        rule="NG-M001",
+        rule="NV-M001",
     )
 
 
@@ -497,7 +497,7 @@ def _merge_interfaces(
     by_name: dict[str, int] = {}
     for index, entry in enumerate(device):
         name = _name_of(entry)
-        # A device that declares one name twice keeps both entries; NG-I001
+        # A device that declares one name twice keeps both entries; NV-I001
         # reports it a moment later, and swallowing the second here would turn
         # a duplicate into a silent override.
         if name is not None and name not in by_name:

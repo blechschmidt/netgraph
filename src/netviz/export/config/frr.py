@@ -16,7 +16,7 @@ inventory can state about routing: every static route, every VRF, every OSPF
 interface and every BGP neighbour §16 can express has a spelling here. The two
 cases that would have been refusals — a route or an interface naming a VRF the
 device does not define, and an OSPF interface the device does not declare — are
-refused before this module runs, by ``NG-F002``/``NG-F005`` in the model and by
+refused before this module runs, by ``NV-F002``/``NV-F005`` in the model and by
 ``E034`` in the validator. Inventing a third refusal to have one would be
 dishonest; when ``--force`` drives an inventory past ``E034``, the dropped name
 is recorded in the manifest instead.
@@ -128,7 +128,7 @@ def limits(plan: DevicePlan) -> tuple[Unsupported, ...]:
     FRR's grammar is otherwise a superset of what an inventory can state about
     routing, so there is no field within its remit that it would have to invent
     or drop. The two candidates are both refused earlier — a VRF reference that
-    resolves to nothing by ``NG-F002``/``NG-F005`` when the document is parsed,
+    resolves to nothing by ``NV-F002``/``NV-F005`` when the document is parsed,
     and an OSPF interface the device has not got by ``E034`` — and everything
     else the inventory holds is out of FRR's remit rather than beyond its
     syntax, which makes it a manifest skip. See the module docstring.
@@ -297,7 +297,7 @@ def _route(plan: DevicePlan, route: StaticRoute) -> str:
     """One static route, in the order FRR's grammar takes the words.
 
     ``ip`` or ``ipv6`` comes from the destination's own family rather than from
-    the next hop: the two are the same by ``NG-F003``, and the destination is
+    the next hop: the two are the same by ``NV-F003``, and the destination is
     the one a route always has.
 
     A route placed in a table (§16.3) is written with ``table``, which FRR takes

@@ -5,7 +5,7 @@ metadata:
   description: |
     Access switch 01, South campus. Layer-2 only: the ports are untagged access
     ports, and the switch's own management address lives on the Vlan99 SVI
-    rather than on a port (NG-V009).
+    rather than on a port (NV-V009).
   labels:
     site: south
     role: access

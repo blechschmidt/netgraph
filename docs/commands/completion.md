@@ -97,7 +97,7 @@ worth completing has a completer, and each candidate carries a description:
 | `netviz export <TAB>` | The five export formats, with the artefact each writes. |
 | `--layer <TAB>` | `physical`, `l1`, `l2`, `l3`, `overlay`, `rack`, with what each one draws. |
 | `--kind <TAB>` | The element kinds the option accepts — no `cable` on a filter, `cable` included on `netviz schema`. |
-| `--disable <TAB>` | Rule ids with their summaries, `*` included; type `NG-` for the schema aliases. |
+| `--disable <TAB>` | Rule ids with their summaries, `*` included; type `NV-` for the schema aliases. |
 | `--profile <TAB>` | The `[profile.<name>]` blocks of the inventory's `netviz.toml`, each described by the settings it overrides. |
 
 Two details follow from how the lists are built rather than from a decision about

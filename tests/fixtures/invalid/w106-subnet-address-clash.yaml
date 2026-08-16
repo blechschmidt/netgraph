@@ -1,4 +1,4 @@
-# W106 (NG-A009) - one address claimed twice inside a subnet.
+# W106 (NV-A009) - one address claimed twice inside a subnet.
 #
 # Both hosts are configured with 10.0.0.1/24, but in different VLANs, so E004 -
 # which scopes a duplicate to one broadcast domain - stays quiet. The layer-3

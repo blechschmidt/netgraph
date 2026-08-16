@@ -1,4 +1,4 @@
-# W154 (NG-B014) - a rule numbered above the one that closes its chain.
+# W154 (NV-B014) - a rule numbered above the one that closes its chain.
 #
 # The chain is walked from the lowest priority upwards and the first terminal
 # match decides. Rule 100 names no selector and drops, so it closes the forward

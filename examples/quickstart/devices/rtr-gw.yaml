@@ -6,7 +6,7 @@ metadata:
   annotations:
     # wan0 faces the ISP, which is not an element of this inventory, so it
     # terminates no cable on purpose.
-    netviz/ignore: NG-C015
+    netviz/ignore: NV-C015
 spec:
   vendor: MikroTik
   interfaces:

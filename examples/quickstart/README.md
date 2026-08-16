@@ -42,7 +42,7 @@ quickstart/
 * **Every cabled interface states `mtu: 1500`**, so the two ends of each link
   agree and `W102` stays quiet.
 * **The WAN port is annotated, not hidden.** `wan0` faces an ISP that is not an
-  element here, so it terminates no cable — `I002` (`NG-C015`). A
+  element here, so it terminates no cable — `I002` (`NV-C015`). A
   `netviz/ignore` annotation on `rtr-gw` says that is deliberate, which is
   what an exception should look like.
 

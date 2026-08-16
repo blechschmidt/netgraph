@@ -62,7 +62,7 @@ for a router loopback somebody declared on purpose, which the distribution's
 ``iface lo inet loopback`` is not. This is :mod:`netviz.importer.iproute`'s
 rule, for its reason. A bridge or bond that the file declares with no member
 port (``bridge_ports none``, or a stanza whose ports are configured elsewhere)
-is left out for the same kind of reason: ``NG-I003`` requires an aggregate to
+is left out for the same kind of reason: ``NV-I003`` requires an aggregate to
 list at least one member, and an empty one would be a tree that does not load.
 
 One thing the format simply does not state is an interface *type*: a port is
@@ -459,7 +459,7 @@ def _finish(state: _Pass) -> None:
         if interface.type in ("bridge", "lag") and not interface.members:
             state.note(
                 f"{name} is declared as a {interface.type} with no member port; netviz "
-                "requires at least one (NG-I003), so it was not imported"
+                "requires at least one (NV-I003), so it was not imported"
             )
             state.device.note(
                 f"{name} was observed as a {interface.type} with no members and is therefore "

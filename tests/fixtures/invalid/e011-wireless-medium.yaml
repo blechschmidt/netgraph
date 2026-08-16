@@ -1,4 +1,4 @@
-# E011 (NG-C006) - the cable's medium disagrees with an endpoint's type.
+# E011 (NV-C006) - the cable's medium disagrees with an endpoint's type.
 #
 # 'pc-a:wlan0' is a radio, but the cable calls itself copper. A wireless link is
 # an association between two radios; a copper run cannot end on one.

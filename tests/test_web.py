@@ -146,13 +146,13 @@ def test_a_syntax_error_is_recorded_with_its_line() -> None:
 
 def test_a_rejected_document_does_not_stop_the_ones_after_it() -> None:
     inventory = load_stream(f"kind: nonsense\n---\n{TWO_HOSTS}")
-    assert [error.rule for error in inventory.errors] == ["NG-D003"]
+    assert [error.rule for error in inventory.errors] == ["NV-D003"]
     assert sorted(inventory.elements) == ["cbl-a-b", "pc-a", "pc-b"]
 
 
 def test_a_duplicate_name_in_one_stream_is_reported() -> None:
     inventory = load_stream(f"{TWO_HOSTS}\n---\n{TWO_HOSTS}")
-    assert any(error.rule == "NG-N002" for error in inventory.errors)
+    assert any(error.rule == "NV-N002" for error in inventory.errors)
 
 
 def test_an_empty_stream_loads_to_nothing() -> None:

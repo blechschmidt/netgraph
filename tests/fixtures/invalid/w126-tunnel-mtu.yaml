@@ -1,4 +1,4 @@
-# W126 (NG-T011) - a tunnel's MTU does not fit inside its underlay.
+# W126 (NV-T011) - a tunnel's MTU does not fit inside its underlay.
 #
 # The OpenVPN tunnel asks for 1420 bytes inside a WireGuard tunnel that offers
 # 1420 minus 69 bytes of OpenVPN encapsulation. Both types encrypt, and both

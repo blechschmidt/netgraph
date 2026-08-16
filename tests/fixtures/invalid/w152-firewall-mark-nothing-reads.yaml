@@ -1,4 +1,4 @@
-# W152 (NG-B012) - a mark written by the firewall that no policy rule reads.
+# W152 (NV-B012) - a mark written by the firewall that no policy rule reads.
 #
 # Half of the plan of section 16.9: mark the packet in the firewall, route by
 # the mark in the policy database. The marking half is here; the routing half

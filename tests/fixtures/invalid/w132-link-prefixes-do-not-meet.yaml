@@ -1,4 +1,4 @@
-# W132 (NG-A012) - an address outside every prefix on its own link.
+# W132 (NV-A012) - an address outside every prefix on its own link.
 #
 # One cable is one segment, and there is no room for a router inside it. With
 # 10.0.0.1/30 facing 192.168.1.1/30 neither end is inside any prefix the other

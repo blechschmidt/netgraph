@@ -1094,7 +1094,7 @@ def test_w106_ignores_the_same_address_in_a_different_prefix(tmp_path: Path) -> 
 
 
 def test_e007_reports_a_two_step_stacking_cycle(tmp_path: Path) -> None:
-    """NG-I002 catches `parent: self`; nothing per-document catches a longer loop."""
+    """NV-I002 catches `parent: self`; nothing per-document catches a longer loop."""
     inventory = load(
         tmp_path,
         net=doc(
@@ -1425,7 +1425,7 @@ def test_the_two_low_bits_of_the_first_octet_are_independent(
 def test_stacking_checks_tolerate_an_adapter_upstream_member(tmp_path: Path) -> None:
     """An adapter's `members` may name the upstream port, which is not an interface.
 
-    `NG-X004` puts the upstream port in the same name space as the downstream
+    `NV-X004` puts the upstream port in the same name space as the downstream
     ones, so it resolves for the schema but has no `Interface` behind it. Every
     stacking rule has to step over it rather than trip on it.
     """
@@ -1604,7 +1604,7 @@ def test_w109_is_satisfied_by_one_cableable_port(tmp_path: Path, itype: str) -> 
 
 
 def test_w109_leaves_adapters_alone(tmp_path: Path) -> None:
-    """NG-X003 already restricts an adapter to the three cableable types."""
+    """NV-X003 already restricts an adapter to the three cableable types."""
     inventory = load(
         tmp_path,
         net=doc(
@@ -2870,7 +2870,7 @@ def orphan(name: str = "spare", **metadata: Any) -> str:
 
 @pytest.mark.parametrize(
     "value",
-    ["W103", "NG-C016", "w103", "*", "all", "any", "E001, W103", "E001 W103", "E001;W103"],
+    ["W103", "NV-C016", "w103", "*", "all", "any", "E001, W103", "E001 W103", "E001;W103"],
 )
 def test_annotation_suppresses_a_rule(tmp_path: Path, value: str) -> None:
     inventory = load(tmp_path, net=orphan(annotations={"netviz/ignore": value}))
@@ -2948,7 +2948,7 @@ def test_config_file_round_trip(tmp_path: Path) -> None:
         """
         [validate]
         strict = true
-        ignore = ["W101", "NG-C016"]
+        ignore = ["W101", "NV-C016"]
 
         [validate.severity]
         E004 = "warning"
@@ -2958,7 +2958,7 @@ def test_config_file_round_trip(tmp_path: Path) -> None:
     config = load_config(tmp_path)
     assert config.path == tmp_path / CONFIG_FILE_NAME
     assert not config.is_default
-    # The NG-* alias resolves to the short id it shares a rule with.
+    # The NV-* alias resolves to the short id it shares a rule with.
     assert config.validation.ignore == frozenset({"W101", "W103"})
     assert config.validation.severity == {"E004": Severity.WARNING}
     assert config.validation.strict is True
@@ -3024,7 +3024,7 @@ def test_unknown_top_level_tables_are_left_alone(tmp_path: Path) -> None:
 
 def test_command_line_overrides_layer_on_top_of_the_file(tmp_path: Path) -> None:
     base = ValidationConfig(ignore=frozenset({"W101"}))
-    merged = base.with_overrides(strict=True, ignore=["NG-C016"])
+    merged = base.with_overrides(strict=True, ignore=["NV-C016"])
     assert merged.ignore == frozenset({"W101", "W103"})
     assert merged.strict is True
     # The original is untouched.
@@ -3097,7 +3097,7 @@ def test_rule_ids_and_aliases_are_unique() -> None:
     assert len(set(names)) == len(names)
 
 
-@pytest.mark.parametrize(("token", "expected"), [("e001", "E001"), ("NG-C005", "E002")])
+@pytest.mark.parametrize(("token", "expected"), [("e001", "E001"), ("NV-C005", "E002")])
 def test_rule_ids_resolve_case_insensitively(token: str, expected: str) -> None:
     assert resolve_rule_id(token) == expected
     assert known_rule(token)

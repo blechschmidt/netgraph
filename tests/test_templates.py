@@ -139,7 +139,7 @@ def test_the_count_is_the_product_of_the_spans() -> None:
 def test_a_malformed_range_is_rejected_with_ng_r002(pattern: str) -> None:
     with pytest.raises(RangeError) as raised:
         parse_range(pattern)
-    assert raised.value.rule == "NG-R002"
+    assert raised.value.rule == "NV-R002"
 
 
 def test_a_range_must_be_a_string() -> None:
@@ -170,7 +170,7 @@ def test_description_substitution(description: str, values: tuple[str, ...], exp
 def test_a_bad_placeholder_is_ng_r005(description: str) -> None:
     with pytest.raises(RangeError) as raised:
         substitute(description, ("1",))
-    assert raised.value.rule == "NG-R005"
+    assert raised.value.rule == "NV-R005"
 
 
 # --------------------------------------------------------------------------- #
@@ -249,7 +249,7 @@ def test_a_range_over_the_bound_is_ng_r003(tmp_path: Path) -> None:
     )
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-R003"
+    assert error.rule == "NV-R003"
     assert str(MAX_INTERFACES_PER_DOCUMENT) in error.message
     assert error.field_path == ("spec", "interfaces", 0, "range")
 
@@ -268,7 +268,7 @@ def test_the_bound_is_per_document_not_per_range(tmp_path: Path) -> None:
     )
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-R003"
+    assert error.rule == "NV-R003"
     assert error.field_path == ("spec", "interfaces", 1, "range")
 
 
@@ -294,7 +294,7 @@ def test_name_and_range_together_are_ng_r001(tmp_path: Path) -> None:
     )
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-R001"
+    assert error.rule == "NV-R001"
     assert "not both" in error.message
 
 
@@ -312,7 +312,7 @@ def test_a_range_colliding_with_a_name_quotes_both_locations(tmp_path: Path) -> 
     )
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-R004"
+    assert error.rule == "NV-R004"
     assert "'eth1'" in error.message
     # Both sides are named, each with its own line, so the fix is obvious.
     assert "sw.yaml#0:6" in error.message  # the range entry
@@ -331,7 +331,7 @@ def test_two_ranges_that_overlap_collide(tmp_path: Path) -> None:
     )
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-R004"
+    assert error.rule == "NV-R004"
     assert "'eth2'" in error.message
 
 
@@ -346,7 +346,7 @@ def test_two_explicit_duplicates_are_still_ng_i001(tmp_path: Path) -> None:
             "    - {name: eth0, type: ethernet}\n"
         ),
     )
-    assert only_error(load_tree(tmp_path)).rule == "NG-I001"
+    assert only_error(load_tree(tmp_path)).rule == "NV-I001"
 
 
 def test_a_document_without_ranges_is_left_alone(tmp_path: Path) -> None:
@@ -383,7 +383,7 @@ def test_a_diagnostic_on_an_expanded_port_points_at_the_range(tmp_path: Path) ->
     )
     errors = load_tree(tmp_path).errors
 
-    assert errors and {error.rule for error in errors} == {"NG-I011"}
+    assert errors and {error.rule for error in errors} == {"NV-I011"}
     for error in errors:
         # Every one of the ten ports was produced by the entry at index 1, so
         # every diagnostic lands on its 'mtu' -- line 10. Without the redirect
@@ -432,7 +432,7 @@ def test_a_malformed_template_spec_is_ng_m005(document: Any, path: tuple[str, ..
     with pytest.raises(SchemaError) as raised:
         parse_template(document)
     (issue,) = raised.value.issues
-    assert issue.rule == "NG-M005"
+    assert issue.rule == "NV-M005"
     assert issue.path == path
 
 
@@ -452,7 +452,7 @@ def test_an_unused_template_is_still_checked(tmp_path: Path) -> None:
     write(tmp_path, "t.yaml", template("  interfaces: [{range: 'eth[9-1]', type: ethernet}]\n"))
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-R002"
+    assert error.rule == "NV-R002"
     assert error.relative == "t.yaml"
 
 
@@ -461,7 +461,7 @@ def test_a_duplicate_template_name_is_ng_m002(tmp_path: Path) -> None:
     write(tmp_path, "b.yaml", template("  vendor: two\n"))
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-M002"
+    assert error.rule == "NV-M002"
     assert "a.yaml" in error.message
     assert error.relative == "b.yaml"
 
@@ -484,7 +484,7 @@ def test_an_unknown_template_is_ng_m001(tmp_path: Path) -> None:
     write(tmp_path, "sw.yaml", switch("  from: nope\n"))
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-M001"
+    assert error.rule == "NV-M001"
     assert error.field_path == ("spec", "from")
     assert "declares no 'kind: template' document" in error.message
 
@@ -494,7 +494,7 @@ def test_an_unknown_template_lists_the_known_ones(tmp_path: Path) -> None:
     write(tmp_path, "sw.yaml", switch("  from: c9300l\n"))
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-M001"
+    assert error.rule == "NV-M001"
     assert "c9200l" in error.message
 
 
@@ -504,14 +504,14 @@ def test_an_ambiguous_template_reference_is_ng_m001(tmp_path: Path) -> None:
     write(tmp_path, "c/sw.yaml", switch("  from: tpl\n"))
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-M001"
+    assert error.rule == "NV-M001"
     assert "ambiguous" in error.message
     assert "a/tpl" in error.message and "b/tpl" in error.message
 
 
 def test_a_non_string_from_is_ng_m001(tmp_path: Path) -> None:
     write(tmp_path, "sw.yaml", switch("  from: [a, b]\n"))
-    assert only_error(load_tree(tmp_path)).rule == "NG-M001"
+    assert only_error(load_tree(tmp_path)).rule == "NV-M001"
 
 
 def test_from_on_a_cable_is_ng_m006(tmp_path: Path) -> None:
@@ -523,7 +523,7 @@ def test_from_on_a_cable_is_ng_m006(tmp_path: Path) -> None:
     )
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-M006"
+    assert error.rule == "NV-M006"
     assert error.field_path == ("spec", "from")
 
 
@@ -545,8 +545,8 @@ def test_a_template_cycle_is_ng_m003(tmp_path: Path) -> None:
     inventory = load_tree(tmp_path)
 
     rules = [error.rule for error in inventory.errors]
-    assert "NG-M003" in rules
-    cycle = next(error for error in inventory.errors if error.rule == "NG-M003")
+    assert "NV-M003" in rules
+    cycle = next(error for error in inventory.errors if error.rule == "NV-M003")
     assert "->" in cycle.message
 
 
@@ -558,7 +558,7 @@ def test_a_device_naming_an_invalid_template_is_ng_m004(tmp_path: Path) -> None:
     rules = [error.rule for error in inventory.errors]
     # The template is blamed once, for itself; the device only says it cannot
     # use it. Fifty devices would not produce fifty copies of the first error.
-    assert rules == ["NG-R002", "NG-M004"]
+    assert rules == ["NV-R002", "NV-M004"]
 
 
 # --------------------------------------------------------------------------- #
@@ -799,7 +799,7 @@ def test_a_field_from_the_template_is_reported_against_the_template(tmp_path: Pa
     )
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-I011"
+    assert error.rule == "NV-I011"
     assert error.relative == "a-template.yaml"
     assert error.line == 8  # the 'mtu: 1000' line of the template
     assert error.field_path == ("spec", "interfaces", 0, "mtu")
@@ -821,7 +821,7 @@ def test_a_field_the_device_overrode_is_reported_against_the_device(tmp_path: Pa
     )
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-I011"
+    assert error.rule == "NV-I011"
     assert error.relative == "b-switch.yaml"
     assert error.line == 8  # the device's own 'mtu: 900'
     assert "inherited by" not in error.message
@@ -1119,7 +1119,7 @@ def test_a_bad_range_description_is_reported_at_load(tmp_path: Path) -> None:
     )
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-R005"
+    assert error.rule == "NV-R005"
     assert error.field_path == ("spec", "interfaces", 0, "description")
 
 
@@ -1166,14 +1166,14 @@ def test_a_device_with_from_and_a_bad_range_reports_the_range(tmp_path: Path) ->
     )
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-R002"
+    assert error.rule == "NV-R002"
 
 
 def test_a_template_whose_parent_is_unknown_is_ng_m001(tmp_path: Path) -> None:
     write(tmp_path, "t.yaml", template("  from: missing\n  vendor: Cisco\n"))
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-M001"
+    assert error.rule == "NV-M001"
     assert error.relative == "t.yaml"
 
 
@@ -1182,7 +1182,7 @@ def test_a_qualified_reference_that_matches_nothing_is_ng_m001(tmp_path: Path) -
     write(tmp_path, "sw.yaml", switch("  from: elsewhere/tpl\n"))
     error = only_error(load_tree(tmp_path))
 
-    assert error.rule == "NG-M001"
+    assert error.rule == "NV-M001"
 
 
 def test_a_bare_reference_resolves_globally_when_the_name_is_unique(tmp_path: Path) -> None:

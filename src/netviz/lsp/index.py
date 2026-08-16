@@ -331,7 +331,7 @@ def _split_reference(span: Range, text: str, *, has_detail: bool) -> tuple[Range
     """Split ``device:interface`` into its two halves, by the first colon.
 
     Neither half may contain a colon — an element name and an interface name are
-    both spelled out of a grammar that excludes it (``NG-N001``, §6.2) — so the
+    both spelled out of a grammar that excludes it (``NV-N001``, §6.2) — so the
     first one is the separator and there is nothing to disambiguate.
     """
     if not has_detail:

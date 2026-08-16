@@ -1,4 +1,4 @@
-# E032 (NG-F008) - a static route's next hop is not on-link.
+# E032 (NV-F008) - a static route's next hop is not on-link.
 #
 # 'rtr-a' is addressed only in 10.0.0.0/30, so nothing resolves 10.9.9.1: the
 # router would have to route to reach the next hop that tells it how to route.

@@ -354,7 +354,7 @@ a network one. Both have an icon in the bundled [themes](#icons).
 from the group to the member. That is the direction the fact is written in and
 the direction a reader follows to answer "who is in this?". A nested group is an
 ordinary member, so the hierarchy is drawn as one: `everyone` → `engineering` →
-`ana`. A member that does not resolve is not drawn — `NG-S010` is the place that
+`ana`. A member that does not resolve is not drawn — `NV-S010` is the place that
 says so, and `--force` has to keep producing a picture.
 
 Everything else is discarded, for the same reason the power view discards the
@@ -1508,7 +1508,7 @@ netviz render -f html --layer l1 --layer l2 --layer l3 \
 ```
 
 [**docs/home-lab.html**](home-lab.html) is that command's output, committed:
-the home-lab inventory at all three layers, 174 kB, no server. GitHub shows an
+the home-lab inventory at all three layers, 177 kB, no server. GitHub shows an
 `.html` file as source, so download it — or open it from a Pages site — to see
 the page itself.
 
@@ -1558,7 +1558,7 @@ Two consequences of there being no layout engine in a browser are worth knowing:
   view — each layer, with and without the addresses and the VLANs — and shows
   the one you asked for. Identical drawings are stored once, so an inventory
   with no VLANs pays nothing for the VLAN toggle. That is also the size: expect
-  roughly 43 kB of client plus a drawing per view, or ~174 kB for the
+  roughly 43 kB of client plus a drawing per view, or ~177 kB for the
   three-layer example above. A view costs its drawing and essentially nothing
   else — the records are stored once for the whole page however many layers
   draw an element, and an `--icons` theme is stored once however many nodes and

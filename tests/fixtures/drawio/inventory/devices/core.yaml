@@ -4,7 +4,7 @@ metadata:
   name: rtr-core
   description: Edge router. wan0 faces an ISP this inventory does not describe.
   annotations:
-    netviz/ignore: NG-C015
+    netviz/ignore: NV-C015
 spec:
   vendor: MikroTik
   model: hEX S

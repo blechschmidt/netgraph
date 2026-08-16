@@ -30,7 +30,7 @@ _MAX_LABEL_VALUE = 253
 
 
 def _check_key(key: str, *, kind: str) -> None:
-    """Validate a label or annotation key against ``NG-N003``."""
+    """Validate a label or annotation key against ``NV-N003``."""
     prefix, separator, name = key.rpartition("/")
     if separator and not prefix:
         raise ValueError(f"{kind} key {echo_value(key)} has an empty prefix")
@@ -59,7 +59,7 @@ def _check_key(key: str, *, kind: str) -> None:
 
 
 def _check_label_key(key: str) -> None:
-    """Validate a label key against ``NG-N003``.
+    """Validate a label key against ``NV-N003``.
 
     Labels are *user* vocabulary and drive ``--select``, so the tool's own
     prefix is off limits. Annotations are the opposite: they exist to carry
@@ -95,8 +95,8 @@ class Location(NetvizModel):
     position: RackUnit | None = None
     #: How many units it occupies, upwards from :attr:`position`.
     height: RackUnits = 1
-    #: How tall the rack is. Declared by any element in it; ``NG-U003`` refuses
-    #: two elements that disagree, and the value bounds ``NG-U002``.
+    #: How tall the rack is. Declared by any element in it; ``NV-U003`` refuses
+    #: two elements that disagree, and the value bounds ``NV-U002``.
     rack_height: RackUnits | None = None
 
     @model_validator(mode="after")
@@ -105,7 +105,7 @@ class Location(NetvizModel):
             if getattr(self, key) is not None and self.rack is None:
                 raise field_error(
                     f"{key!r} places the element in a rack, so 'rack' must name which one",
-                    rule="NG-U004",
+                    rule="NV-U004",
                     path=(key,),
                 )
         return self
@@ -151,7 +151,7 @@ class Location(NetvizModel):
 class Metadata(NetvizModel):
     """Identity and free-form annotation of an element."""
 
-    #: Unique across the whole inventory (``NG-N002``, checked by the validator).
+    #: Unique across the whole inventory (``NV-N002``, checked by the validator).
     name: ElementName
     #: Free text, may be multi-line. Rendered as a node tooltip.
     description: str | None = None

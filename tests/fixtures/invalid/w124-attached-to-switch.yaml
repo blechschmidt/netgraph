@@ -1,4 +1,4 @@
-# W124 (NG-X007) - an adapter is plugged into a switch.
+# W124 (NV-X007) - an adapter is plugged into a switch.
 #
 # Adapters hang off a host bus; a switch takes a cable. A media converter
 # between two switches is modelled with 'passthrough: false' and a cable each

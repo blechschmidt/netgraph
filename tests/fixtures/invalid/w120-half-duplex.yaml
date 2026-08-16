@@ -1,4 +1,4 @@
-# W120 (NG-C013) - 'duplex: half' on a link with no repeater on it.
+# W120 (NV-C013) - 'duplex: half' on a link with no repeater on it.
 #
 # Two switched ports do not share a collision domain, so half duplex here is
 # either a failed negotiation or a value copied from a document about a hub.

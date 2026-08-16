@@ -186,7 +186,7 @@ def test_the_per_type_facts_are_the_published_ones(
 
 
 def test_a_tunnel_interface_is_not_cableable() -> None:
-    """``NG-C009`` and ``NG-T003`` are complementary: a port takes one or the other."""
+    """``NV-C009`` and ``NV-T003`` are complementary: a port takes one or the other."""
     assert not InterfaceType.TUNNEL.is_cableable
     assert InterfaceType.TUNNEL.iana_if_type == "ianaift:tunnel"
 
@@ -235,20 +235,20 @@ def test_other_ends_refuses_an_endpoint_that_is_not_one() -> None:
 @pytest.mark.parametrize(
     "spec,rule,field",
     [
-        # NG-T001: two endpoints at least, and no repeats.
-        ({"type": "gre", "endpoints": ["a:gre0"]}, "NG-T001", "endpoints"),
-        ({"type": "gre", "endpoints": ["a:gre0", "a:gre0"]}, "NG-T001", "1"),
-        # NG-T007: the VNI belongs to VXLAN and Geneve, and to nothing else.
-        ({"type": "vxlan", "endpoints": ["a:vx0", "b:vx0"]}, "NG-T007", "vni"),
-        ({"type": "geneve", "endpoints": ["a:gv0", "b:gv0"]}, "NG-T007", "vni"),
-        ({"type": "gre", "endpoints": ["a:g", "b:g"], "vni": 1}, "NG-T007", "vni"),
-        # NG-T008: mode is IPsec's, and a port needs a transport that has one.
-        ({"type": "gre", "endpoints": ["a:g", "b:g"], "mode": "tunnel"}, "NG-T008", "mode"),
-        ({"type": "gre", "endpoints": ["a:g", "b:g"], "port": 47}, "NG-T008", "port"),
-        ({"type": "ipsec", "endpoints": ["a:i", "b:i"], "port": 500}, "NG-T008", "port"),
-        # NG-T009: nothing to describe on a tunnel that protects nothing.
-        ({"type": "gre", "endpoints": ["a:g", "b:g"], "cipher": "aes"}, "NG-T009", "cipher"),
-        ({"type": "gre", "endpoints": ["a:g", "b:g"], "auth": "psk"}, "NG-T009", "auth"),
+        # NV-T001: two endpoints at least, and no repeats.
+        ({"type": "gre", "endpoints": ["a:gre0"]}, "NV-T001", "endpoints"),
+        ({"type": "gre", "endpoints": ["a:gre0", "a:gre0"]}, "NV-T001", "1"),
+        # NV-T007: the VNI belongs to VXLAN and Geneve, and to nothing else.
+        ({"type": "vxlan", "endpoints": ["a:vx0", "b:vx0"]}, "NV-T007", "vni"),
+        ({"type": "geneve", "endpoints": ["a:gv0", "b:gv0"]}, "NV-T007", "vni"),
+        ({"type": "gre", "endpoints": ["a:g", "b:g"], "vni": 1}, "NV-T007", "vni"),
+        # NV-T008: mode is IPsec's, and a port needs a transport that has one.
+        ({"type": "gre", "endpoints": ["a:g", "b:g"], "mode": "tunnel"}, "NV-T008", "mode"),
+        ({"type": "gre", "endpoints": ["a:g", "b:g"], "port": 47}, "NV-T008", "port"),
+        ({"type": "ipsec", "endpoints": ["a:i", "b:i"], "port": 500}, "NV-T008", "port"),
+        # NV-T009: nothing to describe on a tunnel that protects nothing.
+        ({"type": "gre", "endpoints": ["a:g", "b:g"], "cipher": "aes"}, "NV-T009", "cipher"),
+        ({"type": "gre", "endpoints": ["a:g", "b:g"], "auth": "psk"}, "NV-T009", "auth"),
     ],
 )
 def test_a_field_that_makes_no_sense_for_the_type_is_refused(
@@ -276,11 +276,11 @@ def test_declaring_a_cleartext_tunnel_encrypted_unlocks_the_cipher_fields() -> N
     "key", ["private_key", "preshared_key", "psk", "password", "secret", "passphrase"]
 )
 def test_key_material_is_refused_by_name_rather_than_as_an_unknown_key(key: str) -> None:
-    """§14.2: ``NG-T010`` exists so the message explains *why*, not just *that*."""
+    """§14.2: ``NV-T010`` exists so the message explains *why*, not just *that*."""
     with pytest.raises(SchemaError) as exc:
         parsed(type="wireguard", endpoints=["a:wg0", "b:wg0"], **{key: "hunter2"})
     (issue,) = exc.value.issues
-    assert issue.rule == "NG-T010"
+    assert issue.rule == "NV-T010"
     assert "never stores secrets" in issue.message
 
 
@@ -291,7 +291,7 @@ def test_the_vni_is_a_24_bit_field() -> None:
 
 
 def test_a_tunnel_interface_may_name_its_underlay_port_and_nothing_else_may() -> None:
-    """``NG-I002``: ``parent`` is ``if:lower-layer-if``, not a free-form pointer."""
+    """``NV-I002``: ``parent`` is ``if:lower-layer-if``, not a free-form pointer."""
     document = yaml.safe_load("""
 apiVersion: netviz.dev/v1alpha1
 kind: computer
@@ -306,7 +306,7 @@ spec:
     document["spec"]["interfaces"][1] = {"name": "eth1", "type": "ethernet", "parent": "eth0"}
     with pytest.raises(SchemaError) as exc:
         parse_document(document)
-    assert ("NG-I002", "parent") in issues(exc)
+    assert ("NV-I002", "parent") in issues(exc)
 
 
 def test_a_tunnel_interface_must_not_be_its_own_parent() -> None:
@@ -320,7 +320,7 @@ spec:
 """)
     with pytest.raises(SchemaError) as exc:
         parse_document(document)
-    assert ("NG-I002", "parent") in issues(exc)
+    assert ("NV-I002", "parent") in issues(exc)
 
 
 # --------------------------------------------------------------------------- #

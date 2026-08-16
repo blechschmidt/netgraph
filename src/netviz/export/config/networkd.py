@@ -430,7 +430,7 @@ def _routes(plan: DevicePlan, interface: Interface, *, unbound: bool) -> Iterato
     """One ``[Route]`` per gateway and per static route leaving this interface.
 
     A blackhole route is the one that belongs to no interface: it has no next hop
-    and no egress by construction (``NG-F004``), and networkd installs it without
+    and no egress by construction (``NV-F004``), and networkd installs it without
     a device. Every ``[Route]`` still has to be *stated* in some ``.network``, so
     it goes in the first one this device gets — an arbitrary choice, but not a
     guess, because the file it sits in does not change what the route does.
@@ -529,7 +529,7 @@ def _rule_selectors(plan: DevicePlan, rule: PolicyRule) -> Iterator[str]:
 def _rule_action(plan: DevicePlan, rule: PolicyRule) -> Iterator[str]:
     """What the rule does: a table to route by, or the way it refuses to."""
     if rule.action is PolicyAction.LOOKUP:
-        assert rule.table is not None  # NG-F016: a lookup always names one
+        assert rule.table is not None  # NV-F016: a lookup always names one
         yield f"Table={_table(plan, rule.table)}"
         return
     if rule.action is PolicyAction.GOTO:

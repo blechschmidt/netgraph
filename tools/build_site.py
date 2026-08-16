@@ -13,7 +13,7 @@ What it produces
     The README, with a strip of links into the live examples above the fold.
 ``docs/…``
     Every Markdown file under ``docs/`` as a page, with the same anchors GitHub
-    derives, so a URL somebody has bookmarked or a ``NG-*`` rule's help link
+    derives, so a URL somebody has bookmarked or a ``NV-*`` rule's help link
     lands in the same place here as it does on GitHub.
 ``demo/<example>-diagram.html``
     ``netviz render -f html`` over each inventory in ``examples/``, several
@@ -193,7 +193,7 @@ def slug(heading: str) -> str:
     """The anchor GitHub derives from a heading.
 
     Deliberately the same function as ``tests/test_docs.py``'s, and
-    ``tests/test_site.py`` asserts they stay the same: every ``NG-*`` finding's
+    ``tests/test_site.py`` asserts they stay the same: every ``NV-*`` finding's
     help link is ``validation-rules.md#<anchor>``, and a site that derived its
     own anchors would answer those links with the top of the page.
     """

@@ -276,7 +276,7 @@ def _widen_ipv4_address(definition: dict[str, Any]) -> dict[str, Any]:
         "description": (
             "The dotted-quad spelling of `prefix_length`, normalised away on "
             "load. Mutually exclusive with `prefix_length`; a non-contiguous "
-            "mask is rejected (`NG-A003`)."
+            "mask is rejected (`NV-A003`)."
         ),
         "pattern": rf"^{_V4_OCTET}(?:\.{_V4_OCTET}){{3}}$",
     }
@@ -354,7 +354,7 @@ _PORT_RANGE_SCHEMA: Final[dict[str, Any]] = {
     "description": (
         "The positions a patch panel has: a count (`24`, meaning 1 to 24) or "
         "comma-separated spans (`1-24`, `1-12,17-24`). Each position becomes a "
-        "`front/<n>` and a `rear/<n>` interface (`NG-P006`)."
+        "`front/<n>` and a `rear/<n>` interface (`NV-P006`)."
     ),
     "anyOf": [
         {"type": "integer", "minimum": 1},
@@ -384,7 +384,7 @@ _COUPLERS_SCHEMA: Final[dict[str, Any]] = {
     "title": "couplers",
     "description": (
         "Front position to rear position, for a panel that is not wired straight "
-        "through. Absent means the identity mapping (`NG-P007`)."
+        "through. Absent means the identity mapping (`NV-P007`)."
     ),
     "type": "object",
     "propertyNames": {"pattern": r"^\d+$"},

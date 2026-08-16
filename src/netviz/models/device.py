@@ -146,7 +146,7 @@ class DeviceSpec(NetvizModel):
 
     @model_validator(mode="after")
     def _check_vrf_table(self) -> DeviceSpec:
-        """``NG-F001``/``NG-F002``/``NG-F005``: the VRF table and its references.
+        """``NV-F001``/``NV-F002``/``NV-F005``: the VRF table and its references.
 
         A VRF is referred to by name from two places in the same ``spec`` — an
         interface binds to one, a route is placed in one — so the reference is
@@ -159,7 +159,7 @@ class DeviceSpec(NetvizModel):
             if vrf.name in declared:
                 raise field_error(
                     f"VRF {vrf.name!r} is declared twice",
-                    rule="NG-F001",
+                    rule="NV-F001",
                     path=("vrfs", index, "name"),
                 )
             declared.add(vrf.name)
@@ -169,7 +169,7 @@ class DeviceSpec(NetvizModel):
                 raise field_error(
                     f"{interface.name!r} binds to VRF {interface.vrf!r}, which "
                     f"{_vrf_table(declared)}",
-                    rule="NG-F002",
+                    rule="NV-F002",
                     path=("interfaces", index, "vrf"),
                 )
 
@@ -178,14 +178,14 @@ class DeviceSpec(NetvizModel):
                 raise field_error(
                     f"route {route.prefix} is placed in VRF {route.vrf!r}, which "
                     f"{_vrf_table(declared)}",
-                    rule="NG-F005",
+                    rule="NV-F005",
                     path=("routes", index, "vrf"),
                 )
         return self
 
     @model_validator(mode="after")
     def _check_routing_policy(self) -> DeviceSpec:
-        """``NG-F015``/``NG-F019``/``NG-F020``/``NG-F021``: tables and the policy over them.
+        """``NV-F015``/``NV-F019``/``NV-F020``/``NV-F021``: tables and the policy over them.
 
         The same shape as :meth:`_check_vrf_table` and for the same reason: a
         table is named from two places in one ``spec`` — a route is placed in
@@ -203,7 +203,7 @@ class DeviceSpec(NetvizModel):
                 raise field_error(
                     f"route {route.prefix} is placed in table {route.table!r}, which "
                     f"{_table_list(resolvable)}",
-                    rule="NG-F019",
+                    rule="NV-F019",
                     path=("routes", index, "table"),
                 )
 
@@ -214,7 +214,7 @@ class DeviceSpec(NetvizModel):
                 raise field_error(
                     f"policy rule {rule.priority} looks up table {rule.table!r}, which "
                     f"{_table_list(resolvable)}",
-                    rule="NG-F019",
+                    rule="NV-F019",
                     path=("routing_policy", index, "table"),
                 )
             for family in rule.families:
@@ -223,7 +223,7 @@ class DeviceSpec(NetvizModel):
                         f"two {family.value} policy rules share priority {rule.priority} "
                         f"(this one and entry {first}); the database is walked in priority "
                         f"order, so which of them decides is not something the document says",
-                        rule="NG-F020",
+                        rule="NV-F020",
                         path=("routing_policy", index, "priority"),
                     )
                 seen[(family, rule.priority)] = index
@@ -233,13 +233,13 @@ class DeviceSpec(NetvizModel):
                     raise field_error(
                         f"policy rule {rule.priority} selects on {key} {port!r}, which the "
                         f"device does not have; it has {_name_list(names)}",
-                        rule="NG-F021",
+                        rule="NV-F021",
                         path=("routing_policy", index, key),
                     )
         return self
 
     def _check_route_tables(self) -> set[str]:
-        """``NG-F015``: the declared tables, checked; their names, returned.
+        """``NV-F015``: the declared tables, checked; their names, returned.
 
         A reserved name or number is refused rather than merged, because the
         three tables of :data:`~netviz.models.routing.RESERVED_TABLES` exist
@@ -254,27 +254,27 @@ class DeviceSpec(NetvizModel):
                 raise field_error(
                     f"{table.name!r} is one of the tables every routing stack already has "
                     f"({_reserved_tables()}); it is nameable without being declared",
-                    rule="NG-F015",
+                    rule="NV-F015",
                     path=("route_tables", index, "name"),
                 )
             if table.name in declared:
                 raise field_error(
                     f"routing table {table.name!r} is declared twice",
-                    rule="NG-F015",
+                    rule="NV-F015",
                     path=("route_tables", index, "name"),
                 )
             if (reserved := _reserved_by_id(table.id)) is not None:
                 raise field_error(
                     f"table {table.name!r} is numbered {table.id}, which is reserved for "
                     f"{reserved!r}; a table declared there is that table under another name",
-                    rule="NG-F015",
+                    rule="NV-F015",
                     path=("route_tables", index, "id"),
                 )
             if (other := ids.get(table.id)) is not None:
                 raise field_error(
                     f"tables {other!r} and {table.name!r} are both numbered {table.id}; a "
                     f"table is its number, so these are one table with two names",
-                    rule="NG-F015",
+                    rule="NV-F015",
                     path=("route_tables", index, "id"),
                 )
             declared.add(table.name)
@@ -283,7 +283,7 @@ class DeviceSpec(NetvizModel):
 
     @model_validator(mode="after")
     def _check_netns_table(self) -> DeviceSpec:
-        """``NG-N020``/``NG-N021``/``NG-N022``: the namespace table and its references.
+        """``NV-N020``/``NV-N021``/``NV-N022``: the namespace table and its references.
 
         The same shape as :meth:`_check_vrf_table`, and here for the same
         reason: a namespace is named from two places in one ``spec`` — another
@@ -298,7 +298,7 @@ class DeviceSpec(NetvizModel):
             if entry.name in declared:
                 raise field_error(
                     f"network namespace {entry.name!r} is declared twice",
-                    rule="NG-N020",
+                    rule="NV-N020",
                     path=("netns", index, "name"),
                 )
             declared.add(entry.name)
@@ -308,7 +308,7 @@ class DeviceSpec(NetvizModel):
                 raise field_error(
                     f"namespace {entry.name!r} is nested inside {entry.parent!r}, which "
                     f"{_netns_table(declared)}",
-                    rule="NG-N021",
+                    rule="NV-N021",
                     path=("netns", index, "parent"),
                 )
 
@@ -319,7 +319,7 @@ class DeviceSpec(NetvizModel):
                     f"namespace nesting is cyclic: {' -> '.join(repr(name) for name in cycle)}. "
                     f"A namespace is created from inside exactly one other, so the chain has "
                     f"to end at the initial namespace.",
-                    rule="NG-N021",
+                    rule="NV-N021",
                     path=("netns", index, "parent"),
                 )
 
@@ -328,14 +328,14 @@ class DeviceSpec(NetvizModel):
                 raise field_error(
                     f"{interface.name!r} is in network namespace {interface.netns!r}, which "
                     f"{_netns_table(declared)}",
-                    rule="NG-N022",
+                    rule="NV-N022",
                     path=("interfaces", index, "netns"),
                 )
         return self
 
     @model_validator(mode="after")
     def _check_zones(self) -> DeviceSpec:
-        """``NG-B001``/``NG-B002``/``NG-B003``: the zone table and what is in it.
+        """``NV-B001``/``NV-B002``/``NV-B003``: the zone table and what is in it.
 
         The same shape as :meth:`_check_vrf_table` and for the same reason: a
         zone is named from two places in one ``spec`` — an interface is put in
@@ -353,13 +353,13 @@ class DeviceSpec(NetvizModel):
                     f"here rather than passing through — so it is nameable in a rule "
                     f"without being declared, and it is not one of the parts the "
                     f"interfaces are divided into",
-                    rule="NG-B001",
+                    rule="NV-B001",
                     path=("zones", index, "name"),
                 )
             if zone.name in declared:
                 raise field_error(
                     f"security zone {zone.name!r} is declared twice",
-                    rule="NG-B001",
+                    rule="NV-B001",
                     path=("zones", index, "name"),
                 )
             declared.add(zone.name)
@@ -368,7 +368,7 @@ class DeviceSpec(NetvizModel):
                     raise field_error(
                         f"zone {zone.name!r} holds interface {port!r}, which the device does "
                         f"not have; it has {_name_list(names)}",
-                        rule="NG-B002",
+                        rule="NV-B002",
                         path=("zones", index, "interfaces", position),
                     )
                 if (owner := placed.get(port)) is not None:
@@ -381,7 +381,7 @@ class DeviceSpec(NetvizModel):
                         f"interface {port!r} is {written}; an interface is in at most one "
                         f"zone, which is what makes 'from {owner}' a statement about a "
                         f"packet rather than a question",
-                        rule="NG-B003",
+                        rule="NV-B003",
                         path=("zones", index, "interfaces", position),
                     )
                 placed[port] = zone.name
@@ -389,7 +389,7 @@ class DeviceSpec(NetvizModel):
 
     @model_validator(mode="after")
     def _check_firewall(self) -> DeviceSpec:
-        """``NG-B004``/``NG-B008``/``NG-B009``: the policy over the zone table.
+        """``NV-B004``/``NV-B008``/``NV-B009``: the policy over the zone table.
 
         Separate from :meth:`_check_zones` because it depends on it: every zone
         a rule names has to be one the device declares, and the set of those is
@@ -411,7 +411,7 @@ class DeviceSpec(NetvizModel):
                         f"two {family.value} firewall rules share priority {rule.priority} "
                         f"(this one and entry {first}); the chain is walked in priority "
                         f"order, so which of them decides is not something the document says",
-                        rule="NG-B008",
+                        rule="NV-B008",
                         path=("firewall", "rules", index, "priority"),
                     )
                 seen[(family, rule.priority)] = index
@@ -421,7 +421,7 @@ class DeviceSpec(NetvizModel):
                     raise field_error(
                         f"firewall rule {rule.priority} selects on {key} {port!r}, which the "
                         f"device does not have; it has {_name_list(names)}",
-                        rule="NG-B009",
+                        rule="NV-B009",
                         path=("firewall", "rules", index, key),
                     )
 
@@ -436,25 +436,25 @@ class DeviceSpec(NetvizModel):
         *,
         path: tuple[str | int, ...],
     ) -> None:
-        """``NG-B004``: both zone fields of one rule name a zone that exists."""
+        """``NV-B004``: both zone fields of one rule name a zone that exists."""
         for key in ("src_zone", "dst_zone"):
             name: str | None = getattr(rule, key)
             if name is not None and name not in resolvable:
                 raise field_error(
                     f"{rule.describe()} names zone {name!r}, which {_zone_list(resolvable)}",
-                    rule="NG-B004",
+                    rule="NV-B004",
                     path=(*path, key),
                 )
 
     @model_validator(mode="after")
     def _check_vlan_database(self) -> DeviceSpec:
-        """``NG-V001``: ``vlans[].id`` is unique within a device."""
+        """``NV-V001``: ``vlans[].id`` is unique within a device."""
         seen: set[int] = set()
         for index, vlan in enumerate(self.vlans):
             if vlan.id in seen:
                 raise field_error(
                     f"VLAN {vlan.id} is declared twice",
-                    rule="NG-V001",
+                    rule="NV-V001",
                     path=("vlans", index, "id"),
                 )
             seen.add(vlan.id)
@@ -519,7 +519,7 @@ class DeviceSpec(NetvizModel):
 
         Sorted by priority rather than by declaration, because that *is* the
         database: two rules in the document are a set, and the order they are
-        consulted in is the number on them. Ties cannot happen (``NG-F020``), so
+        consulted in is the number on them. Ties cannot happen (``NV-F020``), so
         the sort is total and the result is what the device would do.
         """
         return tuple(
@@ -545,7 +545,7 @@ class DeviceSpec(NetvizModel):
     def zone_of(self, interface: str) -> Zone | None:
         """The zone ``interface`` is in, or ``None`` if it is in none (§24.1).
 
-        At most one can match: ``NG-B003`` is what makes that true, and it is
+        At most one can match: ``NV-B003`` is what makes that true, and it is
         also what makes this answer meaningful — an interface in two zones would
         leave every rule naming either of them ambiguous.
         """
@@ -633,7 +633,7 @@ class DeviceSpec(NetvizModel):
     def veth_pairs(self) -> tuple[tuple[Interface, Interface], ...]:
         """Every veth pair of the device, once each, in declaration order (§23.2).
 
-        Once each rather than twice: the pairing is symmetric (``NG-N023``), so
+        Once each rather than twice: the pairing is symmetric (``NV-N023``), so
         walking the interfaces would find every pair from both ends. The end
         declared first is the source, which is what makes the result — and the
         edge a renderer draws from it — deterministic.
@@ -660,7 +660,7 @@ class DeviceSpec(NetvizModel):
 
 
 def _vrf_table(declared: Iterable[str]) -> str:
-    """``is not declared in 'spec.vrfs' (which holds …)`` — the tail of NG-F002."""
+    """``is not declared in 'spec.vrfs' (which holds …)`` — the tail of NV-F002."""
     names = sorted(declared)
     if not names:
         return "is not declared: the device declares no 'spec.vrfs' at all"
@@ -668,7 +668,7 @@ def _vrf_table(declared: Iterable[str]) -> str:
 
 
 def _table_list(resolvable: Iterable[str]) -> str:
-    """``is no table of this device; it routes by …`` — the tail of ``NG-F019``.
+    """``is no table of this device; it routes by …`` — the tail of ``NV-F019``.
 
     The reserved three are named alongside the declared ones because they are
     equally valid answers: somebody who wrote ``table: mian`` needs to see that
@@ -680,7 +680,7 @@ def _table_list(resolvable: Iterable[str]) -> str:
 
 
 def _zone_list(resolvable: Iterable[str]) -> str:
-    """``is no zone of this device; it has …`` — the tail of ``NG-B004``.
+    """``is no zone of this device; it has …`` — the tail of ``NV-B004``.
 
     :data:`~netviz.models.firewall.LOCAL_ZONE` is named alongside the declared
     ones because it is an equally valid answer: somebody who wrote
@@ -708,7 +708,7 @@ def _reserved_by_id(number: int) -> str | None:
 
 
 def _netns_table(declared: Iterable[str]) -> str:
-    """The tail of ``NG-N021`` and ``NG-N022``, shaped like :func:`_vrf_table`."""
+    """The tail of ``NV-N021`` and ``NV-N022``, shaped like :func:`_vrf_table`."""
     names = sorted(declared)
     if not names:
         return "is not declared: the device declares no 'spec.netns' at all"
@@ -738,10 +738,10 @@ def _netns_cycle(start: str, parents: Mapping[str, str]) -> tuple[str, ...] | No
 def check_interface_set(interfaces: Iterable[Interface], *, reserved: Iterable[str] = ()) -> None:
     """Check name uniqueness and stacking references within one element.
 
-    ``NG-I001``: interface names are unique within their device. ``NG-I002`` /
-    ``NG-I003``: ``parent`` and ``members`` resolve to interfaces on the same
+    ``NV-I001``: interface names are unique within their device. ``NV-I002`` /
+    ``NV-I003``: ``parent`` and ``members`` resolve to interfaces on the same
     device. ``reserved`` holds extra names that are taken but are not entries of
-    the list itself (the adapter upstream port, ``NG-X004``).
+    the list itself (the adapter upstream port, ``NV-X004``).
     """
     reserved_names = set(reserved)
     names: set[str] = set()
@@ -750,13 +750,13 @@ def check_interface_set(interfaces: Iterable[Interface], *, reserved: Iterable[s
         if interface.name in reserved_names:
             raise field_error(
                 f"interface name {interface.name!r} collides with the upstream port",
-                rule="NG-X004",
+                rule="NV-X004",
                 path=("interfaces", index, "name"),
             )
         if interface.name in names:
             raise field_error(
                 f"interface name {interface.name!r} is declared twice",
-                rule="NG-I001",
+                rule="NV-I001",
                 path=("interfaces", index, "name"),
             )
         names.add(interface.name)
@@ -768,7 +768,7 @@ def check_interface_set(interfaces: Iterable[Interface], *, reserved: Iterable[s
                 key = "parent" if interface.parent is not None else "members"
                 raise field_error(
                     f"{interface.name!r} references unknown interface {referenced!r}",
-                    rule="NG-I002" if key == "parent" else "NG-I003",
+                    rule="NV-I002" if key == "parent" else "NV-I003",
                     path=("interfaces", index, key),
                 )
 
@@ -776,7 +776,7 @@ def check_interface_set(interfaces: Iterable[Interface], *, reserved: Iterable[s
 
 
 def check_veth_pairs(interfaces: Iterable[Interface]) -> None:
-    """``NG-N023``: every ``peer`` names a free interface that names it back (§23.2).
+    """``NV-N023``: every ``peer`` names a free interface that names it back (§23.2).
 
     A veth pair is created as a pair and destroyed as a pair; there is no
     operation that leaves one end. So a document in which ``veth0`` names
@@ -798,7 +798,7 @@ def check_veth_pairs(interfaces: Iterable[Interface]) -> None:
                 f"{interface.name!r} is one end of a veth pair whose other end "
                 f"{peer_name!r} is not an interface of this element; both ends of a veth "
                 f"pair are interfaces of the machine that holds it",
-                rule="NG-N023",
+                rule="NV-N023",
                 path=("interfaces", index, "peer"),
             )
         if peer.peer != interface.name:
@@ -806,7 +806,7 @@ def check_veth_pairs(interfaces: Iterable[Interface]) -> None:
             raise field_error(
                 f"{interface.name!r} names {peer_name!r} as its veth peer, but {peer_name!r} "
                 f"{written}; a veth pair is symmetric",
-                rule="NG-N023",
+                rule="NV-N023",
                 path=("interfaces", index, "peer"),
             )
 
@@ -839,20 +839,20 @@ class Device(ElementBase):
         return self
 
     def _check_kind_constraints(self) -> None:
-        """§6.5 / ``NG-H001`` to ``NG-H004``."""
+        """§6.5 / ``NV-H001`` to ``NV-H004``."""
         if not self.vlan_aware:
             for key in ("bridge", "vlans"):
                 if getattr(self.spec, key):
                     raise field_error(
                         f"a {self.kind} is a layer-1 repeater and has no {key!r}",
-                        rule="NG-H003",
+                        rule="NV-H003",
                         path=("spec", key),
                     )
             for index, interface in enumerate(self.spec.interfaces):
                 if interface.vlan is not None:
                     raise field_error(
                         f"a {self.kind} interface must not declare 'vlan'",
-                        rule="NG-H001",
+                        rule="NV-H001",
                         path=("spec", "interfaces", index, "vlan"),
                     )
 
@@ -861,7 +861,7 @@ class Device(ElementBase):
                 if getattr(self.spec, key):
                     raise field_error(
                         f"a {self.kind} has no IP stack and must not declare {key!r}",
-                        rule="NG-H003",
+                        rule="NV-H003",
                         path=("spec", key),
                     )
             for index, interface in enumerate(self.spec.interfaces):
@@ -869,13 +869,13 @@ class Device(ElementBase):
                     if getattr(interface, family) is not None:
                         raise field_error(
                             f"a {self.kind} interface must not declare {family!r}",
-                            rule="NG-H002",
+                            rule="NV-H002",
                             path=("spec", "interfaces", index, family),
                         )
                 if interface.vrf is not None:
                     raise field_error(
                         f"a {self.kind} interface has no IP stack, so it is in no VRF",
-                        rule="NG-H002",
+                        rule="NV-H002",
                         path=("spec", "interfaces", index, "vrf"),
                     )
 
@@ -887,7 +887,7 @@ class Device(ElementBase):
                     raise field_error(
                         f"{interface.name!r} is of type {interface.type.value!r}; "
                         f"a {self.kind} only supports {permitted}",
-                        rule="NG-H004",
+                        rule="NV-H004",
                         path=("spec", "interfaces", index, "type"),
                     )
 

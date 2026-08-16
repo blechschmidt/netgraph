@@ -1,4 +1,4 @@
-# W123 (NG-X002) - a dongle is patched into the network but plugged into nothing.
+# W123 (NV-X002) - a dongle is patched into the network but plugged into nothing.
 #
 # 'adp-a:en0' terminates a cable, so the adapter is in use; without an
 # 'attached_to' nothing says which machine it presents that port to.

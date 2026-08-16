@@ -496,7 +496,7 @@ spec:
         (("spec", "interfaces", 0, "mtu"), 9, 12),
         (("spec", "bogus"), 10, 10),
     ]
-    assert inventory.errors[1].rule == "NG-D005"
+    assert inventory.errors[1].rule == "NV-D005"
     assert str(inventory.errors[0]).startswith("bad.yaml#0:9:12: spec.interfaces[0].mtu: ")
 
 
@@ -511,7 +511,7 @@ def test_missing_key_is_located_at_the_closest_known_node(tmp_path: Path) -> Non
     (error,) = load_tree(root).errors
 
     assert error.field_path == ("spec",)
-    assert error.rule == "NG-D001"
+    assert error.rule == "NV-D001"
     assert error.line == 1
 
 
@@ -562,7 +562,7 @@ def test_unknown_kind_is_reported_once(tmp_path: Path) -> None:
 
     (error,) = load_tree(root).errors
 
-    assert error.rule == "NG-D003"
+    assert error.rule == "NV-D003"
     assert error.field_path == ("kind",)
 
 
@@ -572,7 +572,7 @@ def test_scalar_document_is_reported_as_a_document_error(tmp_path: Path) -> None
 
     (error,) = load_tree(root).errors
 
-    assert error.rule == "NG-D001"
+    assert error.rule == "NV-D001"
     assert "must be a mapping" in error.message
 
 
@@ -586,7 +586,7 @@ def test_duplicate_names_in_one_namespace_keep_the_first(tmp_path: Path) -> None
 
     assert sorted(inventory.elements) == ["sub/sw", "sw"]
     (error,) = inventory.errors
-    assert error.rule == "NG-N002"
+    assert error.rule == "NV-N002"
     assert error.relative == "b.yaml"
     assert "first declared at a.yaml#0:1" in error.message
 
@@ -603,7 +603,7 @@ def test_non_utf8_file_is_reported(tmp_path: Path) -> None:
 
 def test_load_error_location_without_a_file() -> None:
     assert LoadError(message="boom").location == "-"
-    assert str(LoadError(message="boom", rule="NG-D001")) == "-: NG-D001: boom"
+    assert str(LoadError(message="boom", rule="NV-D001")) == "-: NV-D001: boom"
 
 
 # -- safety ---------------------------------------------------------------
@@ -696,7 +696,7 @@ def test_the_strict_boolean_rule_does_not_leak_into_pyyaml() -> None:
     assert read(StrictSafeLoader, "value: yes\n") == {"value": "yes"}
 
 
-# -- symlinks (NG-L003) ---------------------------------------------------
+# -- symlinks (NV-L003) ---------------------------------------------------
 
 
 @requires_symlinks

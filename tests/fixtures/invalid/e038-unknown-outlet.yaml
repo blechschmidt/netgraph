@@ -1,4 +1,4 @@
-# E038 (NG-E011) - a power input names an outlet the PDU has not got.
+# E038 (NV-E011) - a power input names an outlet the PDU has not got.
 #
 # The strip declares outlets 1 to 8; the switch is plugged into outlet 9. The
 # outlets come from a range rather than being written out, so this is only

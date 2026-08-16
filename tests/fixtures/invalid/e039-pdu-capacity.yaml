@@ -1,4 +1,4 @@
-# E039 (NG-E012) - the declared load on a PDU exceeds its capacity.
+# E039 (NV-E012) - the declared load on a PDU exceeds its capacity.
 #
 # A 500 W server on a strip rated for 100 W. The strip has the outlets for it;
 # what it has not got is the amperage.

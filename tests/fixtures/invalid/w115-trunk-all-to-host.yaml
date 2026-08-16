@@ -1,4 +1,4 @@
-# W115 (NG-V007) - every VLAN is trunked to a host.
+# W115 (NV-V007) - every VLAN is trunked to a host.
 #
 # 'trunk_vlans: all' expands to 1-4094. Between switches that is ordinary;
 # pointed at a workstation it hands the whole VLAN estate to a machine that

@@ -52,12 +52,12 @@ __all__ = [
     "substitute",
 ]
 
-#: ``NG-R003`` — ceiling on the interfaces one document may expand to. A
+#: ``NV-R003`` — ceiling on the interfaces one document may expand to. A
 #: chassis switch tops out around 576 ports; 4096 leaves room for a stack of
 #: them and still bounds the work a single malformed span can ask for.
 MAX_INTERFACES_PER_DOCUMENT: Final = 4096
 
-#: ``NG-R002`` — how many spans one pattern may carry. Three (``ge-[0-1]/[0-1]/[0-47]``)
+#: ``NV-R002`` — how many spans one pattern may carry. Three (``ge-[0-1]/[0-1]/[0-47]``)
 #: covers slot/module/port; the limit exists so the product cannot be built out
 #: of a hundred tiny spans that individually look harmless.
 MAX_SPANS_PER_RANGE: Final = 4
@@ -150,7 +150,7 @@ def parse_range(pattern: Any) -> RangePattern:
         raise RangeError(
             f"'range' must be a string such as 'GigabitEthernet1/0/[1-48]', "
             f"got {type(pattern).__name__}",
-            rule="NG-R002",
+            rule="NV-R002",
         )
 
     literals: list[str] = []
@@ -168,7 +168,7 @@ def parse_range(pattern: Any) -> RangePattern:
             raise RangeError(
                 f"{echo_value(pattern)} is not a valid range: expected a span "
                 f"'[low-high]' at character {position + 1}",
-                rule="NG-R002",
+                rule="NV-R002",
             )
         literals.append(literal.group())
         spans.append(_span_from(span, pattern))
@@ -180,13 +180,13 @@ def parse_range(pattern: Any) -> RangePattern:
         raise RangeError(
             f"{echo_value(pattern)} declares no span; a range needs at least one "
             "'[low-high]', and a single interface is written with 'name'",
-            rule="NG-R002",
+            rule="NV-R002",
         )
     if len(spans) > MAX_SPANS_PER_RANGE:
         raise RangeError(
             f"{echo_value(pattern)} declares {len(spans)} spans; at most "
             f"{MAX_SPANS_PER_RANGE} are allowed",
-            rule="NG-R002",
+            rule="NV-R002",
         )
     return RangePattern(literals=tuple(literals), spans=tuple(spans))
 
@@ -206,13 +206,13 @@ def _span_from(match: re.Match[str], pattern: str) -> Span:
             f"span {echo_value(match.group())} of {echo_value(pattern)} names a number of "
             f"more than {_MAX_SPAN_DIGITS} digits; a document expands to at most "
             f"{MAX_INTERFACES_PER_DOCUMENT} interfaces",
-            rule="NG-R003",
+            rule="NV-R003",
         )
     low, high = int(low_text), int(high_text)
     if low > high:
         raise RangeError(
             f"span {echo_value(match.group())} of {echo_value(pattern)} is inverted: {low} > {high}",
-            rule="NG-R002",
+            rule="NV-R002",
         )
     # The low bound fixes the width: '[01-12]' is a two-digit port number, and
     # deciding the width per value would produce two naming schemes in one range.
@@ -275,7 +275,7 @@ def _expand_placeholder(match: re.Match[str], values: Sequence[str]) -> str:
         raise RangeError(
             f"'{{{selector}}}' in a range description must be empty or a span number; "
             "write '{}' for the last span or '{0}' for the first",
-            rule="NG-R005",
+            rule="NV-R005",
         )
     position = int(selector)
     if position >= len(values):
@@ -284,18 +284,18 @@ def _expand_placeholder(match: re.Match[str], values: Sequence[str]) -> str:
         raise RangeError(
             f"'{{{selector}}}' in a range description names span {position}, but the "
             f"range declares {available}",
-            rule="NG-R005",
+            rule="NV-R005",
         )
     return values[position]
 
 
 def _reject_lone_brace(text: str, template: str) -> None:
-    """``NG-R005`` — a brace outside a placeholder is a typo, not a literal."""
+    """``NV-R005`` — a brace outside a placeholder is a typo, not a literal."""
     if "{" in text or "}" in text:
         raise RangeError(
             f"unmatched brace in the range description {echo_value(template)}; write "
             "'{{' and '}}' for literal braces",
-            rule="NG-R005",
+            rule="NV-R005",
         )
 
 
@@ -343,7 +343,7 @@ def expand_interfaces(
     if not any(isinstance(entry, dict) and "range" in entry for entry in entries):
         # The overwhelmingly common case, and the one on the hot path of every
         # load: nothing moves, so nothing needs a redirect and no name can
-        # collide by expansion. Two explicitly named duplicates are NG-I001.
+        # collide by expansion. Two explicitly named duplicates are NV-I001.
         return Expansion(entries=entries, redirects={}, issues=[], expanded=False)
 
     issues: list[SchemaIssue] = []
@@ -351,7 +351,7 @@ def expand_interfaces(
     redirects: dict[FieldPath, Site] = {}
     #: name -> path of the input entry that first claimed it, and whether that
     #: entry was a range. Only a collision involving a range is reported here;
-    #: two explicitly named duplicates are ``NG-I001``, reported by the model
+    #: two explicitly named duplicates are ``NV-I001``, reported by the model
     #: with the wording it has always used.
     claimed: dict[str, tuple[FieldPath, bool]] = {}
     expanded = False
@@ -409,7 +409,7 @@ def _claim(
     issues: list[SchemaIssue],
     provenance: Provenance,
 ) -> None:
-    """``NG-R004`` — refuse a name a range already produced, or would shadow."""
+    """``NV-R004`` — refuse a name a range already produced, or would shadow."""
     if name is None:
         return
     previous = claimed.get(name)
@@ -418,7 +418,7 @@ def _claim(
         return
     previous_path, previous_was_range = previous
     if not is_range and not previous_was_range:
-        return  # NG-I001's business; the model says it better.
+        return  # NV-I001's business; the model says it better.
     issues.append(
         SchemaIssue(
             path=source,
@@ -427,7 +427,7 @@ def _claim(
                 f"{_describe(previous_path, previous_was_range, provenance)} and by "
                 f"{_describe(source, is_range, provenance)}"
             ),
-            rule="NG-R004",
+            rule="NV-R004",
         )
     )
 
@@ -453,7 +453,7 @@ def _expand_entry(
                     "an interface entry declares either 'name' or 'range', not both; "
                     "drop 'name' to expand the range"
                 ),
-                rule="NG-R001",
+                rule="NV-R001",
             )
         )
         return []
@@ -473,7 +473,7 @@ def _expand_entry(
                     f"{pattern.count} interfaces; a document expands to at most "
                     f"{MAX_INTERFACES_PER_DOCUMENT}"
                 ),
-                rule="NG-R003",
+                rule="NV-R003",
             )
         )
         return []

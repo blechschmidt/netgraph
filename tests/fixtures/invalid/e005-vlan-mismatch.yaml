@@ -1,4 +1,4 @@
-# E005 (NG-C011) - two directly connected access ports carry different VLANs.
+# E005 (NV-C011) - two directly connected access ports carry different VLANs.
 #
 # One end is untagged in VLAN 10, the other in VLAN 20, so the link joins two
 # different broadcast domains.

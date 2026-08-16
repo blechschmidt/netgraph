@@ -83,14 +83,14 @@ __all__ = [
 #: Mirrors :data:`netviz.models.annotation.VALUE_RULE`, and behaves the same
 #: way under a field-at-a-time write — a bad value is wrong when it is written
 #: and wrong afterwards, so :mod:`netviz.edit.apply` refuses it immediately.
-STYLE_VALUE_RULE: Final = "NG-Z001"
+STYLE_VALUE_RULE: Final = "NV-Z001"
 
 #: The rule a style that is *self-defeating* is reported under: an element faded
 #: to nothing, a label the same colour as the box behind it. Unlike
 #: :data:`STYLE_VALUE_RULE` these are warnings from the semantic validator, not
 #: schema errors — each value is legal on its own and only the combination is a
 #: mistake, which an editor may pass through on its way somewhere else.
-STYLE_RULE: Final = "NG-Z003"
+STYLE_RULE: Final = "NV-Z003"
 
 #: The named colours a style may use, and the hex each one resolves to.
 #:
@@ -330,7 +330,7 @@ class Style(NetvizModel):
 
     @model_validator(mode="after")
     def _not_empty(self) -> Style:
-        """``NG-Z002``: a ``style`` block that says nothing is a mistake.
+        """``NV-Z002``: a ``style`` block that says nothing is a mistake.
 
         Almost always a half-finished edit or a key indented one level too far.
         An empty mapping would otherwise validate, render identically, and give
@@ -340,7 +340,7 @@ class Style(NetvizModel):
             raise field_error(
                 "'style' is empty; give it at least one of "
                 f"{', '.join(STYLE_FIELDS)}, or remove it",
-                rule="NG-Z002",
+                rule="NV-Z002",
             )
         return self
 

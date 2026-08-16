@@ -60,7 +60,7 @@ declares are keyed by the id the graph gives them: ``subnet:10.0.0.0/24``,
 address, or the synthetic id of a derived edge. A group key is a namespace.
 
 A key naming something the inventory no longer has is a **warning**, not an
-error (``NG-Y001``): deleting a switch must not break ``netviz validate``,
+error (``NV-Y001``): deleting a switch must not break ``netviz validate``,
 and ``netviz layout --prune`` is the one-line fix.
 
 Links
@@ -197,7 +197,7 @@ def _pair(value: Any, *, keys: tuple[str, str], noun: str) -> Any:
             raise field_error(
                 f"a {noun} written as a sequence must have exactly two numbers "
                 f"({keys[0]} then {keys[1]}), got {len(value)}",
-                rule="NG-Y003",
+                rule="NV-Y003",
             )
         return dict(zip(keys, value, strict=True))
     return value
@@ -264,7 +264,7 @@ class EdgeGeometry(NetvizModel):
     written, from the ``source`` end to the ``target`` end of the edge as the
     graph orders them; the two ends are the nodes, which is why moving a node
     moves the route without invalidating the bends. An entry carrying none of
-    the three fields is refused (``NG-Y003``): it says nothing, and the way to
+    the three fields is refused (``NV-Y003``): it says nothing, and the way to
     say nothing is to leave the key out.
     """
 
@@ -279,7 +279,7 @@ class EdgeGeometry(NetvizModel):
             raise field_error(
                 "an edge entry must say something about the link — waypoints, "
                 "routing or label; drop the key to say nothing",
-                rule="NG-Y003",
+                rule="NV-Y003",
             )
         return self
 
@@ -304,19 +304,19 @@ def _entries(value: Any, *, section: str) -> Any:
     if not isinstance(value, dict):
         raise field_error(
             f"{section!r} must be a mapping of address to geometry, got {type(value).__name__}",
-            rule="NG-Y003",
+            rule="NV-Y003",
         )
     if len(value) > MAX_GEOMETRY_ENTRIES:
         raise field_error(
             f"{section!r} places {len(value)} things; at most {MAX_GEOMETRY_ENTRIES} "
             "may be arranged in one view",
-            rule="NG-Y003",
+            rule="NV-Y003",
         )
     for key in value:
         if not isinstance(key, str) or not key.strip():
             raise field_error(
                 f"{section!r} is keyed by address; {echo_value(key)} is not one",
-                rule="NG-Y003",
+                rule="NV-Y003",
             )
     return value
 
@@ -357,7 +357,7 @@ class LayoutSpec(NetvizModel):
     @model_validator(mode="before")
     @classmethod
     def _check_view_names(cls, value: Any) -> Any:
-        """``NG-Y003`` — a view is one of the layers netviz draws."""
+        """``NV-Y003`` — a view is one of the layers netviz draws."""
         if not isinstance(value, dict):
             return value
         views = value.get("views")
@@ -366,14 +366,14 @@ class LayoutSpec(NetvizModel):
         if not isinstance(views, dict):
             raise field_error(
                 f"'views' must be a mapping of view name to geometry, got {type(views).__name__}",
-                rule="NG-Y003",
+                rule="NV-Y003",
                 path=("views",),
             )
         for name in views:
             if name not in LAYOUT_VIEWS:
                 raise field_error(
                     f"unknown view {echo_value(name)}; expected one of {', '.join(LAYOUT_VIEWS)}",
-                    rule="NG-Y003",
+                    rule="NV-Y003",
                     path=("views", name if isinstance(name, str) else str(name)),
                 )
         return value

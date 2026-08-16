@@ -4,7 +4,7 @@ Everything §6.2.6 adds, in the four places it has to hold together:
 
 * the **model** — the band/channel plan, the widths a band supports, the BSS
   list and the one-association-per-client rule, all reported at schema time
-  with an ``NG-W*`` id and the path of the offending value;
+  with an ``NV-W*`` id and the path of the offending value;
 * the **validator** — the five cross-document rules, each on an inventory that
   differs from a clean one in exactly the way the rule is about, so a finding
   cannot be an accident of the fixture;
@@ -186,7 +186,7 @@ def test_the_span_is_centred_on_the_primary_channel() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# The model (NG-W001 … NG-W006)
+# The model (NV-W001 … NV-W006)
 # --------------------------------------------------------------------------- #
 
 
@@ -202,18 +202,18 @@ def test_wireless_is_refused_on_anything_but_a_radio() -> None:
         parse_document(
             device("pc", {"name": "eth0", "type": "ethernet", "wireless": {"role": "ap"}})
         )
-    assert issues(exc) == [("NG-W002", "wireless")]
+    assert issues(exc) == [("NV-W002", "wireless")]
 
 
 @pytest.mark.parametrize(
     ("wireless", "rule", "field"),
     [
-        ({"band": "2.4GHz", "channel": 36}, "NG-W003", "channel"),
-        ({"band": "6GHz", "channel": 2}, "NG-W003", "channel"),
-        ({"channel": 6}, "NG-W003", "channel"),
-        ({"width_mhz": 40}, "NG-W003", "width_mhz"),
-        ({"band": "2.4GHz", "channel": 6, "width_mhz": 80}, "NG-W004", "width_mhz"),
-        ({"band": "5GHz", "channel": 36, "width_mhz": 320}, "NG-W004", "width_mhz"),
+        ({"band": "2.4GHz", "channel": 36}, "NV-W003", "channel"),
+        ({"band": "6GHz", "channel": 2}, "NV-W003", "channel"),
+        ({"channel": 6}, "NV-W003", "channel"),
+        ({"width_mhz": 40}, "NV-W003", "width_mhz"),
+        ({"band": "2.4GHz", "channel": 6, "width_mhz": 80}, "NV-W004", "width_mhz"),
+        ({"band": "5GHz", "channel": 36, "width_mhz": 320}, "NV-W004", "width_mhz"),
     ],
 )
 def test_the_frequency_settings_have_to_agree_with_the_band(
@@ -256,7 +256,7 @@ def test_an_ssid_that_is_not_a_string_is_refused_rather_than_stringified() -> No
 def test_a_radio_may_not_declare_one_ssid_or_one_bssid_twice() -> None:
     with pytest.raises(SchemaError) as exc:
         parse_radio(bss=[{"ssid": "lab"}, {"ssid": "lab"}])
-    assert issues(exc) == [("NG-W005", "ssid")]
+    assert issues(exc) == [("NV-W005", "ssid")]
 
     with pytest.raises(SchemaError) as exc:
         parse_radio(
@@ -265,14 +265,14 @@ def test_a_radio_may_not_declare_one_ssid_or_one_bssid_twice() -> None:
                 {"ssid": "guest", "bssid": "02-00-5E-00-00-01"},
             ]
         )
-    assert issues(exc) == [("NG-W005", "bssid")]
+    assert issues(exc) == [("NV-W005", "bssid")]
 
 
 @pytest.mark.parametrize("role", ["station", "mesh"])
 def test_a_client_radio_joins_one_bss_at_a_time(role: str) -> None:
     with pytest.raises(SchemaError) as exc:
         parse_radio(role=role, bss=[{"ssid": "a"}, {"ssid": "b"}])
-    assert issues(exc) == [("NG-W006", "bss")]
+    assert issues(exc) == [("NV-W006", "bss")]
     # An access point serving two SSIDs is the ordinary case.
     assert len(parse_radio(role="ap", bss=[{"ssid": "a"}, {"ssid": "b"}]).bss) == 2
 

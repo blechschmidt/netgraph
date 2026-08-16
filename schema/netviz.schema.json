@@ -116,7 +116,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "adapter",
@@ -245,7 +245,7 @@
           "minItems": 1,
           "title": "interfaces",
           "type": "array",
-          "description": "The network ports the adapter presents downstream. Only `ethernet`, `wifi` and `lag` are allowed (`NG-X003`).\n\nYANG: `/if:interfaces/if:interface`"
+          "description": "The network ports the adapter presents downstream. Only `ethernet`, `wifi` and `lag` are allowed (`NV-X003`).\n\nYANG: `/if:interfaces/if:interface`"
         },
         "style": {
           "anyOf": [
@@ -343,7 +343,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "area",
@@ -778,7 +778,7 @@
       "type": "string"
     },
     "Band": {
-      "description": "§6.2.6 — the three bands 802.11 operates in.\n\nThe band is not derivable from the channel number: channels 1 to 13 exist in\nboth the 2.4 GHz and the 6 GHz plan and mean different frequencies, so a\ndocument that states a channel has to state the band with it (`NG-W003`).",
+      "description": "§6.2.6 — the three bands 802.11 operates in.\n\nThe band is not derivable from the channel number: channels 1 to 13 exist in\nboth the 2.4 GHz and the 6 GHz plan and mean different frequencies, so a\ndocument that states a channel has to state the band with it (`NV-W003`).",
       "enum": [
         "2.4GHz",
         "5GHz",
@@ -810,7 +810,7 @@
           ],
           "default": null,
           "title": "router_id",
-          "description": "BGP identifier — a dotted quad. Unique across the inventory (`NG-F012`); commonly the same value as the OSPF router id, which is one identity rather than a duplicate."
+          "description": "BGP identifier — a dotted quad. Unique across the inventory (`NV-F012`); commonly the same value as the OSPF router id, which is one identity rather than a duplicate."
         },
         "neighbors": {
           "items": {
@@ -843,14 +843,14 @@
             }
           ],
           "title": "address",
-          "description": "Peer address. Resolved against every address the inventory configures; a peer that resolves to nothing is `NG-F013`, a warning, because an eBGP peer may be external."
+          "description": "Peer address. Resolved against every address the inventory configures; a peer that resolves to nothing is `NV-F013`, a warning, because an eBGP peer may be external."
         },
         "remote_asn": {
           "maximum": 4294967295,
           "minimum": 1,
           "title": "remote_asn",
           "type": "integer",
-          "description": "The AS the peer is in. Checked against the peer's own `asn` when the address resolves (`NG-F011`)."
+          "description": "The AS the peer is in. Checked against the peer's own `asn` when the address resolves (`NV-F011`)."
         },
         "description": {
           "anyOf": [
@@ -933,14 +933,14 @@
     },
     "Bss": {
       "additionalProperties": false,
-      "description": "One entry of `interfaces[].wireless.bss` — a basic service set.\n\nOn an `ap` radio each entry is an SSID the radio beacons, with the VLAN\nits traffic is bridged into. On a `station` or `mesh` radio the single\nentry names the BSS the radio is associated to, which is what `NG-W010`\nchecks against the AP at the other end of the link.",
+      "description": "One entry of `interfaces[].wireless.bss` — a basic service set.\n\nOn an `ap` radio each entry is an SSID the radio beacons, with the VLAN\nits traffic is bridged into. On a `station` or `mesh` radio the single\nentry names the BSS the radio is associated to, which is what `NV-W010`\nchecks against the AP at the other end of the link.",
       "properties": {
         "ssid": {
           "maxLength": 32,
           "minLength": 1,
           "title": "ssid",
           "type": "string",
-          "description": "The network name, 1 to 32 octets. Unique within one radio (`NG-W005`), and on a client radio it must be one the AP at the far end advertises (`NG-W010`).\n\nYANG: `…/dot11:bss/dot11:ssid`"
+          "description": "The network name, 1 to 32 octets. Unique within one radio (`NV-W005`), and on a client radio it must be one the AP at the far end advertises (`NV-W010`).\n\nYANG: `…/dot11:bss/dot11:ssid`"
         },
         "bssid": {
           "anyOf": [
@@ -953,7 +953,7 @@
           ],
           "default": null,
           "title": "bssid",
-          "description": "MAC address of this BSS — usually the radio's own for the first SSID and a derived one for each further SSID. Unique across the inventory (`NG-W008`).\n\nYANG: `…/dot11:bss/dot11:bssid`"
+          "description": "MAC address of this BSS — usually the radio's own for the first SSID and a derived one for each further SSID. Unique across the inventory (`NV-W008`).\n\nYANG: `…/dot11:bss/dot11:bssid`"
         },
         "vlan": {
           "anyOf": [
@@ -968,7 +968,7 @@
           ],
           "default": null,
           "title": "vlan",
-          "description": "The VLAN this SSID's traffic is bridged into. Absent means the radio's untagged domain. Checked against the device's VLAN database (`W113`) and against the VLANs the access point actually carries (`NG-W009`)."
+          "description": "The VLAN this SSID's traffic is bridged into. Absent means the radio's untagged domain. Checked against the device's VLAN database (`W113`) and against the VLANs the access point actually carries (`NV-W009`)."
         },
         "security": {
           "anyOf": [
@@ -1004,7 +1004,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "cable",
@@ -1042,12 +1042,12 @@
           },
           "title": "endpoints",
           "type": "array",
-          "description": "Exactly two `device:interface` references (`NG-C001`). The link is undirected, so the pair is sorted on load and the order carries no meaning."
+          "description": "Exactly two `device:interface` references (`NV-C001`). The link is undirected, so the pair is sorted on load and the order carries no meaning."
         },
         "medium": {
           "$ref": "#/$defs/Medium",
           "title": "medium",
-          "description": "What the link physically is. `wireless` requires both endpoints to be `type: wifi` and forbids `length_m` and `category` (`NG-C006`, `NG-C007`)."
+          "description": "What the link physically is. `wireless` requires both endpoints to be `type: wifi` and forbids `length_m` and `category` (`NV-C006`, `NV-C007`)."
         },
         "speed": {
           "anyOf": [
@@ -1077,7 +1077,7 @@
           "$ref": "#/$defs/Duplex",
           "default": "full",
           "title": "duplex",
-          "description": "Duplex of the link. `half` outside a hub link is `NG-C013`."
+          "description": "Duplex of the link. `half` outside a hub link is `NV-C013`."
         },
         "length_m": {
           "anyOf": [
@@ -1161,7 +1161,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "computer",
@@ -1358,7 +1358,7 @@
           },
           "title": "zones",
           "type": "array",
-          "description": "The security zones the device divides its interfaces into (§24.1). Policy is written *between* zones rather than between interfaces, so a rule survives a port being renamed, doubled or moved to a LAG. An interface is in at most one zone (`NG-B003`)."
+          "description": "The security zones the device divides its interfaces into (§24.1). Policy is written *between* zones rather than between interfaces, so a rule survives a port being renamed, doubled or moved to a LAG. An interface is in at most one zone (`NV-B003`)."
         },
         "firewall": {
           "anyOf": [
@@ -1457,7 +1457,7 @@
     },
     "EdgeGeometry": {
       "additionalProperties": false,
-      "description": "How one link is drawn: its bends, its routing style and its label.\n\nThe waypoints are the **interior** points of the route, in the order\nwritten, from the ``source`` end to the ``target`` end of the edge as the\ngraph orders them; the two ends are the nodes, which is why moving a node\nmoves the route without invalidating the bends. An entry carrying none of\nthe three fields is refused (``NG-Y003``): it says nothing, and the way to\nsay nothing is to leave the key out.",
+      "description": "How one link is drawn: its bends, its routing style and its label.\n\nThe waypoints are the **interior** points of the route, in the order\nwritten, from the ``source`` end to the ``target`` end of the edge as the\ngraph orders them; the two ends are the nodes, which is why moving a node\nmoves the route without invalidating the bends. An entry carrying none of\nthe three fields is refused (``NV-Y003``): it says nothing, and the way to\nsay nothing is to leave the key out.",
       "properties": {
         "waypoints": {
           "default": [],
@@ -1508,7 +1508,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "firewall",
@@ -1556,7 +1556,7 @@
           "$ref": "#/$defs/FirewallAction",
           "default": "drop",
           "title": "default_input",
-          "description": "What a packet *for this machine* gets when no rule decides. One of `accept`, `drop` and `reject` — a default has to decide (`NG-B007`). Defaults to `drop`."
+          "description": "What a packet *for this machine* gets when no rule decides. One of `accept`, `drop` and `reject` — a default has to decide (`NV-B007`). Defaults to `drop`."
         },
         "default_forward": {
           "$ref": "#/$defs/FirewallAction",
@@ -1612,7 +1612,7 @@
           "minimum": 0,
           "title": "priority",
           "type": "integer",
-          "description": "Unique within the device, per family (`NG-B008`). The chain is walked from the lowest priority upwards; the first rule whose action is terminal decides, and nothing after it is consulted."
+          "description": "Unique within the device, per family (`NV-B008`). The chain is walked from the lowest priority upwards; the first rule whose action is terminal decides, and nothing after it is consulted."
         },
         "name": {
           "anyOf": [
@@ -1644,7 +1644,7 @@
           ],
           "default": null,
           "title": "src_zone",
-          "description": "The zone the packet came from: a declared zone, or `local` for traffic this machine generated (`NG-B004`). Unset matches any zone."
+          "description": "The zone the packet came from: a declared zone, or `local` for traffic this machine generated (`NV-B004`). Unset matches any zone."
         },
         "dst_zone": {
           "anyOf": [
@@ -1660,7 +1660,7 @@
           ],
           "default": null,
           "title": "dst_zone",
-          "description": "The zone the packet is going to, on the same terms (`NG-B004`). Together with `src_zone` this decides the hook: `to: local` is input, `from: local` is output, two real zones are forward."
+          "description": "The zone the packet is going to, on the same terms (`NV-B004`). Together with `src_zone` this decides the hook: `to: local` is input, `from: local` is output, two real zones are forward."
         },
         "family": {
           "anyOf": [
@@ -1673,7 +1673,7 @@
           ],
           "default": null,
           "title": "family",
-          "description": "Which family's chain the rule is in. Omit to install in both, and derive from `src`, `dst` or `protocol` when possible (`NG-B005`); `ipv4` and `ipv6` are explicit."
+          "description": "Which family's chain the rule is in. Omit to install in both, and derive from `src`, `dst` or `protocol` when possible (`NV-B005`); `ipv4` and `ipv6` are explicit."
         },
         "src": {
           "anyOf": [
@@ -1722,7 +1722,7 @@
           ],
           "default": null,
           "title": "protocol",
-          "description": "The IP protocol. Required by `src_ports` and `dst_ports`, which only `tcp`, `udp` and `sctp` have (`NG-B005`). `icmp` is IPv4 and `icmpv6` is IPv6, and stating one against the other family is refused."
+          "description": "The IP protocol. Required by `src_ports` and `dst_ports`, which only `tcp`, `udp` and `sctp` have (`NV-B005`). `icmp` is IPv4 and `icmpv6` is IPv6, and stating one against the other family is refused."
         },
         "src_ports": {
           "items": {
@@ -1762,7 +1762,7 @@
           ],
           "default": null,
           "title": "iif",
-          "description": "Ingress interface selector (`NG-B009`), for when a zone is too coarse. Rare: the point of a zone is not needing this."
+          "description": "Ingress interface selector (`NV-B009`), for when a zone is too coarse. Rare: the point of a zone is not needing this."
         },
         "oif": {
           "anyOf": [
@@ -1778,13 +1778,13 @@
           ],
           "default": null,
           "title": "oif",
-          "description": "Egress interface selector, on the same terms (`NG-B009`)."
+          "description": "Egress interface selector, on the same terms (`NV-B009`)."
         },
         "invert": {
           "default": false,
           "title": "invert",
           "type": "boolean",
-          "description": "Match everything the selectors do not. Meaningless without a selector to invert (`NG-B005`)."
+          "description": "Match everything the selectors do not. Meaningless without a selector to invert (`NV-B005`)."
         },
         "action": {
           "$ref": "#/$defs/FirewallAction",
@@ -1802,7 +1802,7 @@
           ],
           "default": null,
           "title": "mark",
-          "description": "The mark to write, hexadecimal, optionally masked. Required by `action: mark` and refused by everything else (`NG-B005`). This is what `spec.routing_policy[].fwmark` reads — see §16.9 and §24.3."
+          "description": "The mark to write, hexadecimal, optionally masked. Required by `action: mark` and refused by everything else (`NV-B005`). This is what `spec.routing_policy[].fwmark` reads — see §16.9 and §24.3."
         },
         "log_prefix": {
           "anyOf": [
@@ -1816,7 +1816,7 @@
           ],
           "default": null,
           "title": "log_prefix",
-          "description": "The tag put in front of a logged packet. For `action: log` only (`NG-B005`)."
+          "description": "The tag put in front of a logged packet. For `action: log` only (`NV-B005`)."
         },
         "description": {
           "anyOf": [
@@ -1869,13 +1869,13 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "group",
           "title": "kind",
           "type": "string",
-          "description": "Selects the shape of `spec`. A named set of identities. `members` may name a `user` or another `group`, which is what makes a hierarchy expressible; the nesting must not loop (`NG-S012`)."
+          "description": "Selects the shape of `spec`. A named set of identities. `members` may name a `user` or another `group`, which is what makes a hierarchy expressible; the nesting must not loop (`NV-S012`)."
         },
         "metadata": {
           "$ref": "#/$defs/Metadata",
@@ -1928,7 +1928,7 @@
           "maxItems": 4096,
           "title": "members",
           "type": "array",
-          "description": "The users and nested groups in this group, as element references resolved outwards from the group's own namespace. Must resolve (`NG-S010`), must be an identity (`NG-S011`), and the nesting must not loop (`NG-S012`)."
+          "description": "The users and nested groups in this group, as element references resolved outwards from the group's own namespace. Must resolve (`NV-S010`), must be an identity (`NV-S011`), and the nesting must not loop (`NV-S012`)."
         },
         "gid": {
           "anyOf": [
@@ -1943,7 +1943,7 @@
           ],
           "default": null,
           "title": "gid",
-          "description": "POSIX group id, when the estate assigns one. 0 to 4294967294; two groups claiming one is `NG-S013`."
+          "description": "POSIX group id, when the estate assigns one. 0 to 4294967294; two groups claiming one is `NV-S013`."
         },
         "email": {
           "anyOf": [
@@ -1985,7 +1985,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "hub",
@@ -2038,7 +2038,7 @@
             "netmask": {
               "type": "string",
               "title": "netmask",
-              "description": "The dotted-quad spelling of `prefix_length`, normalised away on load. Mutually exclusive with `prefix_length`; a non-contiguous mask is rejected (`NG-A003`).",
+              "description": "The dotted-quad spelling of `prefix_length`, normalised away on load. Mutually exclusive with `prefix_length`; a non-contiguous mask is rejected (`NV-A003`).",
               "pattern": "^(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$"
             }
           },
@@ -2387,7 +2387,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "layout",
@@ -2454,7 +2454,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "legend",
@@ -2649,7 +2649,7 @@
           ],
           "default": null,
           "title": "rack",
-          "description": "Rack identifier, unique within its room. Naming one is what puts the element on an elevation; site, room and rack together identify the rack (`NG-U001`)."
+          "description": "Rack identifier, unique within its room. Naming one is what puts the element on an elevation; site, room and rack together identify the rack (`NV-U001`)."
         },
         "position": {
           "anyOf": [
@@ -2664,7 +2664,7 @@
           ],
           "default": null,
           "title": "position",
-          "description": "Lowest rack unit the element occupies, counted from 1 at the bottom of the rack. Requires `rack` (`NG-U004`)."
+          "description": "Lowest rack unit the element occupies, counted from 1 at the bottom of the rack. Requires `rack` (`NV-U004`)."
         },
         "height": {
           "default": 1,
@@ -2687,7 +2687,7 @@
           ],
           "default": null,
           "title": "rack_height",
-          "description": "How tall the rack itself is. Any element in the rack may declare it; two that disagree are `NG-U003`, and nothing may extend past it (`NG-U002`)."
+          "description": "How tall the rack itself is. Any element in the rack may declare it; two that disagree are `NV-U003`, and nothing may extend past it (`NV-U002`)."
         }
       },
       "title": "Location",
@@ -2713,7 +2713,7 @@
           "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
           "title": "name",
           "type": "string",
-          "description": "Element name, unique within its namespace across all kinds (`NG-N002`). The namespace is the directory the document was found in."
+          "description": "Element name, unique within its namespace across all kinds (`NV-N002`). The namespace is the directory the document was found in."
         },
         "description": {
           "anyOf": [
@@ -2739,7 +2739,7 @@
           ],
           "default": null,
           "title": "location",
-          "description": "Where the hardware physically is: site, room, rack and the rack units it occupies. Drives `--layer rack` and the placement rules `NG-U001` to `NG-U004`."
+          "description": "Where the hardware physically is: site, room, rack and the rack units it occupies. Drives `--layer rack` and the placement rules `NV-U001` to `NV-U004`."
         },
         "labels": {
           "additionalProperties": {
@@ -2787,7 +2787,7 @@
         "type": {
           "$ref": "#/$defs/NatType",
           "title": "type",
-          "description": "`snat` and `masquerade` rewrite the source on the way out; `dnat` and `redirect` rewrite the destination on the way in. Which of the two fields below are required follows from this (`NG-B006`)."
+          "description": "`snat` and `masquerade` rewrite the source on the way out; `dnat` and `redirect` rewrite the destination on the way in. Which of the two fields below are required follows from this (`NV-B006`)."
         },
         "src_zone": {
           "anyOf": [
@@ -2803,7 +2803,7 @@
           ],
           "default": null,
           "title": "src_zone",
-          "description": "The zone the packet came from (`NG-B004`)."
+          "description": "The zone the packet came from (`NV-B004`)."
         },
         "dst_zone": {
           "anyOf": [
@@ -2819,7 +2819,7 @@
           ],
           "default": null,
           "title": "dst_zone",
-          "description": "The zone it is going to (`NG-B004`). The usual selector for a source translation: *everything leaving towards the wan is masqueraded*."
+          "description": "The zone it is going to (`NV-B004`). The usual selector for a source translation: *everything leaving towards the wan is masqueraded*."
         },
         "family": {
           "anyOf": [
@@ -2832,7 +2832,7 @@
           ],
           "default": null,
           "title": "family",
-          "description": "Which family the translation is in. Derived from any address it names (`NG-B006`)."
+          "description": "Which family the translation is in. Derived from any address it names (`NV-B006`)."
         },
         "src": {
           "anyOf": [
@@ -2881,7 +2881,7 @@
           ],
           "default": null,
           "title": "protocol",
-          "description": "The IP protocol. Required by `dst_ports` (`NG-B006`)."
+          "description": "The IP protocol. Required by `dst_ports` (`NV-B006`)."
         },
         "dst_ports": {
           "items": {
@@ -2907,7 +2907,7 @@
           ],
           "default": null,
           "title": "to_address",
-          "description": "What the address becomes. Required by `snat` and `dnat`; refused by `masquerade` (whose address is the egress interface's, unknown here) and by `redirect` (whose address is this machine) — `NG-B006`."
+          "description": "What the address becomes. Required by `snat` and `dnat`; refused by `masquerade` (whose address is the egress interface's, unknown here) and by `redirect` (whose address is this machine) — `NV-B006`."
         },
         "to_port": {
           "anyOf": [
@@ -2922,7 +2922,7 @@
           ],
           "default": null,
           "title": "to_port",
-          "description": "What the port becomes. Required by `redirect`, which translates the port and nothing else; on a source translation it needs a `dst_ports` to be about (`NG-B006`)."
+          "description": "What the port becomes. Required by `redirect`, which translates the port and nothing else; on a source translation it needs a `dst_ports` to be about (`NV-B006`)."
         },
         "description": {
           "anyOf": [
@@ -2957,7 +2957,7 @@
     },
     "NetnsDefinition": {
       "additionalProperties": false,
-      "description": "One entry of `spec.netns` — a network namespace on the device (§23.1).\n\nThree fields and no configuration: everything a namespace *contains* is\ndeclared by the things that name it. Interfaces move into one with\n`interfaces[].netns`, and that is also what gives the namespace its\naddresses and its routes, because those hang off the interfaces.\n\n`NG-N020` (names are unique per device), `NG-N021` (`parent` resolves\nand does not loop) and `NG-N022` (`interfaces[].netns` resolves) are all\nchecked by the device spec, where the whole table is in view.",
+      "description": "One entry of `spec.netns` — a network namespace on the device (§23.1).\n\nThree fields and no configuration: everything a namespace *contains* is\ndeclared by the things that name it. Interfaces move into one with\n`interfaces[].netns`, and that is also what gives the namespace its\naddresses and its routes, because those hang off the interfaces.\n\n`NV-N020` (names are unique per device), `NV-N021` (`parent` resolves\nand does not loop) and `NV-N022` (`interfaces[].netns` resolves) are all\nchecked by the device spec, where the whole table is in view.",
       "properties": {
         "name": {
           "maxLength": 253,
@@ -2965,7 +2965,7 @@
           "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
           "title": "name",
           "type": "string",
-          "description": "Name of the namespace, as `ip netns` spells it. Unique within the device (`NG-N020`), and what `interfaces[].netns` and another entry's `parent` refer to."
+          "description": "Name of the namespace, as `ip netns` spells it. Unique within the device (`NV-N020`), and what `interfaces[].netns` and another entry's `parent` refer to."
         },
         "parent": {
           "anyOf": [
@@ -2981,7 +2981,7 @@
           ],
           "default": null,
           "title": "parent",
-          "description": "The namespace this one was created inside (`NG-N021`). Unset means the machine's initial namespace. This is the whole of the hierarchy: a namespace has exactly one creator, so nesting is a tree."
+          "description": "The namespace this one was created inside (`NV-N021`). Unset means the machine's initial namespace. This is the whole of the hierarchy: a namespace has exactly one creator, so nesting is a tree."
         },
         "description": {
           "anyOf": [
@@ -3036,7 +3036,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "note",
@@ -3188,7 +3188,7 @@
           ],
           "default": null,
           "title": "router_id",
-          "description": "Router identifier — a dotted quad even in an IPv6-only network. Unique across the inventory (`NG-F012`)."
+          "description": "Router identifier — a dotted quad even in an IPv6-only network. Unique across the inventory (`NV-F012`)."
         },
         "interfaces": {
           "items": {
@@ -3200,7 +3200,7 @@
           "minItems": 1,
           "title": "interfaces",
           "type": "array",
-          "description": "The interfaces OSPF runs on. Non-empty, free of duplicates (`NG-F006`), and each one an interface of this device (`NG-F010`).\n\nYANG: `/if:interfaces/if:interface/if:name`"
+          "description": "The interfaces OSPF runs on. Non-empty, free of duplicates (`NV-F006`), and each one an interface of this device (`NV-F010`).\n\nYANG: `/if:interfaces/if:interface/if:name`"
         }
       },
       "required": [
@@ -3219,12 +3219,12 @@
           "pattern": "^[A-Za-z0-9._/-]+$",
           "title": "name",
           "type": "string",
-          "description": "Interface name as the device itself spells it (`eth0`, `GigabitEthernet0/2`). Unique within the element (`NG-I001`), and the target of a cable endpoint.\n\nYANG: `/if:interfaces/if:interface/if:name`"
+          "description": "Interface name as the device itself spells it (`eth0`, `GigabitEthernet0/2`). Unique within the element (`NV-I001`), and the target of a cable endpoint.\n\nYANG: `/if:interfaces/if:interface/if:name`"
         },
         "type": {
           "$ref": "#/$defs/InterfaceType",
           "title": "type",
-          "description": "What kind of interface this is. Decides which other fields are allowed and whether a cable may terminate here (`NG-C009`).\n\nYANG: `…/if:type`"
+          "description": "What kind of interface this is. Decides which other fields are allowed and whether a cable may terminate here (`NV-C009`).\n\nYANG: `…/if:type`"
         },
         "description": {
           "anyOf": [
@@ -3329,7 +3329,7 @@
           ],
           "default": null,
           "title": "vrf",
-          "description": "The routing instance this interface is in. Names an entry of the device's `spec.vrfs` (`NG-F002`); unset means the global instance. An address only collides with another address in the same VRF.\n\nYANG: `/ni:network-instances/ni:network-instance/ni:name`"
+          "description": "The routing instance this interface is in. Names an entry of the device's `spec.vrfs` (`NV-F002`); unset means the global instance. An address only collides with another address in the same VRF.\n\nYANG: `/ni:network-instances/ni:network-instance/ni:name`"
         },
         "wireless": {
           "anyOf": [
@@ -3342,7 +3342,7 @@
           ],
           "default": null,
           "title": "wireless",
-          "description": "Radio configuration of a `type: wifi` interface: which side of the association it is, which frequency it uses and which BSSs it beacons or joins. Forbidden on every other type (`NG-W002`).\n\nYANG: `…/dot11:wireless-interface`"
+          "description": "Radio configuration of a `type: wifi` interface: which side of the association it is, which frequency it uses and which BSSs it beacons or joins. Forbidden on every other type (`NV-W002`).\n\nYANG: `…/dot11:wireless-interface`"
         },
         "poe": {
           "anyOf": [
@@ -3355,7 +3355,7 @@
           ],
           "default": null,
           "title": "poe",
-          "description": "This port is power sourcing equipment: it hands power down the cable (§17.3). Only on a type a cable terminates on — `ethernet` or `lag` (`NG-E006`).\n\nYANG: `/power-ethernet-mib:pethPsePortTable/pethPsePortEntry`"
+          "description": "This port is power sourcing equipment: it hands power down the cable (§17.3). Only on a type a cable terminates on — `ethernet` or `lag` (`NV-E006`).\n\nYANG: `/power-ethernet-mib:pethPsePortTable/pethPsePortEntry`"
         },
         "parent": {
           "anyOf": [
@@ -3371,7 +3371,7 @@
           ],
           "default": null,
           "title": "parent",
-          "description": "The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NG-I002`).\n\nYANG: `…/if:lower-layer-if`"
+          "description": "The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NV-I002`).\n\nYANG: `…/if:lower-layer-if`"
         },
         "members": {
           "anyOf": [
@@ -3390,7 +3390,7 @@
           ],
           "default": null,
           "title": "members",
-          "description": "The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`).\n\nYANG: `…/if:lower-layer-if`"
+          "description": "The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NV-I003`).\n\nYANG: `…/if:lower-layer-if`"
         },
         "netns": {
           "anyOf": [
@@ -3406,7 +3406,7 @@
           ],
           "default": null,
           "title": "netns",
-          "description": "The network namespace this interface lives in (§23.1). Names an entry of the device's `spec.netns` (`NG-N022`); unset means the machine's initial namespace. Unlike `vrf`, which partitions one stack's routing table, this places the interface in a different stack entirely — its addresses do not collide with the same addresses elsewhere on the machine."
+          "description": "The network namespace this interface lives in (§23.1). Names an entry of the device's `spec.netns` (`NV-N022`); unset means the machine's initial namespace. Unlike `vrf`, which partitions one stack's routing table, this places the interface in a different stack entirely — its addresses do not collide with the same addresses elsewhere on the machine."
         },
         "peer": {
           "anyOf": [
@@ -3422,7 +3422,7 @@
           ],
           "default": null,
           "title": "peer",
-          "description": "The other end of the veth pair this interface is one end of (§23.2). Names another `type: ethernet` interface of the same element, which must name this one back (`NG-N023`). A veth end is `ianaift:ethernetCsmacd` like any other port; what it has instead of a socket is this peer, so a cable must not terminate on it (`NG-N024`).\n\nYANG: `…/if:lower-layer-if`"
+          "description": "The other end of the veth pair this interface is one end of (§23.2). Names another `type: ethernet` interface of the same element, which must name this one back (`NV-N023`). A veth end is `ianaift:ethernetCsmacd` like any other port; what it has instead of a socket is this peer, so a cable must not terminate on it (`NV-N024`).\n\nYANG: `…/if:lower-layer-if`"
         },
         "range": {
           "type": "string",
@@ -3460,7 +3460,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "patchpanel",
@@ -3546,7 +3546,7 @@
         },
         "ports": {
           "title": "ports",
-          "description": "The positions the panel has, as a count (`24`) or as spans (`1-12,17-24`). Each one becomes a `front/<n>` and a `rear/<n>` interface (`NG-P006`).\n\nYANG: `/if:interfaces/if:interface`",
+          "description": "The positions the panel has, as a count (`24`) or as spans (`1-12,17-24`). Each one becomes a `front/<n>` and a `rear/<n>` interface (`NV-P006`).\n\nYANG: `/if:interfaces/if:interface`",
           "anyOf": [
             {
               "type": "integer",
@@ -3562,7 +3562,7 @@
           "anyOf": [
             {
               "title": "couplers",
-              "description": "Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NG-P007`).",
+              "description": "Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NV-P007`).",
               "type": "object",
               "propertyNames": {
                 "pattern": "^\\d+$"
@@ -3586,7 +3586,7 @@
           ],
           "default": null,
           "title": "couplers",
-          "description": "Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NG-P007`)."
+          "description": "Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NV-P007`)."
         },
         "style": {
           "anyOf": [
@@ -3616,7 +3616,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "pdu",
@@ -3702,7 +3702,7 @@
         },
         "outlets": {
           "title": "outlets",
-          "description": "The outlets the unit has, as a count (`24`) or as spans (`1-12,17-24`). Referred to by number from a device's `power.inputs`; at most 512, no repeats (`NG-E001`).\n\nYANG: `/entity-mib:entPhysicalTable/entPhysicalEntry`",
+          "description": "The outlets the unit has, as a count (`24`) or as spans (`1-12,17-24`). Referred to by number from a device's `power.inputs`; at most 512, no repeats (`NV-E001`).\n\nYANG: `/entity-mib:entPhysicalTable/entPhysicalEntry`",
           "anyOf": [
             {
               "type": "integer",
@@ -3727,7 +3727,7 @@
           ],
           "default": null,
           "title": "capacity_watts",
-          "description": "How many watts may be drawn through the unit in total. `NG-E012` sums the declared loads against it; absent means the rating is not recorded, and nothing is graded.\n\nYANG: `/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate`"
+          "description": "How many watts may be drawn through the unit in total. `NV-E012` sums the declared loads against it; absent means the rating is not recorded, and nothing is graded.\n\nYANG: `/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate`"
         },
         "input_feed": {
           "anyOf": [
@@ -3741,7 +3741,7 @@
           ],
           "default": null,
           "title": "input_feed",
-          "description": "Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only for equality: two PDUs on one feed do not make a device redundant (`NG-E015`).\n\nYANG: `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry`"
+          "description": "Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only for equality: two PDUs on one feed do not make a device redundant (`NV-E015`).\n\nYANG: `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry`"
         },
         "style": {
           "anyOf": [
@@ -3765,7 +3765,7 @@
     },
     "PoeConfig": {
       "additionalProperties": false,
-      "description": "`interfaces[].poe` — this port is a PSE (§17.3).\n\nDeclaring the block is what makes the port a power sourcing equipment port;\n`enabled: false` records a port that *could* source power and is\nadministratively told not to, which is `pethPsePortAdminEnable` and is the\ndifference between \"no PoE here\" and \"PoE turned off here\".\n\nHow much the port reserves is said in one of two ways, and never both\n(`NG-E004`):\n\n* `class` — an IEEE classification. The reservation is the PSE-side figure\n  for that class (:data:`POE_PSE_WATTS`), which is what the switch actually\n  takes out of its budget.\n* `budget_watts` — an explicit reservation, for a vendor that lets an\n  operator cap a port below its class.\n\nWith neither, the port reserves its standard's maximum: that is what a switch\nwith no per-port configuration does, and assuming less would make an\noversubscribed budget look fine.",
+      "description": "`interfaces[].poe` — this port is a PSE (§17.3).\n\nDeclaring the block is what makes the port a power sourcing equipment port;\n`enabled: false` records a port that *could* source power and is\nadministratively told not to, which is `pethPsePortAdminEnable` and is the\ndifference between \"no PoE here\" and \"PoE turned off here\".\n\nHow much the port reserves is said in one of two ways, and never both\n(`NV-E004`):\n\n* `class` — an IEEE classification. The reservation is the PSE-side figure\n  for that class (:data:`POE_PSE_WATTS`), which is what the switch actually\n  takes out of its budget.\n* `budget_watts` — an explicit reservation, for a vendor that lets an\n  operator cap a port below its class.\n\nWith neither, the port reserves its standard's maximum: that is what a switch\nwith no per-port configuration does, and assuming less would make an\noversubscribed budget look fine.",
       "properties": {
         "standard": {
           "$ref": "#/$defs/PoeStandard",
@@ -3785,7 +3785,7 @@
           ],
           "default": null,
           "title": "class",
-          "description": "The IEEE classification, 0 to 8, written `class` in YAML. Fixes the reservation; refused above the standard's own ceiling, and exclusive with `budget_watts` (`NG-E004`).\n\nYANG: `…/pethPsePortEntry/pethPsePortPowerClassifications`"
+          "description": "The IEEE classification, 0 to 8, written `class` in YAML. Fixes the reservation; refused above the standard's own ceiling, and exclusive with `budget_watts` (`NV-E004`).\n\nYANG: `…/pethPsePortEntry/pethPsePortPowerClassifications`"
         },
         "budget_watts": {
           "anyOf": [
@@ -3806,7 +3806,7 @@
           "default": true,
           "title": "enabled",
           "type": "boolean",
-          "description": "Is the port administratively allowed to source power? A disabled PSE port reserves nothing and powers nothing, which is what `NG-E014` reports it for.\n\nYANG: `…/pethPsePortEntry/pethPsePortAdminEnable`"
+          "description": "Is the port administratively allowed to source power? A disabled PSE port reserves nothing and powers nothing, which is what `NV-E014` reports it for.\n\nYANG: `…/pethPsePortEntry/pethPsePortAdminEnable`"
         }
       },
       "required": [
@@ -3866,7 +3866,7 @@
           "minimum": 0,
           "title": "priority",
           "type": "integer",
-          "description": "Where the rule sits in the policy database, 0-4294967295. The database is walked from the lowest priority upwards and the first match decides, so this is the rule's position and its identity: unique within the device per family (`NG-F020`)."
+          "description": "Where the rule sits in the policy database, 0-4294967295. The database is walked from the lowest priority upwards and the first match decides, so this is the rule's position and its identity: unique within the device per family (`NV-F020`)."
         },
         "family": {
           "anyOf": [
@@ -3956,7 +3956,7 @@
           ],
           "default": null,
           "title": "iif",
-          "description": "Match packets that arrived on this interface. Names an interface of this device (`NG-F021`)."
+          "description": "Match packets that arrived on this interface. Names an interface of this device (`NV-F021`)."
         },
         "oif": {
           "anyOf": [
@@ -3972,7 +3972,7 @@
           ],
           "default": null,
           "title": "oif",
-          "description": "Match packets that would leave by this interface — locally originated traffic from a socket bound to it. Names an interface of this device (`NG-F021`)."
+          "description": "Match packets that would leave by this interface — locally originated traffic from a socket bound to it. Names an interface of this device (`NV-F021`)."
         },
         "dscp": {
           "anyOf": [
@@ -3993,7 +3993,7 @@
           "default": false,
           "title": "invert",
           "type": "boolean",
-          "description": "Match everything the selectors do *not*. Needs a selector to invert (`NG-F017`)."
+          "description": "Match everything the selectors do *not*. Needs a selector to invert (`NV-F017`)."
         },
         "action": {
           "$ref": "#/$defs/PolicyAction",
@@ -4015,7 +4015,7 @@
           ],
           "default": null,
           "title": "table",
-          "description": "The table to route by. Required by `lookup` and refused by every other action (`NG-F016`); names an entry of `spec.route_tables`, a VRF, or a reserved table (`NG-F019`)."
+          "description": "The table to route by. Required by `lookup` and refused by every other action (`NV-F016`); names an entry of `spec.route_tables`, a VRF, or a reserved table (`NV-F019`)."
         },
         "goto": {
           "anyOf": [
@@ -4030,7 +4030,7 @@
           ],
           "default": null,
           "title": "goto",
-          "description": "The priority to jump to. Required by `goto` and refused by every other action (`NG-F016`), and strictly greater than this rule's own — the database is walked upwards, so a backwards jump is a loop."
+          "description": "The priority to jump to. Required by `goto` and refused by every other action (`NV-F016`), and strictly greater than this rule's own — the database is walked upwards, so a backwards jump is a loop."
         },
         "description": {
           "anyOf": [
@@ -4076,19 +4076,19 @@
           "maxItems": 8,
           "title": "inputs",
           "type": "array",
-          "description": "One entry per power supply, naming the PDU outlet feeding it. At most 8. Empty for a device fed over PoE, or one whose feed is not recorded yet (`NG-E016`).\n\nYANG: `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry`"
+          "description": "One entry per power supply, naming the PDU outlet feeding it. At most 8. Empty for a device fed over PoE, or one whose feed is not recorded yet (`NV-E016`).\n\nYANG: `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry`"
         },
         "redundant": {
           "default": false,
           "title": "redundant",
           "type": "boolean",
-          "description": "The feeds are meant to be independent: losing one must not lose the device. Needs at least two `inputs` (`NG-E002`) that land on different units and different feeds (`NG-E015`)."
+          "description": "The feeds are meant to be independent: losing one must not lose the device. Needs at least two `inputs` (`NV-E002`) that land on different units and different feeds (`NV-E015`)."
         },
         "powered_by": {
           "$ref": "#/$defs/PowerSource",
           "default": "outlet",
           "title": "powered_by",
-          "description": "Where the device's own power comes from: `outlet` (the default) or `poe`, meaning it takes power over its uplink and declares no `inputs` (`NG-E005`, `NG-E014`)."
+          "description": "Where the device's own power comes from: `outlet` (the default) or `poe`, meaning it takes power over its uplink and declares no `inputs` (`NV-E005`, `NV-E014`)."
         },
         "poe_budget_watts": {
           "anyOf": [
@@ -4103,7 +4103,7 @@
           ],
           "default": null,
           "title": "poe_budget_watts",
-          "description": "The PoE power this device can hand out across every PSE port together. `NG-E013` checks the ports that hold budget fit inside it.\n\nYANG: `/power-ethernet-mib:pethMainPseTable/pethMainPseEntry/pethMainPsePower`"
+          "description": "The PoE power this device can hand out across every PSE port together. `NV-E013` checks the ports that hold budget fit inside it.\n\nYANG: `/power-ethernet-mib:pethMainPseTable/pethMainPseEntry/pethMainPsePower`"
         }
       },
       "title": "PowerConfig",
@@ -4158,7 +4158,7 @@
           "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*)*$",
           "title": "pdu",
           "type": "string",
-          "description": "The PDU feeding this supply. An element reference, so it may be written fully qualified to pick one of several PDUs sharing a short name (`NG-E011`)."
+          "description": "The PDU feeding this supply. An element reference, so it may be written fully qualified to pick one of several PDUs sharing a short name (`NV-E011`)."
         },
         "outlet": {
           "maxLength": 16,
@@ -4166,7 +4166,7 @@
           "pattern": "^[A-Za-z0-9]+$",
           "title": "outlet",
           "type": "string",
-          "description": "The outlet on it, as the PDU numbers it. Must exist (`NG-E011`) and must not already feed something else (`NG-E010`). Writable as the shorthand `pdu-r1-a:7`."
+          "description": "The outlet on it, as the PDU numbers it. Must exist (`NV-E011`) and must not already feed something else (`NV-E010`). Writable as the shorthand `pdu-r1-a:7`."
         },
         "psu": {
           "anyOf": [
@@ -4200,7 +4200,7 @@
       "type": "string"
     },
     "Protocol": {
-      "description": "The IP protocol a rule selects on.\n\nA closed set rather than a number, because the eight here are the ones a\npolicy is ever written about and a bare protocol number in a firewall rule is\nalmost always a typo for one of them. `icmp` and `icmpv6` are separate\nprotocols carried by separate families, which is a fact the schema can check\n(`NG-B005`) only because they are not one entry called \"icmp\".",
+      "description": "The IP protocol a rule selects on.\n\nA closed set rather than a number, because the eight here are the ones a\npolicy is ever written about and a bare protocol number in a firewall rule is\nalmost always a typo for one of them. `icmp` and `icmpv6` are separate\nprotocols carried by separate families, which is a fact the schema can check\n(`NV-B005`) only because they are not one entry called \"icmp\".",
       "enum": [
         "tcp",
         "udp",
@@ -4226,7 +4226,7 @@
     },
     "RouteTable": {
       "additionalProperties": false,
-      "description": "One entry of `spec.route_tables` — a routing table of its own (§16.3).\n\nA table is a name and a number and nothing else, because that is all a table\nis: a container routes are placed in. What makes it *do* anything is a policy\nrule that looks it up (§16.4) — a table nothing selects holds routes nothing\nconsults, which is `NG-F023`.\n\nThe three tables every stack already has — `main`, `local` and\n`default` — are never declared here and always nameable anyway; declaring\neither their name or their number is `NG-F015`, because a second `main`\nis not a second table, it is a document that has stopped describing the\ndevice.",
+      "description": "One entry of `spec.route_tables` — a routing table of its own (§16.3).\n\nA table is a name and a number and nothing else, because that is all a table\nis: a container routes are placed in. What makes it *do* anything is a policy\nrule that looks it up (§16.4) — a table nothing selects holds routes nothing\nconsults, which is `NV-F023`.\n\nThe three tables every stack already has — `main`, `local` and\n`default` — are never declared here and always nameable anyway; declaring\neither their name or their number is `NV-F015`, because a second `main`\nis not a second table, it is a document that has stopped describing the\ndevice.",
       "properties": {
         "name": {
           "maxLength": 253,
@@ -4234,14 +4234,14 @@
           "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
           "title": "name",
           "type": "string",
-          "description": "Name of the routing table. Unique within the device, and not one of the reserved `main`, `local` or `default`, which exist without being declared (`NG-F015`)."
+          "description": "Name of the routing table. Unique within the device, and not one of the reserved `main`, `local` or `default`, which exist without being declared (`NV-F015`)."
         },
         "id": {
           "maximum": 4294967295,
           "minimum": 1,
           "title": "id",
           "type": "integer",
-          "description": "The number the table is known by, 1-4294967295. Unique within the device, and not 253, 254 or 255 — those are the reserved three under another name (`NG-F015`)."
+          "description": "The number the table is known by, 1-4294967295. Unique within the device, and not 253, 254 or 255 — those are the reserved three under another name (`NV-F015`)."
         },
         "description": {
           "anyOf": [
@@ -4272,7 +4272,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "router",
@@ -4354,7 +4354,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "server",
@@ -4406,7 +4406,7 @@
     },
     "StaticRoute": {
       "additionalProperties": false,
-      "description": "One entry of `spec.routes` — a configured route (RFC 8349 `rt:route`).\n\nA route needs somewhere to send the packet, so at least one of `via`,\n`dev` and `blackhole` is required (`NG-F004`); `blackhole` excludes\nthe other two, because a route that discards has no egress.",
+      "description": "One entry of `spec.routes` — a configured route (RFC 8349 `rt:route`).\n\nA route needs somewhere to send the packet, so at least one of `via`,\n`dev` and `blackhole` is required (`NV-F004`); `blackhole` excludes\nthe other two, because a route that discards has no egress.",
       "properties": {
         "prefix": {
           "anyOf": [
@@ -4438,7 +4438,7 @@
           ],
           "default": null,
           "title": "via",
-          "description": "Next-hop address. Same family as `prefix` (`NG-F003`), and on a prefix the device configures (`NG-F008`).\n\nYANG: `…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address`"
+          "description": "Next-hop address. Same family as `prefix` (`NV-F003`), and on a prefix the device configures (`NV-F008`).\n\nYANG: `…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address`"
         },
         "dev": {
           "anyOf": [
@@ -4454,7 +4454,7 @@
           ],
           "default": null,
           "title": "dev",
-          "description": "Egress interface, for an unnumbered next hop or a route pointed at an interface. Names an interface of this device (`NG-F009`).\n\nYANG: `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface`"
+          "description": "Egress interface, for an unnumbered next hop or a route pointed at an interface. Names an interface of this device (`NV-F009`).\n\nYANG: `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface`"
         },
         "vrf": {
           "anyOf": [
@@ -4470,7 +4470,7 @@
           ],
           "default": null,
           "title": "vrf",
-          "description": "The routing instance holding the route. Names an entry of `spec.vrfs` (`NG-F005`); unset means the global instance.\n\nYANG: `/ni:network-instances/ni:network-instance/ni:name`"
+          "description": "The routing instance holding the route. Names an entry of `spec.vrfs` (`NV-F005`); unset means the global instance.\n\nYANG: `/ni:network-instances/ni:network-instance/ni:name`"
         },
         "table": {
           "anyOf": [
@@ -4486,7 +4486,7 @@
           ],
           "default": null,
           "title": "table",
-          "description": "The routing table holding the route; `main` when unset. Names an entry of `spec.route_tables` or a reserved table (`NG-F019`). A VRF is a table of its own, so `vrf` and `table` are alternatives, not a pair (`NG-F018`)."
+          "description": "The routing table holding the route; `main` when unset. Names an entry of `spec.route_tables` or a reserved table (`NV-F019`). A VRF is a table of its own, so `vrf` and `table` are alternatives, not a pair (`NV-F018`)."
         },
         "metric": {
           "anyOf": [
@@ -4507,7 +4507,7 @@
           "default": false,
           "title": "blackhole",
           "type": "boolean",
-          "description": "Discard matching packets. Excludes `via` and `dev` (`NG-F004`).\n\nYANG: `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop`"
+          "description": "Discard matching packets. Excludes `via` and `dev` (`NV-F004`).\n\nYANG: `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop`"
         }
       },
       "required": [
@@ -4793,7 +4793,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "switch",
@@ -4829,7 +4829,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "template",
@@ -5015,7 +5015,7 @@
           },
           "title": "zones",
           "type": "array",
-          "description": "The security zones the device divides its interfaces into (§24.1). Policy is written *between* zones rather than between interfaces, so a rule survives a port being renamed, doubled or moved to a LAG. An interface is in at most one zone (`NG-B003`)."
+          "description": "The security zones the device divides its interfaces into (§24.1). Policy is written *between* zones rather than between interfaces, so a rule survives a port being renamed, doubled or moved to a LAG. An interface is in at most one zone (`NV-B003`)."
         },
         "firewall": {
           "anyOf": [
@@ -5076,7 +5076,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "testsuite",
@@ -5144,7 +5144,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "theme",
@@ -5268,7 +5268,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "tunnel",
@@ -5331,7 +5331,7 @@
           },
           "title": "endpoints",
           "type": "array",
-          "description": "Two or more `device:interface` references, each naming an interface of `type: tunnel` (`NG-T001`, `NG-T003`). The link is undirected, so the list is sorted on load. Three or more endpoints make it multipoint, and it is then drawn as a node rather than a line."
+          "description": "Two or more `device:interface` references, each naming an interface of `type: tunnel` (`NV-T001`, `NV-T003`). The link is undirected, so the list is sorted on load. Three or more endpoints make it multipoint, and it is then drawn as a node rather than a line."
         },
         "over": {
           "anyOf": [
@@ -5347,7 +5347,7 @@
           ],
           "default": null,
           "title": "over",
-          "description": "The tunnel this one is encapsulated in — `vxlan` over `ipsec` is written by naming the IPsec tunnel here (`NG-T004`). Absent means the tunnel runs directly over the physical topology. The chain must not loop (`NG-T005`)."
+          "description": "The tunnel this one is encapsulated in — `vxlan` over `ipsec` is written by naming the IPsec tunnel here (`NV-T004`). Absent means the tunnel runs directly over the physical topology. The chain must not loop (`NV-T005`)."
         },
         "mode": {
           "anyOf": [
@@ -5360,7 +5360,7 @@
           ],
           "default": null,
           "title": "mode",
-          "description": "IPsec's encapsulation mode, `tunnel` or `transport` (RFC 4301). Defaults to `tunnel`; every other type has only one mode and must not declare it (`NG-T008`)."
+          "description": "IPsec's encapsulation mode, `tunnel` or `transport` (RFC 4301). Defaults to `tunnel`; every other type has only one mode and must not declare it (`NV-T008`)."
         },
         "vni": {
           "anyOf": [
@@ -5375,7 +5375,7 @@
           ],
           "default": null,
           "title": "vni",
-          "description": "The 24-bit VXLAN/Geneve virtual network identifier. Required for those two types and rejected for every other (`NG-T007`)."
+          "description": "The 24-bit VXLAN/Geneve virtual network identifier. Required for those two types and rejected for every other (`NV-T007`)."
         },
         "port": {
           "anyOf": [
@@ -5390,7 +5390,7 @@
           ],
           "default": null,
           "title": "port",
-          "description": "Outer UDP/TCP port. Defaults to the registered port of the type (WireGuard 51820, OpenVPN 1194, L2TP 1701, VXLAN 4789, Geneve 6081) and is rejected for GRE and IPsec, which run directly over IP (`NG-T008`)."
+          "description": "Outer UDP/TCP port. Defaults to the registered port of the type (WireGuard 51820, OpenVPN 1194, L2TP 1701, VXLAN 4789, Geneve 6081) and is rejected for GRE and IPsec, which run directly over IP (`NV-T008`)."
         },
         "mtu": {
           "anyOf": [
@@ -5405,7 +5405,7 @@
           ],
           "default": null,
           "title": "mtu",
-          "description": "MTU of the tunnel interface. Compared with what the underlay leaves after the encapsulation overhead of the whole stack (`NG-T011`)."
+          "description": "MTU of the tunnel interface. Compared with what the underlay leaves after the encapsulation overhead of the whole stack (`NV-T011`)."
         },
         "encrypted": {
           "anyOf": [
@@ -5431,7 +5431,7 @@
           ],
           "default": null,
           "title": "cipher",
-          "description": "Negotiated cipher suite, free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NG-T009`)."
+          "description": "Negotiated cipher suite, free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NV-T009`)."
         },
         "auth": {
           "anyOf": [
@@ -5444,7 +5444,7 @@
           ],
           "default": null,
           "title": "auth",
-          "description": "How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or `password`. The *method*, never the material — netviz stores no secrets (`NG-T010`)."
+          "description": "How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or `password`. The *method*, never the material — netviz stores no secrets (`NV-T010`)."
         },
         "label": {
           "anyOf": [
@@ -5505,7 +5505,7 @@
           "pattern": "^[A-Za-z0-9._/-]+$",
           "title": "name",
           "type": "string",
-          "description": "Name of the host-side port. Shares the interface namespace of the adapter (`NG-X004`) and may be named by a cable endpoint.\n\nYANG: `/if:interfaces/if:interface/if:name`"
+          "description": "Name of the host-side port. Shares the interface namespace of the adapter (`NV-X004`) and may be named by a cable endpoint.\n\nYANG: `/if:interfaces/if:interface/if:name`"
         },
         "type": {
           "$ref": "#/$defs/UpstreamType",
@@ -5550,7 +5550,7 @@
           ],
           "default": null,
           "title": "attached_to",
-          "description": "The host the adapter is plugged into. A bare device name, never a `device:interface` reference (`NG-X001`). This is what joins the adapter to the graph when no cable does."
+          "description": "The host the adapter is plugged into. A bare device name, never a `device:interface` reference (`NV-X001`). This is what joins the adapter to the graph when no cable does."
         }
       },
       "required": [
@@ -5582,7 +5582,7 @@
           "const": "netviz.dev/v1alpha1",
           "title": "apiVersion",
           "type": "string",
-          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+          "description": "Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NV-D002`."
         },
         "kind": {
           "const": "user",
@@ -5626,7 +5626,7 @@
           ],
           "default": null,
           "title": "login",
-          "description": "The account name, when it differs from `metadata.name`; absent means the two are the same. Estate-wide, so two users claiming one login is `NG-S013`.\n\nYANG: `/ietf-system:system/authentication/user/name`"
+          "description": "The account name, when it differs from `metadata.name`; absent means the two are the same. Estate-wide, so two users claiming one login is `NV-S013`.\n\nYANG: `/ietf-system:system/authentication/user/name`"
         },
         "full_name": {
           "anyOf": [
@@ -5670,19 +5670,19 @@
           ],
           "default": null,
           "title": "uid",
-          "description": "POSIX user id, when the estate assigns one. 0 to 4294967294; two users claiming one is `NG-S013`.\n\nYANG: `/ietf-system:system/authentication/user`"
+          "description": "POSIX user id, when the estate assigns one. 0 to 4294967294; two users claiming one is `NV-S013`.\n\nYANG: `/ietf-system:system/authentication/user`"
         },
         "type": {
           "$ref": "#/$defs/UserType",
           "default": "person",
           "title": "type",
-          "description": "`person`, `service` or `shared`. Decides whether `NG-S015` and `NG-S016` have anything to say: only a person can depart, and only a person is expected in a group."
+          "description": "`person`, `service` or `shared`. Decides whether `NV-S015` and `NV-S016` have anything to say: only a person can depart, and only a person is expected in a group."
         },
         "status": {
           "$ref": "#/$defs/UserStatus",
           "default": "active",
           "title": "status",
-          "description": "`active`, `suspended` or `departed`. A departed account is kept rather than deleted so the memberships still to be revoked stay visible (`NG-S015`)."
+          "description": "`active`, `suspended` or `departed`. A departed account is kept rather than deleted so the memberships still to be revoked stay visible (`NV-S015`)."
         },
         "ssh_keys": {
           "items": {
@@ -5692,7 +5692,7 @@
           "maxItems": 32,
           "title": "ssh_keys",
           "type": "array",
-          "description": "Public keys the account authenticates with, `<algorithm> <base64> [comment]`. Normalised to single spaces; a private key is refused (`NG-S002`).\n\nYANG: `/ietf-system:system/authentication/user/authorized-key`"
+          "description": "Public keys the account authenticates with, `<algorithm> <base64> [comment]`. Normalised to single spaces; a private key is refused (`NV-S002`).\n\nYANG: `/ietf-system:system/authentication/user/authorized-key`"
         },
         "style": {
           "anyOf": [
@@ -5722,7 +5722,7 @@
       "type": "string"
     },
     "UserType": {
-      "description": "What sort of account an identity is (§19.1).\n\nThe distinction is not cosmetic: three of the rules in the `S` group only\nmake sense for one of these. A service account belongs to no group in a great\nmany estates and reporting that as an oversight (`NG-S016`) would be noise;\na shared account has no single person to depart, so `NG-S015` has nothing\nto say about it.",
+      "description": "What sort of account an identity is (§19.1).\n\nThe distinction is not cosmetic: three of the rules in the `S` group only\nmake sense for one of these. A service account belongs to no group in a great\nmany estates and reporting that as an oversight (`NV-S016`) would be noise;\na shared account has no single person to depart, so `NV-S015` has nothing\nto say about it.",
       "enum": [
         "person",
         "service",
@@ -5799,7 +5799,7 @@
           ],
           "default": null,
           "title": "access_vlan",
-          "description": "The VLAN an access port belongs to, and the encapsulation VID of a `type: vlan` sub-interface. Required in access mode — it defaults to 1 — and forbidden in trunk mode (`NG-V002`).\n\nYANG: `…/dot1q:bridge-port/dot1q:pvid`"
+          "description": "The VLAN an access port belongs to, and the encapsulation VID of a `type: vlan` sub-interface. Required in access mode — it defaults to 1 — and forbidden in trunk mode (`NV-V002`).\n\nYANG: `…/dot1q:bridge-port/dot1q:pvid`"
         },
         "trunk_vlans": {
           "anyOf": [
@@ -5827,7 +5827,7 @@
           ],
           "default": null,
           "title": "native_vlan",
-          "description": "The untagged VLAN on a trunk. Trunk mode only (`NG-V003`); it is implicitly a member of the port's VLAN set.\n\nYANG: `…/dot1q:bridge-port/dot1q:pvid`"
+          "description": "The untagged VLAN on a trunk. Trunk mode only (`NV-V003`); it is implicitly a member of the port's VLAN set.\n\nYANG: `…/dot1q:bridge-port/dot1q:pvid`"
         },
         "ingress_filtering": {
           "default": true,
@@ -5906,7 +5906,7 @@
           "minimum": 1,
           "title": "id",
           "type": "integer",
-          "description": "VLAN identifier. Unique within the device (`NG-V001`).\n\nYANG: `…/dot1q:bridge-vlan/dot1q:vlan/dot1q:vid`"
+          "description": "VLAN identifier. Unique within the device (`NV-V001`).\n\nYANG: `…/dot1q:bridge-vlan/dot1q:vlan/dot1q:vid`"
         },
         "name": {
           "anyOf": [
@@ -5992,7 +5992,7 @@
           "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
           "title": "name",
           "type": "string",
-          "description": "Name of the routing instance. Unique within the device (`NG-F001`), and what an interface's `vrf` and a route's `vrf` refer to. Two devices using one name mean one VRF.\n\nYANG: `/ni:network-instances/ni:network-instance/ni:name`"
+          "description": "Name of the routing instance. Unique within the device (`NV-F001`), and what an interface's `vrf` and a route's `vrf` refer to. Two devices using one name mean one VRF.\n\nYANG: `/ni:network-instances/ni:network-instance/ni:name`"
         },
         "rd": {
           "title": "rd",
@@ -6022,12 +6022,12 @@
     },
     "WirelessConfig": {
       "additionalProperties": false,
-      "description": "`interfaces[].wireless` — the radio configuration of a `wifi` port.\n\nOnly a `wifi` interface may carry it (`NG-W002`): the block is what\nturns an otherwise shapeless `medium: wireless` link into an association\nwith a direction, a frequency and a name.",
+      "description": "`interfaces[].wireless` — the radio configuration of a `wifi` port.\n\nOnly a `wifi` interface may carry it (`NV-W002`): the block is what\nturns an otherwise shapeless `medium: wireless` link into an association\nwith a direction, a frequency and a name.",
       "properties": {
         "role": {
           "$ref": "#/$defs/RadioRole",
           "title": "role",
-          "description": "Which side of the association this radio is: `ap` beacons the SSIDs, `station` and `mesh` associate to one. A wireless link joins exactly one `ap` to one client (`NG-W007`).\n\nYANG: `…/dot11:station-config/dot11:desired-bss-type`"
+          "description": "Which side of the association this radio is: `ap` beacons the SSIDs, `station` and `mesh` associate to one. A wireless link joins exactly one `ap` to one client (`NV-W007`).\n\nYANG: `…/dot11:station-config/dot11:desired-bss-type`"
         },
         "band": {
           "anyOf": [
@@ -6055,7 +6055,7 @@
           ],
           "default": null,
           "title": "channel",
-          "description": "The primary 20 MHz channel, as the band numbers it (`NG-W003`).\n\nYANG: `…/dot11:phy/dot11:current-channel-number`"
+          "description": "The primary 20 MHz channel, as the band numbers it (`NV-W003`).\n\nYANG: `…/dot11:phy/dot11:current-channel-number`"
         },
         "width_mhz": {
           "anyOf": [
@@ -6075,7 +6075,7 @@
           ],
           "default": null,
           "title": "width_mhz",
-          "description": "Total channel width in MHz. 40 is the most 2.4 GHz can bond and 320 is 6 GHz only (`NG-W004`).\n\nYANG: `…/dot11:phy/dot11:current-channel-width`"
+          "description": "Total channel width in MHz. 40 is the most 2.4 GHz can bond and 320 is 6 GHz only (`NV-W004`).\n\nYANG: `…/dot11:phy/dot11:current-channel-width`"
         },
         "tx_power_dbm": {
           "anyOf": [
@@ -6098,7 +6098,7 @@
           },
           "title": "bss",
           "type": "array",
-          "description": "The basic service sets this radio beacons (`ap`) or is associated to (`station`, `mesh`, at most one — `NG-W006`).\n\nYANG: `…/dot11:bss`"
+          "description": "The basic service sets this radio beacons (`ap`) or is associated to (`station`, `mesh`, at most one — `NV-W006`).\n\nYANG: `…/dot11:bss`"
         }
       },
       "required": [
@@ -6109,7 +6109,7 @@
     },
     "Zone": {
       "additionalProperties": false,
-      "description": "One entry of `spec.zones` — a security zone (§24.1).\n\nA name and the interfaces in it. The interfaces are what make the zone a\nfact about the device rather than a label: policy is written between zones,\nand which zone a packet is in is decided by the interface it crossed.\n\nAn interface belongs to at most one zone (`NG-B003`), and a zone holding no\ninterface at all is inert (`W150`) — nothing can be in it, so no rule\nnaming it can ever match.",
+      "description": "One entry of `spec.zones` — a security zone (§24.1).\n\nA name and the interfaces in it. The interfaces are what make the zone a\nfact about the device rather than a label: policy is written between zones,\nand which zone a packet is in is decided by the interface it crossed.\n\nAn interface belongs to at most one zone (`NV-B003`), and a zone holding no\ninterface at all is inert (`W150`) — nothing can be in it, so no rule\nnaming it can ever match.",
       "properties": {
         "name": {
           "maxLength": 253,
@@ -6117,7 +6117,7 @@
           "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
           "title": "name",
           "type": "string",
-          "description": "Name of the zone. Unique within the device, and not `local`, which is the machine itself and is nameable in a rule without being declared (`NG-B001`)."
+          "description": "Name of the zone. Unique within the device, and not `local`, which is the machine itself and is nameable in a rule without being declared (`NV-B001`)."
         },
         "interfaces": {
           "items": {
@@ -6128,7 +6128,7 @@
           },
           "title": "interfaces",
           "type": "array",
-          "description": "The interfaces in this zone. Each names an interface of this device (`NG-B002`), and no interface is in two zones (`NG-B003`). A zone holding none is inert (`W150`)."
+          "description": "The interfaces in this zone. Each names an interface of this device (`NV-B002`), and no interface is in two zones (`NV-B003`). A zone holding none is inert (`W150`)."
         },
         "description": {
           "anyOf": [

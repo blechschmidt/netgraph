@@ -51,7 +51,7 @@ home-lab/
 
 The laptop has no Ethernet port of its own. It is joined to the graph by the
 adapter's `upstream.attached_to: laptop`, **not** by a cable — declaring both
-would be `NG-X005`. The phone is joined by `wl-ap-phone`, a `medium: wireless`
+would be `NV-X005`. The phone is joined by `wl-ap-phone`, a `medium: wireless`
 cable: an association *is* a link, and the two `wireless` blocks at its ends are
 what let the layer-2 view label it `home @ 36/5GHz`.
 
@@ -82,25 +82,25 @@ VLAN 10 (`home`) dual stack; VLAN 20 (`guest`) carries no addressed element.
 
 `netviz list bss` prints exactly that table, with the client radios in it too.
 Both VLANs reach the uplink trunk `ap-home:eth0` ↔ `sw-home:port5`, which is
-what keeps `NG-W009` quiet: an SSID mapped to a VLAN the access point carries
+what keeps `NV-W009` quiet: an SSID mapped to a VLAN the access point carries
 nowhere is an error, because clients would associate and reach nothing.
 
 ## Details worth copying
 
 * **The switch is layer-2 only.** Its management address sits on the `Vlan10`
   SVI — a `type: vlan` interface parented on the `br0` bridge — rather than on
-  a bridge port, which would be `NG-V009`. The access point is modelled the same
+  a bridge port, which would be `NV-V009`. The access point is modelled the same
   way: it is a `switch` whose radio is one more bridge port.
 * **Hosts declare no `vlan` block** even though the switch ports facing them
   are access ports in VLAN 10. That is the expected pairing: the host is
-  untagged and inherits the port's VLAN, so `NG-C011` stays quiet. The phone
+  untagged and inherits the port's VLAN, so `NV-C011` stays quiet. The phone
   does not declare one either: its VLAN comes from the SSID it joined.
 * **The unused Wi-Fi radios are `enabled: false`.** `pc-desk` and `laptop` both
-  have one. A disabled interface is exempt from `NG-I013` and from `NG-C015`, so
+  have one. A disabled interface is exempt from `NV-I013` and from `NV-C015`, so
   spare capacity can be documented without generating warnings.
 * **`rtr-home:wan0` is annotated instead.** It is up, and it terminates no cable
   because the ISP at the far end is not an element of this inventory. The
-  `netviz/ignore: "NG-C015"` annotation on the router says so once, where the
+  `netviz/ignore: "NV-C015"` annotation on the router says so once, where the
   next reader will look for the reason.
 * **Membership is written on the group and nowhere else.** `household` names
   `admins` rather than repeating `ana`, so she is in both without being listed
@@ -111,4 +111,4 @@ nowhere is an error, because clients would associate and reach nothing.
   the normal shape rather than an oversight — so `I004` says nothing about it.
   Marking it as a service account is what makes that distinction.
 * **Every cabled interface states `mtu: 1500`**, so the two ends of each link
-  agree and `NG-C010` stays quiet. The two radios do too — a link is a link.
+  agree and `NV-C010` stays quiet. The two radios do too — a link is a link.

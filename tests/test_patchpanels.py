@@ -153,7 +153,7 @@ def test_a_port_range_expands_the_way_an_interface_range_does(
 def test_a_malformed_port_range_is_refused(written: object) -> None:
     with pytest.raises(SchemaError) as caught:
         parse_document(panel_document("pp", ports=written))
-    assert any(issue.rule == "NG-P006" for issue in caught.value.issues)
+    assert any(issue.rule == "NV-P006" for issue in caught.value.issues)
 
 
 def test_a_panel_derives_two_interfaces_per_position() -> None:
@@ -201,7 +201,7 @@ def test_a_coupler_naming_a_position_the_panel_lacks_is_refused(
 ) -> None:
     with pytest.raises(SchemaError) as caught:
         parse_document(panel_document("pp", ports="1-4", couplers=couplers))
-    assert any(issue.rule == "NG-P007" for issue in caught.value.issues)
+    assert any(issue.rule == "NV-P007" for issue in caught.value.issues)
 
 
 def test_the_normalised_ports_value_is_one_spelling_for_both_forms() -> None:
@@ -574,7 +574,7 @@ def test_position_without_a_rack_is_refused() -> None:
                 "spec": {"ports": 4},
             }
         )
-    assert any(issue.rule == "NG-U004" for issue in caught.value.issues)
+    assert any(issue.rule == "NV-U004" for issue in caught.value.issues)
 
 
 # --------------------------------------------------------------------------- #

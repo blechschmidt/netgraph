@@ -152,7 +152,7 @@ class _Frame:
 def _segments(lines: Sequence[str]) -> list[tuple[int, int]]:
     """``(start, end)`` of each document in ``lines``, ``end`` exclusive.
 
-    Empty documents are kept: they consume an index (``NG-L004``) and every
+    Empty documents are kept: they consume an index (``NV-L004``) and every
     diagnostic in the file is anchored by one.
     """
     breaks = [

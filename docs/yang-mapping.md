@@ -314,7 +314,7 @@ An interface of `type: wifi` already maps to `ianaift:ieee80211` (§9.1). The
 | `bss[].bssid` | `…/dot11:bss/dot11:bssid` | On an AP this is the address the radio beacons with; on a client, `dot11DesiredBSSID`. |
 | `bss[].security` | `…/dot11:bss/dot11:rsna-enabled` + `dot11:privacy-invoked` | One enum standing for several booleans: `open` is neither, and the four WPA values are RSNA with a PSK or an 802.1X authentication server. The cipher suite negotiated on top is not modelled. |
 | `bss[].hidden` | — | Beacon SSID suppression is vendor configuration; 802.11 has no attribute for it, and it is recorded because it explains why a network is missing from a scan. |
-| `bss[].vlan` | — | 802.1Q, not 802.11: it is the VLAN the AP bridges that BSS into, and it is checked against the device's VLAN database and its ports (`NG-V004`, `NG-W009`). |
+| `bss[].vlan` | — | 802.1Q, not 802.11: it is the VLAN the AP bridges that BSS into, and it is checked against the device's VLAN database and its ports (`NV-V004`, `NV-W009`). |
 
 ### What netviz does not model from 802.11
 
@@ -483,7 +483,7 @@ element — a server, a switch, a PDU — is one Energy Object:
 | `inputs[].psu` | — (netviz-only; the label on the back of the chassis) |
 | a `pdu`'s `spec.outlets` | `entPhysicalTable/entPhysicalEntry` (RFC 6933) — an outlet is a physical component, not an interface (§17.1) |
 | a power supply as a component | `…/entPhysicalEntry/entPhysicalClass` = `powerSupply(6)` — which is what `inputs[].psu` labels, and as far as netviz goes towards the component tree |
-| `spec.power.redundant` | — netviz-only. The relation table can record that a box has two inlets; nothing in any of these models says the two were *bought to survive each other*, which is a design intention only a human can state (`NG-E015`) |
+| `spec.power.redundant` | — netviz-only. The relation table can record that a box has two inlets; nothing in any of these models says the two were *bought to survive each other*, which is a design intention only a human can state (`NV-E015`) |
 | `spec.power.powered_by` | — netviz-only. RFC 7326 has both a power inlet and a PoE port, but nothing that says "this box has no cord, so read its power path off its uplink", which is the fact that lets netviz derive the feed (§17.4) |
 
 `eoPower` is `read-only` in the MIB, because it is a *measurement*. netviz

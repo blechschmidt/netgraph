@@ -100,7 +100,7 @@ def _case_insensitive(word: str) -> str:
 # loader, which is the only layer that can still see them.
 Boolean = StrictBool
 
-#: ``NG-D002``: the loader accepts exactly the versions it knows (§12).
+#: ``NV-D002``: the loader accepts exactly the versions it knows (§12).
 ApiVersion = Literal["netviz.dev/v1alpha1"]
 
 #: Element *declaration* grammar, §4.1: what ``metadata.name`` may hold. A
@@ -147,7 +147,7 @@ RackUnit = Annotated[int, Field(strict=True, ge=1, le=MAX_RACK_UNITS)]
 #: A height in rack units. One is the smallest thing anyone mounts.
 RackUnits = Annotated[int, Field(strict=True, ge=1, le=MAX_RACK_UNITS)]
 
-#: Layer-2 MTU (``NG-I011``). The RFC 8344 IPv4 minimum is the lower bound; the
+#: Layer-2 MTU (``NV-I011``). The RFC 8344 IPv4 minimum is the lower bound; the
 #: upper bound is the ``uint16`` maximum of ``ip:ipv4/mtu``.
 InterfaceMtu = Annotated[int, Field(strict=True, ge=68, le=65535)]
 #: ``ip:ipv4/mtu`` (``uint16``, minimum 68).
@@ -169,7 +169,7 @@ MAX_SSID_OCTETS: Final = 32
 
 
 def check_ssid(value: Any) -> Any:
-    """Reject an SSID that no radio could beacon (``NG-W001``).
+    """Reject an SSID that no radio could beacon (``NV-W001``).
 
     Only the octet bound and the empty string are checked here. Every byte
     sequence is a legal SSID as far as 802.11 is concerned — the element is a
@@ -204,7 +204,7 @@ Ssid = Annotated[
 
 #: An 802.11 channel number. The bound spans every band's numbering: 1 to 14 at
 #: 2.4 GHz, 32 to 177 at 5 GHz, 1 to 233 at 6 GHz; which numbers are legal in
-#: which band is :class:`~netviz.models.interface.Band`'s business (``NG-W003``).
+#: which band is :class:`~netviz.models.interface.Band`'s business (``NV-W003``).
 WirelessChannel = Annotated[int, Field(strict=True, ge=1, le=233)]
 
 #: Radiated power in dBm. The floor admits the -10 dBm a phone-sized radio backs

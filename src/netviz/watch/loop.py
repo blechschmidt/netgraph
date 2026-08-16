@@ -149,7 +149,7 @@ class InventoryFilter:
 
 
 def _is_hidden_component(component: str) -> bool:
-    """Mirror ``NG-L002``: the loader never descends into ``.x`` or ``_x``."""
+    """Mirror ``NV-L002``: the loader never descends into ``.x`` or ``_x``."""
     return component.startswith((".", "_"))
 
 

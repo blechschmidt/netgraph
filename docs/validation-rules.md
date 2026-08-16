@@ -58,17 +58,17 @@ because "my file is not being loaded" is a validation question in practice.
 
 | ID | Severity | Rule | Why it matters |
 |---|---|---|---|
-| `NG-L001` | — | Only `*.yaml` and `*.yml` (case-insensitive) are loaded. | A `README.md` or a `.j2` template next to the inventory is not an element. |
-| `NG-L002` | — | Path components starting with `.` or `_`, and anything matched by a `.netvizignore`, are skipped. | Keeps `.git/`, editor backups and work-in-progress drafts out of the graph without moving them elsewhere. |
-| `NG-L003` | error | Symlinks are followed, but one that leaves the inventory root or revisits a directory is an error. | A symlink loop would hang the walk; one pointing outside the root would silently pull in documents nobody reviewing the tree can see. |
-| `NG-L004` | — | A file may hold several documents separated by `---`; empty ones are skipped but still consume a document index. | The index in `links.yaml#2` keeps pointing at the third `---` block even after one is emptied. |
-| `NG-L005` | — | Files load in byte-wise order of their relative path, documents in file order. | Makes every later stage deterministic, so a diagram only changes when the inventory does. |
+| `NV-L001` | — | Only `*.yaml` and `*.yml` (case-insensitive) are loaded. | A `README.md` or a `.j2` template next to the inventory is not an element. |
+| `NV-L002` | — | Path components starting with `.` or `_`, and anything matched by a `.netvizignore`, are skipped. | Keeps `.git/`, editor backups and work-in-progress drafts out of the graph without moving them elsewhere. |
+| `NV-L003` | error | Symlinks are followed, but one that leaves the inventory root or revisits a directory is an error. | A symlink loop would hang the walk; one pointing outside the root would silently pull in documents nobody reviewing the tree can see. |
+| `NV-L004` | — | A file may hold several documents separated by `---`; empty ones are skipped but still consume a document index. | The index in `links.yaml#2` keeps pointing at the third `---` block even after one is emptied. |
+| `NV-L005` | — | Files load in byte-wise order of their relative path, documents in file order. | Makes every later stage deterministic, so a diagram only changes when the inventory does. |
 
 Two further problems are reported at this stage and always fail the run:
 
 | ID | Severity | Rule | Why it matters |
 |---|---|---|---|
-| `NG-N002` | error | `metadata.name` is unique within its namespace, across all kinds. The first declaration wins and the duplicate document is dropped. | Two elements answering to one name make every reference to it ambiguous. The diagnostic names both source locations. |
+| `NV-N002` | error | `metadata.name` is unique within its namespace, across all kinds. The first declaration wins and the duplicate document is dropped. | Two elements answering to one name make every reference to it ambiguous. The diagnostic names both source locations. |
 | *(none)* | error | The file is not well-formed UTF-8 YAML, uses an unsupported tag, or repeats a mapping key. | Reported with the rule column `load`. A document that did not parse is missing from the graph entirely. |
 
 A name reused in a *different* namespace is fine. Namespaces come from the
@@ -89,45 +89,45 @@ does not, the column reads `load` and the message carries the field path
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-D001` | The document is a mapping carrying `apiVersion`, `kind`, `metadata` and `spec`. | Anything else is not a netviz document; guessing at its intent would be worse than refusing it. |
-| `NG-D002` | `apiVersion` is a version this build understands (`netviz.dev/v1alpha1`). | A document written for a later schema may mean something different by the same keys. |
-| `NG-D003` | `kind` is one of the ten element kinds or `template`, lower-case. | `kind` selects the shape of `spec`; an unknown kind has no shape to check against. |
-| `NG-D004` | `spec` matches the shape required by `kind`. | The whole point of declaring the kind. |
-| `NG-D005` | No unknown keys anywhere in the document. | The one failure mode this tool exists to prevent: a misspelt `mtu:`/`mut:` that was silently ignored would produce a diagram that disagrees with the file. |
-| `NG-N001` | `metadata.name` matches the name grammar. | Names end up as graph node ids and as the left half of every `device:interface` reference. |
-| `NG-N003` | Label and annotation keys match the Kubernetes key grammar; label keys may not use the reserved `netviz.dev/` prefix. | Labels are user vocabulary that selectors match on; the tool keeps its own prefix so a future built-in label cannot collide with yours. |
+| `NV-D001` | The document is a mapping carrying `apiVersion`, `kind`, `metadata` and `spec`. | Anything else is not a netviz document; guessing at its intent would be worse than refusing it. |
+| `NV-D002` | `apiVersion` is a version this build understands (`netviz.dev/v1alpha1`). | A document written for a later schema may mean something different by the same keys. |
+| `NV-D003` | `kind` is one of the ten element kinds or `template`, lower-case. | `kind` selects the shape of `spec`; an unknown kind has no shape to check against. |
+| `NV-D004` | `spec` matches the shape required by `kind`. | The whole point of declaring the kind. |
+| `NV-D005` | No unknown keys anywhere in the document. | The one failure mode this tool exists to prevent: a misspelt `mtu:`/`mut:` that was silently ignored would produce a diagram that disagrees with the file. |
+| `NV-N001` | `metadata.name` matches the name grammar. | Names end up as graph node ids and as the left half of every `device:interface` reference. |
+| `NV-N003` | Label and annotation keys match the Kubernetes key grammar; label keys may not use the reserved `netviz.dev/` prefix. | Labels are user vocabulary that selectors match on; the tool keeps its own prefix so a future built-in label cannot collide with yours. |
 
 ### Interfaces
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-I001` | Interface names are unique within their element. | A cable endpoint names one interface; two candidates make the reference meaningless. |
-| `NG-I002` | `parent` is present exactly for `type: vlan`, is not the interface itself, and resolves to an interface on the same element. | A sub-interface without a parent has nothing to be a sub-interface of. |
-| `NG-I003` | `members` is present exactly for `type: lag` and `type: bridge`, is non-empty, free of duplicates, does not include the aggregate itself, and every entry resolves to an interface on the same element. | An aggregate is defined entirely by what it aggregates. |
-| `NG-I011` | `mtu` is within 68–65535, and at least 1280 when the interface carries IPv6 addresses. | RFC 8200 sets 1280 as the IPv6 minimum link MTU; below it, IPv6 on that interface cannot work. |
+| `NV-I001` | Interface names are unique within their element. | A cable endpoint names one interface; two candidates make the reference meaningless. |
+| `NV-I002` | `parent` is present exactly for `type: vlan`, is not the interface itself, and resolves to an interface on the same element. | A sub-interface without a parent has nothing to be a sub-interface of. |
+| `NV-I003` | `members` is present exactly for `type: lag` and `type: bridge`, is non-empty, free of duplicates, does not include the aggregate itself, and every entry resolves to an interface on the same element. | An aggregate is defined entirely by what it aggregates. |
+| `NV-I011` | `mtu` is within 68–65535, and at least 1280 when the interface carries IPv6 addresses. | RFC 8200 sets 1280 as the IPv6 minimum link MTU; below it, IPv6 on that interface cannot work. |
 
 ### Addresses
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-A001` | Exactly one of `prefix_length` or `netmask` per IPv4 address; `prefix_length` is mandatory for IPv6. | An address without a prefix says nothing about which subnet it is in, which is most of what an address is for. |
-| `NG-A002` | Addresses are unique within one address family on one interface. | `ip` is RFC 8344's list key: a repeat is not a second address, it is a contradiction. |
-| `NG-A003` | A `netmask` is contiguous. | Non-contiguous masks are a feature flag in RFC 8344 and unsupported hardware behaviour nearly everywhere else. |
+| `NV-A001` | Exactly one of `prefix_length` or `netmask` per IPv4 address; `prefix_length` is mandatory for IPv6. | An address without a prefix says nothing about which subnet it is in, which is most of what an address is for. |
+| `NV-A002` | Addresses are unique within one address family on one interface. | `ip` is RFC 8344's list key: a repeat is not a second address, it is a contradiction. |
+| `NV-A003` | A `netmask` is contiguous. | Non-contiguous masks are a feature flag in RFC 8344 and unsupported hardware behaviour nearly everywhere else. |
 
 ### VLANs
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-V001` | `vlans[].id` is unique within a device. | The VLAN database is a keyed list; a duplicate id means two names for one VLAN. |
-| `NG-V002` | `access_vlan` in access mode, `trunk_vlans` in trunk mode — never crossed. | The two describe incompatible port behaviours; a port that declared both would have no single correct expansion to 802.1Q. |
-| `NG-V003` | `native_vlan` appears only in trunk mode. | A native VLAN is the untagged VLAN *of a trunk*; on an access port every frame is untagged already. |
+| `NV-V001` | `vlans[].id` is unique within a device. | The VLAN database is a keyed list; a duplicate id means two names for one VLAN. |
+| `NV-V002` | `access_vlan` in access mode, `trunk_vlans` in trunk mode — never crossed. | The two describe incompatible port behaviours; a port that declared both would have no single correct expansion to 802.1Q. |
+| `NV-V003` | `native_vlan` appears only in trunk mode. | A native VLAN is the untagged VLAN *of a trunk*; on an access port every frame is untagged already. |
 
 ### Cables
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-C001` | `endpoints` has exactly two entries. | A cable with one end goes nowhere; one with three is a hub, which is a separate kind. |
-| `NG-C007` | `length_m` and `category` are absent when `medium: wireless`. | Radio has no cable to measure or specify. |
+| `NV-C001` | `endpoints` has exactly two entries. | A cable with one end goes nowhere; one with three is a hub, which is a separate kind. |
+| `NV-C007` | `length_m` and `category` are absent when `medium: wireless`. | Radio has no cable to measure or specify. |
 
 ### Wireless
 
@@ -135,12 +135,12 @@ Checked while a `wifi` interface's `wireless` block is parsed (schema §6.2.6).
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-W001` | `ssid` is between 1 and 32 octets. | 802.11 carries the SSID as a counted octet string; a longer name cannot be beaconed, and the limit is on bytes, so a non-Latin name runs out sooner than its length suggests. |
-| `NG-W002` | `wireless` appears only on `type: wifi`. | The block describes a radio. On an ethernet port it would be configuration nothing implements. |
-| `NG-W003` | `channel` names `band`, and is a channel that band numbers. | Channel 1 exists at 2.4 GHz and at 6 GHz and means two different frequencies; without the band there is nothing to resolve it against. |
-| `NG-W004` | `width_mhz` names `band`, and is a width that band supports. | There is no room for 80 MHz at 2.4 GHz, and 320 MHz is an 802.11be feature of the 6 GHz band alone. |
-| `NG-W005` | `ssid` and `bssid` are each unique within one radio. | The BSS list is keyed by both; a repeat is two descriptions of one service set. |
-| `NG-W006` | A `station` or `mesh` radio lists at most one BSS. | A client radio is associated to exactly one BSS at a time. Several entries describe a history, not a state. |
+| `NV-W001` | `ssid` is between 1 and 32 octets. | 802.11 carries the SSID as a counted octet string; a longer name cannot be beaconed, and the limit is on bytes, so a non-Latin name runs out sooner than its length suggests. |
+| `NV-W002` | `wireless` appears only on `type: wifi`. | The block describes a radio. On an ethernet port it would be configuration nothing implements. |
+| `NV-W003` | `channel` names `band`, and is a channel that band numbers. | Channel 1 exists at 2.4 GHz and at 6 GHz and means two different frequencies; without the band there is nothing to resolve it against. |
+| `NV-W004` | `width_mhz` names `band`, and is a width that band supports. | There is no room for 80 MHz at 2.4 GHz, and 320 MHz is an 802.11be feature of the 6 GHz band alone. |
+| `NV-W005` | `ssid` and `bssid` are each unique within one radio. | The BSS list is keyed by both; a repeat is two descriptions of one service set. |
+| `NV-W006` | A `station` or `mesh` radio lists at most one BSS. | A client radio is associated to exactly one BSS at a time. Several entries describe a history, not a state. |
 
 ### Hubs
 
@@ -149,18 +149,18 @@ stack, so declaring any of those would describe hardware that is not a hub.
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-H001` | A hub interface must not declare `vlan`. | A repeater cannot tag, filter or assign VLANs. |
-| `NG-H002` | A hub interface must not declare `ipv4` or `ipv6`. | No IP stack to hold the address. |
-| `NG-H003` | A hub must not declare `bridge`, `vlans` or `forwarding`. | Same reason, at device level. |
-| `NG-H004` | Every hub interface is `type: ethernet`. | The other types are all logical constructs a repeater does not implement. |
+| `NV-H001` | A hub interface must not declare `vlan`. | A repeater cannot tag, filter or assign VLANs. |
+| `NV-H002` | A hub interface must not declare `ipv4` or `ipv6`. | No IP stack to hold the address. |
+| `NV-H003` | A hub must not declare `bridge`, `vlans` or `forwarding`. | Same reason, at device level. |
+| `NV-H004` | Every hub interface is `type: ethernet`. | The other types are all logical constructs a repeater does not implement. |
 
 ### Adapters
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-X001` | `upstream.attached_to` is a bare element name, never a `device:interface` reference. | An adapter plugs into a *host*, not into one of its network ports; the name grammar rejects the colon. |
-| `NG-X003` | Every downstream interface is `type: ethernet`, `wifi` or `lag`. | An adapter presents physical ports; loopbacks and SVIs belong to the host's own stack. |
-| `NG-X004` | `upstream.name` does not collide with any downstream `interfaces[].name`. | Both are reachable as `adapter:port`, so a collision makes the cable endpoint ambiguous. |
+| `NV-X001` | `upstream.attached_to` is a bare element name, never a `device:interface` reference. | An adapter plugs into a *host*, not into one of its network ports; the name grammar rejects the colon. |
+| `NV-X003` | Every downstream interface is `type: ethernet`, `wifi` or `lag`. | An adapter presents physical ports; loopbacks and SVIs belong to the host's own stack. |
+| `NV-X004` | `upstream.name` does not collide with any downstream `interfaces[].name`. | Both are reachable as `adapter:port`, so a collision makes the cable endpoint ambiguous. |
 
 ### Power
 
@@ -169,12 +169,12 @@ Checked while a `pdu` document, a device's `spec.power` block or an interface's
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-E001` | A PDU's `spec.outlets` is a count (`24`) or comma-separated `[low-high]` spans (`1-12,17-24`), non-inverted, free of repeats, and totals at most 512 outlets. | Outlets are referred to by number from a device's `power.inputs`, so a strip whose numbering did not expand has no holes for anything to plug into. The bound is what stops `1-99999999` from becoming a load schedule nobody can read. |
-| `NG-E002` | An entry of `power.inputs` is `pdu:outlet` with exactly one colon; no two inputs of one device name the same outlet; `redundant: true` requires at least two inputs. | The reference is the same grammar a cable endpoint uses, for the same reason: a named thing on a named element. A device cannot plug two of its own supplies into one hole, and it cannot survive losing a feed it only has one of. |
-| `NG-E003` | `draw_watts` is a number of watts rather than a boolean, and `maximum` is not below `typical`. | `typical` is what a load schedule sums and `maximum` is what a breaker has to survive; a maximum under the typical draw is a transposition of the two, and a load schedule built from it is wrong in the safe-looking direction. |
-| `NG-E004` | A `poe` block states its reservation once — a `class` or a `budget_watts`, never both — and the class is one its `standard` defines. | Two answers cannot both be the budget. A class above the standard's ceiling — class 4 on an `802.3af` port — is a mistake about the hardware rather than a preference: that port cannot deliver 30 W however it is configured. |
-| `NG-E005` | `powered_by: poe` excludes `inputs`. | A device fed over its uplink has no power cord, so an outlet feeding it is a contradiction rather than extra detail; one of the two facts is wrong and the file cannot say which. |
-| `NG-E006` | `poe` appears only on `type: ethernet` or `type: lag`. | PoE travels over the twisted pairs of a run, so a loopback, an SVI, a bridge, a tunnel or a radio has no copper to hand power down. `lag` is allowed because an aggregate of two PoE ports is how a multi-gigabit access point is fed. |
+| `NV-E001` | A PDU's `spec.outlets` is a count (`24`) or comma-separated `[low-high]` spans (`1-12,17-24`), non-inverted, free of repeats, and totals at most 512 outlets. | Outlets are referred to by number from a device's `power.inputs`, so a strip whose numbering did not expand has no holes for anything to plug into. The bound is what stops `1-99999999` from becoming a load schedule nobody can read. |
+| `NV-E002` | An entry of `power.inputs` is `pdu:outlet` with exactly one colon; no two inputs of one device name the same outlet; `redundant: true` requires at least two inputs. | The reference is the same grammar a cable endpoint uses, for the same reason: a named thing on a named element. A device cannot plug two of its own supplies into one hole, and it cannot survive losing a feed it only has one of. |
+| `NV-E003` | `draw_watts` is a number of watts rather than a boolean, and `maximum` is not below `typical`. | `typical` is what a load schedule sums and `maximum` is what a breaker has to survive; a maximum under the typical draw is a transposition of the two, and a load schedule built from it is wrong in the safe-looking direction. |
+| `NV-E004` | A `poe` block states its reservation once — a `class` or a `budget_watts`, never both — and the class is one its `standard` defines. | Two answers cannot both be the budget. A class above the standard's ceiling — class 4 on an `802.3af` port — is a mistake about the hardware rather than a preference: that port cannot deliver 30 W however it is configured. |
+| `NV-E005` | `powered_by: poe` excludes `inputs`. | A device fed over its uplink has no power cord, so an outlet feeding it is a contradiction rather than extra detail; one of the two facts is wrong and the file cannot say which. |
+| `NV-E006` | `poe` appears only on `type: ethernet` or `type: lag`. | PoE travels over the twisted pairs of a run, so a loopback, an SVI, a bridge, a tunnel or a radio has no copper to hand power down. `lag` is allowed because an aggregate of two PoE ports is how a multi-gigabit access point is fed. |
 
 ### Ranges and templates
 
@@ -190,20 +190,20 @@ one mistake.
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-R001` | An interface entry declares exactly one of `name` and `range`. | Both would leave it unclear whether the entry is one interface or forty-eight. |
-| `NG-R002` | `range` carries one to four well-formed, non-inverted `[low-high]` spans and no stray bracket. | A silently ignored bracket would produce an interface literally named `eth[0-47]`. |
-| `NG-R003` | A document expands to at most 4096 interfaces. | `eth[1-99999999]` is a typo, and the answer to a typo is a diagnostic rather than an out-of-memory kill. |
-| `NG-R004` | An expanded name collides with nothing else on the element. | Two ports answering to one name make every cable endpoint naming it ambiguous. Both source locations are quoted. |
-| `NG-R005` | Every `{...}` in a range `description` is empty or names a span the range declares, and braces are paired. | `{1}` on a one-span range is a mistake worth catching; a lone brace is almost always one too. |
-| `NG-M001` | `spec.from` names exactly one `kind: template` document. | A reference that resolves to nothing, or to two things, cannot be merged. |
-| `NG-M002` | Template names are unique within their namespace. | Same reason as `NG-N002`, in the separate index templates live in. |
-| `NG-M003` | Template inheritance through `from` is acyclic. | A cycle has no far end to start merging from. |
-| `NG-M004` | A device only inherits from a template that itself resolved. | The template's own errors are reported once, against the template; the device says only that it cannot use it. |
-| `NG-M005` | A `template` document's `spec` is a mapping of device-spec keys. | It is a partial device spec; a key no device has could never be merged into one. |
-| `NG-M006` | `spec.from` appears only on the five device kinds. | A cable has no device spec for a template to contribute to. |
-| `NG-K001` | Test suite names are unique within their namespace. | Same reason as `NG-N002`, in the separate index suites live in. The first declaration wins, which keeps loading deterministic. |
-| `NG-K002` | A `testsuite` document's `spec.assertions` holds between one and 1024 entries. | A suite that asserts nothing reports a green run having checked nothing, which is worse than no suite at all. |
-| `NG-K003` | Every key an assertion carries belongs to the assertion its `assert` names, every key that assertion requires is present, and a `count` compares against a bound it can satisfy. | `hops` on a `same-vlan` is a bound nobody is checking; ignoring it silently is how a suite comes to mean less than it reads. |
+| `NV-R001` | An interface entry declares exactly one of `name` and `range`. | Both would leave it unclear whether the entry is one interface or forty-eight. |
+| `NV-R002` | `range` carries one to four well-formed, non-inverted `[low-high]` spans and no stray bracket. | A silently ignored bracket would produce an interface literally named `eth[0-47]`. |
+| `NV-R003` | A document expands to at most 4096 interfaces. | `eth[1-99999999]` is a typo, and the answer to a typo is a diagnostic rather than an out-of-memory kill. |
+| `NV-R004` | An expanded name collides with nothing else on the element. | Two ports answering to one name make every cable endpoint naming it ambiguous. Both source locations are quoted. |
+| `NV-R005` | Every `{...}` in a range `description` is empty or names a span the range declares, and braces are paired. | `{1}` on a one-span range is a mistake worth catching; a lone brace is almost always one too. |
+| `NV-M001` | `spec.from` names exactly one `kind: template` document. | A reference that resolves to nothing, or to two things, cannot be merged. |
+| `NV-M002` | Template names are unique within their namespace. | Same reason as `NV-N002`, in the separate index templates live in. |
+| `NV-M003` | Template inheritance through `from` is acyclic. | A cycle has no far end to start merging from. |
+| `NV-M004` | A device only inherits from a template that itself resolved. | The template's own errors are reported once, against the template; the device says only that it cannot use it. |
+| `NV-M005` | A `template` document's `spec` is a mapping of device-spec keys. | It is a partial device spec; a key no device has could never be merged into one. |
+| `NV-M006` | `spec.from` appears only on the five device kinds. | A cable has no device spec for a template to contribute to. |
+| `NV-K001` | Test suite names are unique within their namespace. | Same reason as `NV-N002`, in the separate index suites live in. The first declaration wins, which keeps loading deterministic. |
+| `NV-K002` | A `testsuite` document's `spec.assertions` holds between one and 1024 entries. | A suite that asserts nothing reports a green run having checked nothing, which is worse than no suite at all. |
+| `NV-K003` | Every key an assertion carries belongs to the assertion its `assert` names, every key that assertion requires is present, and a `count` compares against a bound it can satisfy. | `hops` on a `same-vlan` is a bound nobody is checking; ignoring it silently is how a suite comes to mean less than it reads. |
 
 ## Pass 3 — semantics
 
@@ -224,7 +224,7 @@ to describe it must be able to say so.
 
 #### `E001` — unknown cable endpoint
 
-*Alias: `NG-C002`, `NG-C003`. Severity: error.*
+*Alias: `NV-C002`, `NV-C003`. Severity: error.*
 
 A cable endpoint names a device that is not declared, an element that owns no
 interfaces (another cable), an interface that element does not have, or a name
@@ -241,7 +241,7 @@ does annotating the element the endpoint was meant to name.
 
 #### `E002` — interface terminated by more than one cable
 
-*Alias: `NG-C005`. Severity: error.*
+*Alias: `NV-C005`. Severity: error.*
 
 Two cables land on the same `element:interface`, or both ends of one cable land
 on the same port.
@@ -250,12 +250,12 @@ on the same port.
 cable documents is stale — usually a link that was re-patched and documented
 twice — and the graph would draw a topology that cannot be built.
 
-**Suppress with** `E002` / `NG-C005`, or an annotation on either cable or on
+**Suppress with** `E002` / `NV-C005`, or an annotation on either cable or on
 the element holding the port.
 
 #### `E003` — duplicate MAC address
 
-*Alias: `NG-I008`. Severity: error.*
+*Alias: `NV-I008`. Severity: error.*
 
 Two interfaces anywhere in the inventory declare the same `mac`. Interfaces in
 one stacking group — a LAG and its members, a VLAN sub-interface and its parent
@@ -266,12 +266,12 @@ MAC make the forwarding table flap between ports; traffic goes to whichever
 spoke last. In an inventory it almost always means a copy-pasted device
 document whose addresses were never edited.
 
-**Suppress with** `E003` / `NG-I008`, or an annotation on either element.
+**Suppress with** `E003` / `NV-I008`, or an annotation on either element.
 VRRP and CARP virtual addresses are the legitimate case.
 
 #### `E004` — duplicate IP address
 
-*Alias: `NG-A004`. Severity: error.*
+*Alias: `NV-A004`. Severity: error.*
 
 The same address, in the same prefix, in the same VLAN, on two interfaces.
 Re-using a prefix in a *different* VLAN is not a clash, and loopback addresses
@@ -282,12 +282,12 @@ both hosts intermittently and is miserable to diagnose from the outside. The
 scoping by VLAN means the rule stays quiet for the ordinary case of the same
 RFC 1918 prefix re-used per site.
 
-**Suppress with** `E004` / `NG-A004`, or an annotation on any element involved.
+**Suppress with** `E004` / `NV-A004`, or an annotation on any element involved.
 Anycast and VRRP are the legitimate cases.
 
 #### `E005` — VLAN mismatch across a link
 
-*Alias: `NG-C011`. Severity: error.*
+*Alias: `NV-C011`. Severity: error.*
 
 The two ends of a link do not agree about VLANs, in one of four ways:
 
@@ -306,7 +306,7 @@ carries less than the diagram implies — in the first three cases, nothing at
 all. A port left in VLAN 1 after a move is the classic cause of the first; the
 second is what a switchport reconfigured at one end only looks like.
 
-**Suppress with** `E005` / `NG-C011`, or an annotation on the cable or on
+**Suppress with** `E005` / `NV-C011`, or an annotation on the cable or on
 either device. An access port deliberately parked on a trunk's native VLAN is
 the legitimate case for the second shape, and a trunk whose two ends name the
 native VLAN differently on purpose — vendor defaults differ — for the fourth.
@@ -322,7 +322,7 @@ Two exemptions keep the rule quiet where the network is not the exception:
 
 #### `E006` — adapter over capacity
 
-*Alias: `NG-X008`. Severity: error.*
+*Alias: `NV-X008`. Severity: error.*
 
 An adapter declares more entries in `interfaces` than `spec.ports` says the
 hardware has. Not checked when `ports` is omitted.
@@ -332,30 +332,30 @@ added to the document as the network grew, past what the dongle physically has.
 Declaring `ports` is opt-in precisely so that this check exists only where you
 have stated the ground truth.
 
-**Suppress with** `E006` / `NG-X008`, or an annotation on the adapter.
+**Suppress with** `E006` / `NV-X008`, or an annotation on the adapter.
 
 #### `E007` — cyclic interface stacking
 
-*Alias: `NG-I004`. Severity: error.*
+*Alias: `NV-I004`. Severity: error.*
 
 The `parent`/`members` graph of one element contains a loop: `vlan-a` is a
 sub-interface of `vlan-b` which is a sub-interface of `vlan-a`, or two LAGs each
 list the other as a member. The message spells the loop out as a chain.
 
 **Why it matters.** [Pass 2](#pass-2--schema) rejects only the one-step case —
-`NG-I002` forbids an interface being its own `parent`, `NG-I003` an aggregate
+`NV-I002` forbids an interface being its own `parent`, `NV-I003` an aggregate
 listing itself. A longer loop leaves every individual document legal while
 describing hardware in which each interface would have to sit on top of the
 next. Nothing can be built from it, and anything that walks the stack has to
 defend itself against it.
 
-**Suppress with** `E007` / `NG-I004`, or an annotation on the element. There is
+**Suppress with** `E007` / `NV-I004`, or an annotation on the element. There is
 no legitimate case; if this fires, one of the `parent` or `members` entries
 names the wrong interface.
 
 #### `E008` — a member is not free to be aggregated
 
-*Alias: `NG-I005`. Severity: error.*
+*Alias: `NV-I005`. Severity: error.*
 
 A port listed in a `lag`'s or `bridge`'s `members` is not available to be
 aggregated, in one of three ways: it is claimed by a second aggregate as well,
@@ -370,11 +370,11 @@ member moved to the new bond, the old bond never edited.
 A `lag` inside a `bridge` is the one legitimate nesting and is exempt: `br0`
 with `members: [bond0, eth2]` is how every Linux host bridges a bond.
 
-**Suppress with** `E008` / `NG-I005`, or an annotation on the element.
+**Suppress with** `E008` / `NV-I005`, or an annotation on the element.
 
 #### `E009` — sub-interface VLAN not carried by its parent
 
-*Alias: `NG-V005`. Severity: error.*
+*Alias: `NV-V005`. Severity: error.*
 
 A `type: vlan` interface encapsulates a VID that its `parent` does not carry:
 the parent is not a trunk at all, or trunks a set the VID is not in.
@@ -388,11 +388,11 @@ with that VID. If the parent never tags them, the sub-interface is configured,
 addressed, drawn in the diagram, and dead. It is the usual result of adding a
 VLAN to a router and forgetting the switchport.
 
-**Suppress with** `E009` / `NG-V005`, or an annotation on the element.
+**Suppress with** `E009` / `NV-V005`, or an annotation on the element.
 
 #### `E010` — multicast MAC address
 
-*Alias: `NG-I009`. Severity: error.*
+*Alias: `NV-I009`. Severity: error.*
 
 Bit 0 of a MAC's first octet — the least-significant bit, so an odd first octet
 — marks a group address (IEEE 802-2014 §8.2). `01:00:5e:00:00:01` is one.
@@ -406,11 +406,11 @@ because a typo is likelier than a deliberate VRRP design, and this one has not
 even got the deliberate design — there is no configuration in which a multicast
 source address is what was meant.
 
-**Suppress with** `E010` / `NG-I009`, or an annotation on the element.
+**Suppress with** `E010` / `NV-I009`, or an annotation on the element.
 
 #### `E011` — medium disagrees with the endpoint type
 
-*Alias: `NG-C006`. Severity: error.*
+*Alias: `NV-C006`. Severity: error.*
 
 `medium: wireless` requires **both** endpoints to be `type: wifi`, and any other
 medium requires **neither** of them to be. An adapter's upstream port is a host
@@ -418,18 +418,18 @@ bus rather than a radio, so it counts as wired.
 
 **Why it matters.** A wireless cable is not a cable: §7.1 uses it to model one
 station's *association* with an access point, which is why renderers draw it
-dashed and why `length_m` and `category` are refused on it (`NG-C007`). Pointed
+dashed and why `length_m` and `category` are refused on it (`NV-C007`). Pointed
 at a copper port it describes a radio link to something with no antenna;
 conversely a copper run into a `wifi` port has nowhere to plug in. Both are what
 a medium corrected on the cable but not on the port — or the reverse — looks
 like.
 
-**Suppress with** `E011` / `NG-C006`, or an annotation on the cable or either
+**Suppress with** `E011` / `NV-C006`, or an annotation on the cable or either
 element.
 
 #### `E012` — cable terminates on an interface with no socket
 
-*Alias: `NG-C009`. Severity: error.*
+*Alias: `NV-C009`. Severity: error.*
 
 An endpoint is a `loopback`, `vlan` or `bridge` interface. Only `ethernet`,
 `wifi` and `lag` can be cabled — and cabling a `lag` is its own finding,
@@ -441,12 +441,12 @@ plug with nowhere to go, and the physical port it was meant for is left looking
 free — so the diagram is wrong twice. The message lists the ports of the element
 that can actually take the cable.
 
-**Suppress with** `E012` / `NG-C009`, or an annotation on the cable or the
+**Suppress with** `E012` / `NV-C009`, or an annotation on the cable or the
 element holding the port. There is no legitimate case.
 
 #### `E013` — host attachment declared twice
 
-*Alias: `NG-X005`. Severity: error.*
+*Alias: `NV-X005`. Severity: error.*
 
 A cable terminates on an adapter's `upstream` port while `upstream.attached_to`
 is set as well.
@@ -457,14 +457,14 @@ for it. Both spellings at once give the adapter two upstream links where the
 hardware has one plug, and once they drift apart — the dongle is moved, one of
 the two documents is edited — nothing says which of them is current.
 
-**Suppress with** `E013` / `NG-X005`, or an annotation on the adapter or the
+**Suppress with** `E013` / `NV-X005`, or an annotation on the adapter or the
 cable. Cabling the upstream port *instead of* setting `attached_to` is legal and
 silent: that is how a media converter or a dock fed from another adapter is
 written.
 
 #### `E014` — cyclic adapter attachment
 
-*Alias: `NG-X006`. Severity: error.*
+*Alias: `NV-X006`. Severity: error.*
 
 The `attached_to` references form a loop: a dock plugged into a dongle plugged
 back into the dock. The message spells the loop out as a chain.
@@ -474,13 +474,13 @@ there is no machine the ports belong to. Everything that walks the chain — the
 renderer's adapter collapsing, the VLAN propagation of §8.2 — would have to
 defend itself against a walk that never terminates.
 
-**Suppress with** `E014` / `NG-X006`, or an annotation on any adapter in the
+**Suppress with** `E014` / `NV-X006`, or an annotation on any adapter in the
 loop. There is no legitimate case; one of the `attached_to` values names the
 wrong element.
 
 #### `E015` — `attached_to` names nothing that could host the adapter
 
-*Alias: `NG-X001`. Severity: error.*
+*Alias: `NV-X001`. Severity: error.*
 
 `upstream.attached_to` names an element that is not declared, a short name that
 stays ambiguous after the namespace lookup (§2.2), or an element that owns no
@@ -498,13 +498,13 @@ nothing but a `dropped from the graph:` line on stderr to say why. It is the
 same usual cause: a machine renamed in its own document and not in the
 adapter's.
 
-**Suppress with** `E015` / `NG-X001`, or an annotation on the adapter. There is
+**Suppress with** `E015` / `NV-X001`, or an annotation on the adapter. There is
 no legitimate case — an adapter that is genuinely plugged into nothing should
 leave `attached_to` out, which says so exactly.
 
 #### `E016` — unknown tunnel endpoint
 
-*Alias: `NG-T002`. Severity: error.*
+*Alias: `NV-T002`. Severity: error.*
 
 A tunnel endpoint names an element that is not declared, an element that owns no
 interfaces (a cable, or another tunnel), an interface that element does not
@@ -516,12 +516,12 @@ layer drops a tunnel whose ends it cannot resolve, so the diagram shows two
 sites with no overlay between them and says nothing about why. The message lists
 the interfaces the element *does* declare.
 
-**Suppress with** `E016` / `NG-T002`. Annotating the *tunnel* works, and so does
+**Suppress with** `E016` / `NV-T002`. Annotating the *tunnel* works, and so does
 annotating the element the endpoint was meant to name.
 
 #### `E017` — tunnel endpoint is not a tunnel interface
 
-*Alias: `NG-T003`. Severity: error.*
+*Alias: `NV-T003`. Severity: error.*
 
 A tunnel endpoint resolves to an interface whose `type` is not `tunnel` —
 usually the physical port the outer packets leave by.
@@ -534,12 +534,12 @@ would then place both in the wrong subnet. Declare a `tunnel` interface and, if
 you want to record which port the outer packets use, point its `parent` at the
 physical one.
 
-**Suppress with** `E017` / `NG-T003`, or an annotation on the tunnel or on the
+**Suppress with** `E017` / `NV-T003`, or an annotation on the tunnel or on the
 element holding the port.
 
 #### `E018` — `over` names no tunnel
 
-*Alias: `NG-T004`. Severity: error.*
+*Alias: `NV-T004`. Severity: error.*
 
 `spec.over` names an element that is not declared, one that is not a tunnel, or
 a short name that stays ambiguous after the namespace lookup (§2.2).
@@ -550,11 +550,11 @@ VXLAN, which changes the answer to the question the diagram is most often drawn
 to answer — is this traffic encrypted? A tunnel that genuinely runs straight
 over the physical topology omits `over`, which says so exactly.
 
-**Suppress with** `E018` / `NG-T004`, or an annotation on the tunnel.
+**Suppress with** `E018` / `NV-T004`, or an annotation on the tunnel.
 
 #### `E019` — cyclic tunnel encapsulation
 
-*Alias: `NG-T005`. Severity: error.*
+*Alias: `NV-T005`. Severity: error.*
 
 The `over` references form a loop: a VXLAN carried by an IPsec tunnel carried by
 that VXLAN. The message spells the loop out as a chain.
@@ -566,13 +566,13 @@ encapsulation stack a rendering prints, the MTU budget of
 [`W127`](#w127--tunnel-carries-traffic-in-the-clear) — would otherwise have to
 defend itself against a walk that never terminates.
 
-**Suppress with** `E019` / `NG-T005`, or an annotation on any tunnel in the
+**Suppress with** `E019` / `NV-T005`, or an annotation on any tunnel in the
 loop. There is no legitimate case; one of the `over` values names the wrong
 tunnel.
 
 #### `E020` — first hop is not on-link
 
-*Alias: `NG-A013`. Severity: error.*
+*Alias: `NV-A013`. Severity: error.*
 
 An interface declares `ipv4.gateway` or `ipv6.gateway`, and that address is
 inside none of the prefixes the same interface configures for the same family.
@@ -591,13 +591,13 @@ down, so there is no declared prefix for it to be inside of.
 Reported by [`netviz ipam`](ipam.md) as well as by `netviz validate`; the
 IPAM report calls this rule rather than re-deriving it.
 
-**Suppress with** `E020` / `NG-A013`, or an annotation on the element. The
+**Suppress with** `E020` / `NV-A013`, or an annotation on the element. The
 legitimate case is an unnumbered or point-to-point link whose peer address is
 deliberately outside the local prefix — rare enough to be worth annotating.
 
 #### `E021` — cable on a position the patch panel does not have
 
-*Alias: `NG-P001`. Severity: error.*
+*Alias: `NV-P001`. Severity: error.*
 
 A cable terminates on a patch-panel position that `spec.ports` does not
 declare, or on a port name that is not `front/<n>` or `rear/<n>`.
@@ -614,12 +614,12 @@ This is `E001`'s job everywhere else. It is separate here because listing the
 48 interface names of a 24-position panel would bury the one fact that matters,
 which is the range.
 
-**Suppress with** `E021` / `NG-P001`, or an annotation on the cable or the
+**Suppress with** `E021` / `NV-P001`, or an annotation on the cable or the
 panel. There is no legitimate case: a plug goes in a hole that exists.
 
 #### `E022` — patch-panel position terminated twice
 
-*Alias: `NG-P003`. Severity: error.*
+*Alias: `NV-P003`. Severity: error.*
 
 Two cables are patched into the same position of one panel.
 
@@ -630,12 +630,12 @@ rather than an obviously overloaded port the reader gets a run silently spliced
 through whichever cable happened to be declared first, and a second run that
 vanishes.
 
-**Suppress with** `E022` / `NG-P003`, or an annotation on either cable or on
+**Suppress with** `E022` / `NV-P003`, or an annotation on either cable or on
 the panel. No legitimate case exists.
 
 #### `E023` — patch panel where an active element is required
 
-*Alias: `NG-P004`. Severity: error.*
+*Alias: `NV-P004`. Severity: error.*
 
 An adapter's `upstream.attached_to`, or a tunnel endpoint, names a patch panel.
 
@@ -646,13 +646,13 @@ misreading — treating the panel as the device on the other side of it — and 
 fix is the same: name the active element, and let the panel carry the cable
 segments between them.
 
-**Suppress with** `E023` / `NG-P004`, or an annotation on the adapter, the
+**Suppress with** `E023` / `NV-P004`, or an annotation on the adapter, the
 tunnel or the panel. No legitimate case exists; a media converter that looks
 like it wants this spelling is an `adapter` with `passthrough: false` (§8.2).
 
 #### `E024` — patch run loops back into its own panel
 
-*Alias: `NG-P005`. Severity: error.*
+*Alias: `NV-P005`. Severity: error.*
 
 Following a run through the couplers arrives back at a cable segment it has
 already crossed.
@@ -666,12 +666,12 @@ only trace of it would be a link that quietly is not drawn.
 The usual cause is a rear-to-rear patch between two panels that were already
 joined front to front — the tie cable that was added twice, from each end.
 
-**Suppress with** `E024` / `NG-P005`, or an annotation on any cable in the run
+**Suppress with** `E024` / `NV-P005`, or an annotation on any cable in the run
 or on either panel. No legitimate case exists.
 
 #### `E025` — two elements occupy the same rack unit
 
-*Alias: `NG-U001`. Severity: error.*
+*Alias: `NV-U001`. Severity: error.*
 
 Two elements whose `metadata.location` names the same `site`, `room` and `rack`
 claim overlapping units.
@@ -685,13 +685,13 @@ everything above the collision.
 `position` is the **lowest** unit an element occupies and `height` counts
 upwards, so a 2U device at `position: 10` fills U10 and U11.
 
-**Suppress with** `E025` / `NG-U001`, or an annotation on either element. The
+**Suppress with** `E025` / `NV-U001`, or an annotation on either element. The
 one case worth annotating is two half-width devices sharing a shelf, which the
 model has no way to express.
 
 #### `E026` — element mounted above the top of its rack
 
-*Alias: `NG-U002`. Severity: error.*
+*Alias: `NV-U002`. Severity: error.*
 
 An element's highest unit — `position + height - 1` — is above the
 `rack_height` declared for its rack.
@@ -705,13 +705,13 @@ The rule is silent when no element in the rack declares `rack_height`: without
 a declared top there is no bound to check against, and inventing one from the
 tallest occupant would only ever agree with itself.
 
-**Suppress with** `E026` / `NG-U002`, or an annotation on the element. No
+**Suppress with** `E026` / `NV-U002`, or an annotation on the element. No
 legitimate case exists once the height is declared; if the cabinet really is
 taller, correct `rack_height`.
 
 #### `E027` — rack declared with two heights
 
-*Alias: `NG-U003`. Severity: error.*
+*Alias: `NV-U003`. Severity: error.*
 
 Two elements in one rack declare different values for
 `metadata.location.rack_height`.
@@ -722,12 +722,12 @@ this one. The usual causes are a `rack` name reused in another room — in which
 case `site` or `room` is what is wrong, not the height — and a number that was
 guessed on one document and measured on another.
 
-**Suppress with** `E027` / `NG-U003`, or an annotation on any of the elements
+**Suppress with** `E027` / `NV-U003`, or an annotation on any of the elements
 involved. No legitimate case exists.
 
 #### `E028` — wireless link is not an association
 
-*Alias: `NG-W007`. Severity: error.*
+*Alias: `NV-W007`. Severity: error.*
 
 A `medium: wireless` cable joins two radios that are not one `ap` and one
 client: either both beacon, or neither does. Checked only once **both** ends
@@ -743,12 +743,12 @@ copy-pasted radio block looks like. A mesh node's backhaul is the legitimate
 cousin of the second case and is written as `role: mesh` against the
 `role: ap` radio it associates to.
 
-**Suppress with** `E028` / `NG-W007`, or an annotation on the cable or either
+**Suppress with** `E028` / `NV-W007`, or an annotation on the cable or either
 element.
 
 #### `E029` — duplicate BSSID
 
-*Alias: `NG-W008`. Severity: error.*
+*Alias: `NV-W008`. Severity: error.*
 
 Two `ap` radios in the inventory advertise the same `bssid`. Client radios are
 exempt: a station's BSS entry records the BSSID it *joined*, so repeating the
@@ -759,13 +759,13 @@ set to every client in earshot, so two of them answering to one address means
 frames for one arrive at the other and a roam between them is invisible — to
 the client, and to anyone reading a capture. In practice it is a second access
 point cloned from the first with the radio section left untouched. Repeats
-*within* one radio never reach here: `NG-W005` rejects the document.
+*within* one radio never reach here: `NV-W005` rejects the document.
 
-**Suppress with** `E029` / `NG-W008`, or an annotation on either element.
+**Suppress with** `E029` / `NV-W008`, or an annotation on either element.
 
 #### `E030` — SSID VLAN is carried nowhere on the access point
 
-*Alias: `NG-W009`. Severity: error.*
+*Alias: `NV-W009`. Severity: error.*
 
 An `ap` radio maps an SSID to a VLAN, and no interface of that access point is
 a member of it. An access point with a port trunking `all` carries whatever is
@@ -782,11 +782,11 @@ the VLAN to the uplink trunk.
 statement: the VLAN is not in the device's `vlans` database. This one is about
 the ports.
 
-**Suppress with** `E030` / `NG-W009`, or an annotation on the access point.
+**Suppress with** `E030` / `NV-W009`, or an annotation on the access point.
 
 #### `E031` — associated to an SSID the access point does not advertise
 
-*Alias: `NG-W010`. Severity: error.*
+*Alias: `NV-W010`. Severity: error.*
 
 A client radio's BSS names an SSID that the `ap` radio at the other end of the
 link does not beacon. An access point that lists no BSS at all is not modelling
@@ -799,11 +799,11 @@ the client documents never caught up with. Either way the link drawn from it
 does not exist, and the layer-2 diagram labels it with a network that is not on
 the air.
 
-**Suppress with** `E031` / `NG-W010`, or an annotation on either element.
+**Suppress with** `E031` / `NV-W010`, or an annotation on either element.
 
 #### `E032` — next hop is not on-link
 
-*Alias: `NG-F008`. Severity: error.*
+*Alias: `NV-F008`. Severity: error.*
 
 A static route's `via` lies outside every prefix the device configures in the
 route's own routing instance, on the interface the route names if it names one.
@@ -825,11 +825,11 @@ on an interface in a *different* instance is not merely in another subnet — it
 unreachable from this table by construction, however adjacent the two addresses
 look on the page.
 
-**Suppress with** `E032` / `NG-F008`, or an annotation on the device.
+**Suppress with** `E032` / `NV-F008`, or an annotation on the device.
 
 #### `E033` — route sends out of an unknown interface
 
-*Alias: `NG-F009`. Severity: error.*
+*Alias: `NV-F009`. Severity: error.*
 
 A route's `dev` names an interface the device does not have. The finding lists
 the interfaces it does have, because the cause is nearly always a typo or a port
@@ -840,11 +840,11 @@ an address — an unnumbered point-to-point link, or a route into a tunnel. A na
 that resolves to nothing is a route the device would refuse to install, which
 leaves the destination unreachable while the inventory says it is served.
 
-**Suppress with** `E033` / `NG-F009`, or an annotation on the device.
+**Suppress with** `E033` / `NV-F009`, or an annotation on the device.
 
 #### `E034` — OSPF runs on an interface the device does not have
 
-*Alias: `NG-F010`. Severity: error.*
+*Alias: `NV-F010`. Severity: error.*
 
 An entry of `routing.ospf.interfaces` names no interface of the device.
 
@@ -853,11 +853,11 @@ name that resolves to nothing is an adjacency that will never come up. In an
 inventory it is worse than that: the link *looks* like it is in the IGP, so a
 reader of the routing view counts on a path that does not exist.
 
-**Suppress with** `E034` / `NG-F010`, or an annotation on the device.
+**Suppress with** `E034` / `NV-F010`, or an annotation on the device.
 
 #### `E035` — BGP session disagrees about an AS number
 
-*Alias: `NG-F011`. Severity: error.*
+*Alias: `NV-F011`. Severity: error.*
 
 A `neighbors[].remote_asn` contradicts the `asn` the peer declares for itself.
 The peer is found by resolving the neighbour address against every address the
@@ -875,11 +875,11 @@ session that never establishes while both configurations look plausible in
 isolation — which is exactly the failure an inventory holding both ends can catch
 and a device holding one cannot.
 
-**Suppress with** `E035` / `NG-F011`, or an annotation on either element.
+**Suppress with** `E035` / `NV-F011`, or an annotation on either element.
 
 #### `E036` — duplicate router id
 
-*Alias: `NG-F012`. Severity: error.*
+*Alias: `NV-F012`. Severity: error.*
 
 Two elements declare the same `router_id`. One device giving OSPF and BGP the
 same value is **one** identity rather than a duplicate — it is the normal
@@ -893,14 +893,14 @@ down. The cause is nearly always a router built by copying its neighbour's
 configuration, which makes it the mistake most likely to be in an inventory
 twice.
 
-**Suppress with** `E036` / `NG-F012`, or an annotation on either element.
+**Suppress with** `E036` / `NV-F012`, or an annotation on either element.
 
 #### `E037` — PDU outlet claimed twice
 
-*Alias: `NG-E010`. Severity: error.*
+*Alias: `NV-E010`. Severity: error.*
 
 Two elements name the same `pdu:outlet` in their `power.inputs`. Two inputs of
-*one* device naming one outlet is refused earlier, by the model (`NG-E002`), so
+*one* device naming one outlet is refused earlier, by the model (`NV-E002`), so
 every finding here involves at least two elements as well as the PDU, and the
 message names all of them.
 
@@ -913,14 +913,14 @@ figures stay plausible — a doubled claim occupies one outlet, so the free-outl
 count is right and the rack looks as though it has room — while one of the two
 devices is in fact fed from somewhere nobody recorded.
 
-**Suppress with** `E037` / `NG-E010`, or an annotation on either element or on
+**Suppress with** `E037` / `NV-E010`, or an annotation on either element or on
 the PDU. There is no legitimate case: a hole takes one plug. A splitter or a
 short strip chained off an outlet is its own `pdu` document, naming that supply
 in `input_feed`.
 
 #### `E038` — power input names no outlet that exists
 
-*Alias: `NG-E011`. Severity: error.*
+*Alias: `NV-E011`. Severity: error.*
 
 A `power.inputs` entry does not resolve. Four ways to get there, reported apart
 because the fix differs: no element answers to the name before the colon, the
@@ -940,7 +940,7 @@ as written, deliberately, because a strip labelled `01`…`24` and one labelled
 `1`…`24` are different labels and quietly accepting either would put a cord in a
 hole nobody can find.
 
-**Suppress with** `E038` / `NG-E011`, or an annotation on the device or on the
+**Suppress with** `E038` / `NV-E011`, or an annotation on the device or on the
 PDU it names — on any of the candidates, when the name was ambiguous. There is
 no legitimate case; when the feed genuinely is not modelled, leave `inputs` off
 and accept [`W137`](#w137--declared-draw-with-no-power-path) instead of pointing
@@ -948,7 +948,7 @@ at an outlet that does not exist.
 
 #### `E039` — PDU load exceeds its capacity
 
-*Alias: `NG-E012`. Severity: error.*
+*Alias: `NV-E012`. Severity: error.*
 
 The draws landing on a PDU's outlets add up to more than its `capacity_watts`.
 The sum is the **normal-operation share**: a dual-corded server draws its load
@@ -973,7 +973,7 @@ against, and inventing a rating for a strip nobody measured would turn a missing
 fact into a false error. The load is still totalled and reported, without a
 verdict.
 
-**Suppress with** `E039` / `NG-E012`, or an annotation on the PDU or on any of
+**Suppress with** `E039` / `NV-E012`, or an annotation on the PDU or on any of
 the loads. A strip genuinely over its rating has no legitimate case; what is
 worth annotating is a schedule whose draws are known to be pessimistic, because
 they were copied from PSU ratings rather than from what the equipment actually
@@ -981,7 +981,7 @@ pulls.
 
 #### `E040` — PoE allocation exceeds the budget
 
-*Alias: `NG-E013`. Severity: error.*
+*Alias: `NV-E013`. Severity: error.*
 
 The PoE reserved by a device's PSE ports adds up to more than its
 `power.poe_budget_watts`. A port reserves the PSE-side figure for its `class`,
@@ -1005,7 +1005,7 @@ vendor — so the device that goes dark is not the one that was just added, and 
 symptom appears somewhere nobody is working. Hence the message spells out every
 counted port and its share.
 
-**Suppress with** `E040` / `NG-E013`, or an annotation on the switch or on any
+**Suppress with** `E040` / `NV-E013`, or an annotation on the switch or on any
 device it feeds. Silent when `poe_budget_watts` is not recorded at all. The one
 case worth annotating is a chassis with a second supply fitted that the budget
 was never updated for — though correcting the budget is the better fix, since it
@@ -1013,7 +1013,7 @@ is also what the utilisation table reads.
 
 #### `E041` — PoE-powered device has no PoE uplink
 
-*Alias: `NG-E014`. Severity: error.*
+*Alias: `NV-E014`. Severity: error.*
 
 A device declares `powered_by: poe`, so the run carrying its traffic is its only
 power path, and that path does not deliver. Three shapes, all of them a device
@@ -1038,19 +1038,19 @@ powers up, associates, and browns out the moment the radios are busy.
 `enabled: false` left over from the port's previous tenant is the third and
 quietest version.
 
-**Suppress with** `E041` / `NG-E014`, or an annotation on the device or on the
+**Suppress with** `E041` / `NV-E014`, or an annotation on the device or on the
 switch at the far end of its uplink. The legitimate case is an inline midspan
 injector between the two, which the inventory has no element for; annotate the
 device, because "where does this get its power" is the next reader's question.
 
 #### `E042` — redundant power that is not redundant
 
-*Alias: `NG-E015`. Severity: error.*
+*Alias: `NV-E015`. Severity: error.*
 
 A device declares `redundant: true`, but the outlet feeds that resolved are not
 independent — either every input lands on one PDU, or the inputs land on
 different PDUs that record the same `input_feed`. Fewer than two *declared*
-inputs is refused by the model (`NG-E002`) and an input that failed to resolve is
+inputs is refused by the model (`NV-E002`) and an input that failed to resolve is
 [`E038`](#e038--power-input-names-no-outlet-that-exists)'s finding, so a device
 whose only problem is a typo is not also accused of a false claim.
 
@@ -1069,7 +1069,7 @@ fail as a unit at the one moment the redundancy was bought for. `redundant: true
 is also a claim somebody acts on during a maintenance window, when the question
 is whether feed A can be dropped with everything still up.
 
-**Suppress with** `E042` / `NG-E015`, or an annotation on the device or on any
+**Suppress with** `E042` / `NV-E015`, or an annotation on the device or on any
 PDU feeding it. Worth annotating when the feed names are coarser than the failure
 domains they stand for — two independent UPS strings both written `utility`, say
 — but naming the feeds apart is the better fix, because it makes the inventory
@@ -1077,7 +1077,7 @@ right for every other device in that rack too.
 
 #### `E043` — group member does not exist
 
-*Alias: `NG-S010`. Severity: error.*
+*Alias: `NV-S010`. Severity: error.*
 
 A `group`'s `spec.members` names something the inventory does not declare, or
 names something ambiguously — the same two failures every reference in this
@@ -1092,17 +1092,17 @@ nothing is not a cosmetic problem: it is a person the group silently does not
 include, and nothing about reading the file says so. This is the one place the
 mistake is visible.
 
-**Suppress with** `E043` / `NG-S010`, or an annotation on the group. There is no
+**Suppress with** `E043` / `NV-S010`, or an annotation on the group. There is no
 good reason to: a member netviz cannot resolve is a member no consumer of the
 inventory can resolve either.
 
 #### `E044` — group member is not an identity
 
-*Alias: `NG-S011`. Severity: error.*
+*Alias: `NV-S011`. Severity: error.*
 
 A member resolved, but to something that is not a `user` and not a `group` — a
 switch, a cable, a PDU. Names are unique within a namespace across all kinds
-(`NG-N002`) but not across the tree, so this is nearly always a name collision: a
+(`NV-N002`) but not across the tree, so this is nearly always a name collision: a
 group meant `alice` in the `people/` directory and got the workstation called
 `alice` in `desks/`.
 
@@ -1112,12 +1112,12 @@ headcount, which is a picture of something that cannot be true. Refusing it also
 makes the collision findable, which is what actually needs fixing — usually by
 writing the member fully qualified.
 
-**Suppress with** `E044` / `NG-S011`, or an annotation on the group or on the
+**Suppress with** `E044` / `NV-S011`, or an annotation on the group or on the
 element it landed on. Nothing legitimate is behind this one.
 
 #### `E045` — group membership cycle
 
-*Alias: `NG-S012`. Severity: error.*
+*Alias: `NV-S012`. Severity: error.*
 
 Groups contain groups, and somewhere the containment closes a loop:
 `everyone` → `engineering` → `everyone`. The finding names the loop in the order
@@ -1131,13 +1131,13 @@ directory the inventory is applied to, not the person reading the file. Nesting
 is the whole point of groups and the loop is its one failure mode, so it is
 checked rather than hoped for.
 
-**Suppress with** `E045` / `NG-S012`, or an annotation on any group in the loop.
+**Suppress with** `E045` / `NV-S012`, or an annotation on any group in the loop.
 Suppressing it does not make the membership computable; it only stops netviz
 saying so.
 
 #### `E046` — duplicate account identifier
 
-*Alias: `NG-S013`. Severity: error.*
+*Alias: `NV-S013`. Severity: error.*
 
 Two `user` documents claim one `login`, two claim one `uid`, or two `group`
 documents claim one `gid`. A `login` defaults to `metadata.name`, so two users of
@@ -1155,7 +1155,7 @@ sets of keys; two uids that collide make every file one of them creates readable
 and writable by the other, which is a permission boundary that silently does not
 exist. Neither shows up as a conflict anywhere except here.
 
-**Suppress with** `E046` / `NG-S013`, or an annotation on either claimant. The
+**Suppress with** `E046` / `NV-S013`, or an annotation on either claimant. The
 one defensible case is an estate that deliberately reuses a uid across two
 disjoint systems netviz models as one tree; naming the two accounts apart is
 the better fix, because every export of this inventory has the same problem.
@@ -1246,7 +1246,7 @@ fix is a second independent feed or an honest annotation.
 
 #### `E049` — cable on a virtual interface
 
-*Alias: `NG-N024`. Severity: error.*
+*Alias: `NV-N024`. Severity: error.*
 
 A `cable` terminates on one end of a veth pair (§23.2). A veth end is
 `type: ethernet` — deliberately, because it is `ianaift:ethernetCsmacd` in every
@@ -1264,12 +1264,12 @@ right one.
 exist — and the physical port somebody meant is left looking free, which is how
 the same port gets patched twice.
 
-**Suppress with** `E049` / `NG-N024`, or an annotation on the cable. There is no
+**Suppress with** `E049` / `NV-N024`, or an annotation on the cable. There is no
 good reason to: the run has to land somewhere real.
 
 #### `E050` — aggregate spans network namespaces
 
-*Alias: `NG-N025`. Severity: error.*
+*Alias: `NV-N025`. Severity: error.*
 
 A `bridge` or a `lag` lists a member that is in a different network namespace
 from the aggregate itself (§23.1). A bridge forwards frames between its ports
@@ -1288,12 +1288,12 @@ fewer ports than it names, and the ports that are missing are the ones somebody
 isolated on purpose. Nothing about the running system says which of the two
 statements was meant.
 
-**Suppress with** `E050` / `NG-N025`, or an annotation on the element. The fix is
+**Suppress with** `E050` / `NV-N025`, or an annotation on the element. The fix is
 to decide which stack the port belongs to: drop the member, or drop the `netns`.
 
 #### `W101` — interface neither routes nor switches
 
-*Alias: `NG-I013`. Severity: warning.*
+*Alias: `NV-I013`. Severity: warning.*
 
 An interface has no IPv4 or IPv6 address and no `vlan` block. Exempt: hub ports
 (they cannot hold either), `enabled: false` interfaces, and any interface that
@@ -1305,11 +1305,11 @@ document: the port was added and the addressing never followed. If the port is
 genuinely spare, say so with `enabled: false` and the warning goes away on its
 own.
 
-**Suppress with** `W101` / `NG-I013`, or an annotation on the element.
+**Suppress with** `W101` / `NV-I013`, or an annotation on the element.
 
 #### `W102` — MTU mismatch across a link
 
-*Alias: `NG-C010`. Severity: warning.*
+*Alias: `NV-C010`. Severity: warning.*
 
 The two endpoints of a cable declare different `mtu` values. Resolved through
 the LAG master when an endpoint is a member.
@@ -1318,12 +1318,12 @@ the LAG master when an endpoint is a member.
 and pings work, large transfers stall. It is invisible until someone copies a
 big file, and by then nobody suspects the diagram.
 
-**Suppress with** `W102` / `NG-C010`, or an annotation on the cable or either
+**Suppress with** `W102` / `NV-C010`, or an annotation on the cable or either
 device. An intentional jumbo-frame boundary is the legitimate case.
 
 #### `W103` — orphan device
 
-*Alias: `NG-C016`. Severity: warning.*
+*Alias: `NV-C016`. Severity: warning.*
 
 A device terminates no cable, hosts no adapter, and is not the target of an
 adapter's `attached_to`.
@@ -1333,7 +1333,7 @@ topology. Either a cable document is missing, or the device really is spare —
 and if it is spare, saying so explicitly is better documentation than a silent
 island.
 
-**Suppress with** `W103` / `NG-C016`, or an annotation on the device. Spare
+**Suppress with** `W103` / `NV-C016`, or an annotation on the device. Spare
 hardware and cold standby are the legitimate cases.
 
 A device whose cable names a *missing interface* still counts as cabled, so
@@ -1341,7 +1341,7 @@ A device whose cable names a *missing interface* still counts as cabled, so
 
 #### `W104` — IP address on an access port
 
-*Alias: `NG-V009`. Severity: warning.*
+*Alias: `NV-V009`. Severity: warning.*
 
 An `access`-mode port of a layer-2-only switch — a `switch` that forwards
 neither IPv4 nor IPv6 — carries an IP address. A `type: vlan` interface (an
@@ -1351,11 +1351,11 @@ SVI) is exempt.
 belongs on an SVI. Modelling it on the port produces an address that no real
 switch would answer on, and hides which VLAN management actually sits in.
 
-**Suppress with** `W104` / `NG-V009`, or an annotation on the switch.
+**Suppress with** `W104` / `NV-V009`, or an annotation on the switch.
 
 #### `W105` — subnet with a single member
 
-*Alias: `NG-A008`. Severity: warning.*
+*Alias: `NV-A008`. Severity: warning.*
 
 Exactly one element in the inventory is addressed inside a prefix. Prefixes that
 can hold at most two hosts are exempt — `/30`, `/31` and `/32`, and `/126` to
@@ -1370,13 +1370,13 @@ exists but was never written down, so the diagram is missing a device. Only the
 layer-3 view can show this at all, which is why the rule arrived with it; see
 [`--layer l3`](rendering.md#layers-one-inventory-ten-questions).
 
-**Suppress with** `W105` / `NG-A008`, or an annotation on the element holding
+**Suppress with** `W105` / `NV-A008`, or an annotation on the element holding
 the address. A deliberately sparse management prefix, and a link whose peer is
 outside the inventory on purpose, are the legitimate cases.
 
 #### `W106` — one address claimed twice in a subnet
 
-*Alias: `NG-A009`. Severity: warning.*
+*Alias: `NV-A009`. Severity: warning.*
 
 Two different elements hold the same address inside one prefix, in different
 broadcast domains. When two of the claimants share a VLAN, [`E004`](#e004--duplicate-ip-address)
@@ -1390,13 +1390,13 @@ claimants, and an operator working from that picture cannot tell which of them
 answers at the address. Either the address plan re-uses more than it meant to,
 or the two ports belong in one VLAN and one of them is misconfigured.
 
-**Suppress with** `W106` / `NG-A009`, or an annotation on either element.
+**Suppress with** `W106` / `NV-A009`, or an annotation on either element.
 Deliberate per-VLAN re-use of a whole prefix — the same gateway address in every
 site's user VLAN — is the legitimate case.
 
 #### `W107` — addresses on an aggregate member
 
-*Alias: `NG-I006`. Severity: warning.*
+*Alias: `NV-I006`. Severity: warning.*
 
 An interface listed in a `lag`'s or `bridge`'s `members` carries its own `ipv4`
 or `ipv6` addresses.
@@ -1407,11 +1407,11 @@ bonding exists to avoid — and on a bridge member it is not reachable at all,
 because the bridge has already taken the frames. Almost always it means the
 addressing was written before the bond was, and never moved up.
 
-**Suppress with** `W107` / `NG-I006`, or an annotation on the element.
+**Suppress with** `W107` / `NV-I006`, or an annotation on the element.
 
 #### `W108` — MAC address on a loopback
 
-*Alias: `NG-I007`. Severity: warning.*
+*Alias: `NV-I007`. Severity: warning.*
 
 A `type: loopback` interface declares a `mac`.
 
@@ -1419,27 +1419,27 @@ A `type: loopback` interface declares a `mac`.
 address. One written here was copied from a physical port, which means it is
 also about to collide with that port under [`E003`](#e003--duplicate-mac-address).
 
-**Suppress with** `W108` / `NG-I007`, or an annotation on the element.
+**Suppress with** `W108` / `NV-I007`, or an annotation on the element.
 
 #### `W109` — device that cannot be cabled
 
-*Alias: `NG-I012`. Severity: warning.*
+*Alias: `NV-I012`. Severity: warning.*
 
 A device declares no `ethernet`, `wifi` or `lag` interface. Adapters are exempt:
-`NG-X003` already restricts them to exactly those three types at schema time.
+`NV-X003` already restricts them to exactly those three types at schema time.
 
-**Why it matters.** Only those types can terminate a cable (`NG-C009`), so the
+**Why it matters.** Only those types can terminate a cable (`NV-C009`), so the
 device can never appear on a link however many cables are written for it. A
 machine reached only through an adapter is the legitimate reading — and the
 example inventory's dongle-only laptop is exactly that — but far more often the
 physical port was simply never added to the document.
 
-**Suppress with** `W109` / `NG-I012`, or an annotation on the device. A host
+**Suppress with** `W109` / `NV-I012`, or an annotation on the device. A host
 whose only connectivity is an adapter attachment is the legitimate case.
 
 #### `W110` — network or broadcast address assigned
 
-*Alias: `NG-A005`. Severity: warning.*
+*Alias: `NV-A005`. Severity: warning.*
 
 An address is the network or the broadcast address of its own prefix:
 `10.0.0.0/24` or `10.0.0.255/24`. In IPv6 the all-zeros host part is the
@@ -1453,11 +1453,11 @@ document describes a host that cannot exist. It is what an off-by-one in an
 address plan looks like, and what happens when a prefix is pasted where an
 address was meant.
 
-**Suppress with** `W110` / `NG-A005`, or an annotation on the element.
+**Suppress with** `W110` / `NV-A005`, or an annotation on the element.
 
 #### `W111` — overlapping prefixes on one element
 
-*Alias: `NG-A006`. Severity: warning.*
+*Alias: `NV-A006`. Severity: warning.*
 
 Two *different* interfaces of one element hold addresses in prefixes that
 overlap — most often the same prefix twice. Loopback and link-local addresses
@@ -1470,12 +1470,12 @@ ports for traffic in the overlap; which one wins is a property of the operating
 system rather than of the design. A `/16` where a `/24` was meant, or a port
 left in the old subnet after a renumbering, both look like this.
 
-**Suppress with** `W111` / `NG-A006`, or an annotation on the element.
+**Suppress with** `W111` / `NV-A006`, or an annotation on the element.
 Deliberate multi-homing into one subnet is the legitimate case.
 
 #### `W112` — loopback with a non-host prefix
 
-*Alias: `NG-A007`. Severity: warning.*
+*Alias: `NV-A007`. Severity: warning.*
 
 A `type: loopback` interface carries a prefix other than `/32` (IPv4) or `/128`
 (IPv6). The host-scoped loopback addresses are exempt — `127.0.0.1/8` is what
@@ -1486,11 +1486,11 @@ every operating system configures, and RFC 1122 §3.2.1.3 reserves the whole of
 a host route. A `/24` on one claims a whole subnet that exists on no wire, and
 every router that believes the advertisement black-holes the rest of it.
 
-**Suppress with** `W112` / `NG-A007`, or an annotation on the element.
+**Suppress with** `W112` / `NV-A007`, or an annotation on the element.
 
 #### `W113` — undeclared VLAN referenced
 
-*Alias: `NG-V004`. Severity: warning.*
+*Alias: `NV-V004`. Severity: warning.*
 
 A port is a member of a VLAN that the device's `vlans` database does not
 declare. A device with **no** `vlans` at all is skipped entirely: §6.4 makes the
@@ -1507,13 +1507,13 @@ rendering and what the switch will actually create. A port in a VLAN missing
 from it is either a typo'd id or a VLAN that was never added to the switch, and
 both look identical until traffic stops.
 
-**Suppress with** `W113` / `NG-V004`, or an annotation on the device. Partially
+**Suppress with** `W113` / `NV-V004`, or an annotation on the device. Partially
 modelled VLAN databases are the legitimate case — though deleting the `vlans`
 list entirely says so more clearly, and silences the rule outright.
 
 #### `W114` — native VLAN missing from `trunk_vlans`
 
-*Alias: `NG-V006`. Severity: warning.*
+*Alias: `NV-V006`. Severity: warning.*
 
 A trunk's `native_vlan` is not listed in its `trunk_vlans`.
 
@@ -1524,13 +1524,13 @@ does — exactly the quiet disagreement between file and hardware this tool
 exists to surface. Writing it out changes nothing operationally and makes the
 diagram agree with the port.
 
-**Suppress with** `W114` / `NG-V006`, or an annotation on the element. Vendor
+**Suppress with** `W114` / `NV-V006`, or an annotation on the element. Vendor
 configurations that spell the native VLAN separately from the allowed list —
 which is most of them — are the legitimate case.
 
 #### `W115` — every VLAN trunked to a host
 
-*Alias: `NG-V007`. Severity: warning.*
+*Alias: `NV-V007`. Severity: warning.*
 
 A port whose `trunk_vlans` is `all` is cabled to a computer, a server or an
 adapter rather than to another switch. Resolved through the LAG master when the
@@ -1541,12 +1541,12 @@ a host it hands the whole VLAN estate to a machine that needs one or two of
 them: broadcast traffic nobody planned for, and the standard prerequisite for
 VLAN hopping. Trunking only the VLANs the host needs costs nothing.
 
-**Suppress with** `W115` / `NG-V007`, or an annotation on the cable or either
+**Suppress with** `W115` / `NV-V007`, or an annotation on the cable or either
 element. A hypervisor or a router-on-a-stick is the legitimate case.
 
 #### `W116` — LAG member contradicts its aggregate
 
-*Alias: `NG-V008`. Severity: warning.*
+*Alias: `NV-V008`. Severity: warning.*
 
 A `lag` member declares a `vlan` block that differs from the aggregate's. A
 member with no block of its own — the normal shape — is silent.
@@ -1556,11 +1556,11 @@ checks on a member through its aggregate, so the member's own block is never
 what a link is checked against. When the two disagree, which one a reader
 believes is a coin toss, and the one the validator believes is the aggregate's.
 
-**Suppress with** `W116` / `NG-V008`, or an annotation on the element.
+**Suppress with** `W116` / `NV-V008`, or an annotation on the element.
 
 #### `W117` — both ends of a cable on one element
 
-*Alias: `NG-C004`. Severity: warning.*
+*Alias: `NV-C004`. Severity: warning.*
 
 The two endpoints of one cable land on the same element. The degenerate case
 where they name the same *port* is [`E002`](#e002--interface-terminated-by-more-than-one-cable)
@@ -1572,12 +1572,12 @@ cable document was copied and its second endpoint never edited. The link then
 adds no path to the topology while the neighbour it was meant to reach is left
 undrawn.
 
-**Suppress with** `W117` / `NG-C004`, or an annotation on the cable or the
+**Suppress with** `W117` / `NV-C004`, or an annotation on the cable or the
 element. Loopback plugs and single-chassis peer links are the legitimate cases.
 
 #### `W118` — cable and endpoint disagree about speed
 
-*Alias: `NG-C008`. Severity: warning.*
+*Alias: `NV-C008`. Severity: warning.*
 
 A cable's `speed` differs from the speed its endpoint declares. In this schema
 an interface has no `speed` of its own — the wire decides it — with one
@@ -1589,13 +1589,13 @@ the two values cannot both be true and an export to NETCONF would have to pick
 one. A gigabit dongle written into a ten-gigabit run is the shape this catches,
 and it is usually a link budget nobody re-checked after the hardware changed.
 
-**Suppress with** `W118` / `NG-C008`, or an annotation on the cable or the
+**Suppress with** `W118` / `NV-C008`, or an annotation on the cable or the
 adapter. A bus faster than the port it feeds — USB 3.0 at 5 Gbps behind a
 gigabit Ethernet jack — is the legitimate case, and is worth writing down.
 
 #### `W119` — cable terminates on a LAG aggregate
 
-*Alias: `NG-C012`. Severity: warning.*
+*Alias: `NV-C012`. Severity: warning.*
 
 An endpoint is a `lag` interface rather than one of its members.
 
@@ -1605,13 +1605,13 @@ understates both the port count and the redundancy the bundle exists to provide
 — and a reader planning a maintenance window cannot see which lanes go where.
 The message names the members to cable instead.
 
-**Suppress with** `W119` / `NG-C012`, or an annotation on the cable or the
+**Suppress with** `W119` / `NV-C012`, or an annotation on the cable or the
 element. A deliberately abstracted diagram — one line for a bundle whose lane
 detail is out of scope — is the legitimate case.
 
 #### `W120` — half duplex without a hub
 
-*Alias: `NG-C013`. Severity: warning.*
+*Alias: `NV-C013`. Severity: warning.*
 
 A cable declares `duplex: half` and neither endpoint belongs to a `hub`.
 
@@ -1622,12 +1622,12 @@ speed/duplex negotiation that failed — the classic cause of a link that passes
 pings and collapses under load — or a value copied from a document that
 described a hub.
 
-**Suppress with** `W120` / `NG-C013`, or an annotation on the cable or either
+**Suppress with** `W120` / `NV-C013`, or an annotation on the cable or either
 element. Legacy gear pinned to half duplex on purpose is the legitimate case.
 
 #### `W121` — disconnected topology
 
-*Alias: `NG-C014`. Severity: warning.*
+*Alias: `NV-C014`. Severity: warning.*
 
 The topology graph falls into more than one island. Reported **once** for the
 whole inventory, naming each island's alphabetically smallest member and how
@@ -1645,14 +1645,14 @@ missing backbone link looks like, and what happens when a site is added to an
 inventory before the cable that joins it. On a large diagram the two halves may
 simply be laid out next to each other and read as one network.
 
-**Suppress with** `W121` / `NG-C014`, or an annotation on any of the elements
+**Suppress with** `W121` / `NV-C014`, or an annotation on any of the elements
 the message names. Deliberately separate networks in one inventory — an
 out-of-band management island, an air-gapped lab — are the legitimate case; if
 they are separate on purpose, separate inventories usually document that better.
 
 #### `W122` — one hub, two subnets
 
-*Alias: `NG-H005`. Severity: warning.*
+*Alias: `NV-H005`. Severity: warning.*
 
 Two elements cabled into one hub hold addresses that share no prefix. Hubs
 cabled to each other are examined as a single collision domain. The two address
@@ -1665,13 +1665,13 @@ prefix. Ports in prefixes that do not meet are wired together and still cannot
 reach each other, which is a particularly confusing failure because the cabling
 is visibly correct.
 
-**Suppress with** `W122` / `NG-H005`, or an annotation on the hub or on either
+**Suppress with** `W122` / `NV-H005`, or an annotation on the hub or on either
 element. A hub used as a passive tap or a span port, where the far end is
 deliberately in another prefix, is the legitimate case.
 
 #### `W123` — cabled adapter with no host
 
-*Alias: `NG-X002`. Severity: warning.*
+*Alias: `NV-X002`. Severity: warning.*
 
 An adapter has at least one cabled downstream port but no `upstream.attached_to`
 — and its upstream port terminates no cable either.
@@ -1681,13 +1681,13 @@ media converter in a run. Once something is patched into its downstream ports it
 is neither: the dongle is in use, and the machine it presents those ports to was
 left out of the inventory. The host is then missing from the diagram entirely.
 
-**Suppress with** `W123` / `NG-X002`, or an annotation on the adapter. A media
+**Suppress with** `W123` / `NV-X002`, or an annotation on the adapter. A media
 converter mid-run is the legitimate case, and spelling it with a cable on the
 *upstream* port instead says so precisely — which silences this rule outright.
 
 #### `W124` — adapter attached to a hub or a switch
 
-*Alias: `NG-X007`. Severity: warning.*
+*Alias: `NV-X007`. Severity: warning.*
 
 `upstream.attached_to` points at a `switch` or a `hub`.
 
@@ -1698,13 +1698,13 @@ configuration that tempts this spelling, and §8.2 gives it a better one:
 `passthrough: false` with a cable on each side, which draws the converter as the
 distinct node it is rather than folding it into a switch.
 
-**Suppress with** `W124` / `NG-X007`, or an annotation on the adapter or the
+**Suppress with** `W124` / `NV-X007`, or an annotation on the adapter or the
 device. An SFP module modelled as an adapter of the switch it sits in is the
 legitimate case.
 
 #### `W125` — overlay reaches past its underlay
 
-*Alias: `NG-T006`. Severity: warning.*
+*Alias: `NV-T006`. Severity: warning.*
 
 A tunnel names an `over`, but at least one element it terminates on is not an
 endpoint of that underlay tunnel.
@@ -1716,14 +1716,14 @@ other that way — and, worse, is drawn as protected when the traffic to that on
 endpoint is not. Either the underlay is missing an endpoint or the overlay has
 one too many.
 
-**Suppress with** `W125` / `NG-T006`, or an annotation on either tunnel or on
+**Suppress with** `W125` / `NV-T006`, or an annotation on either tunnel or on
 the stranded element. The legitimate case is an underlay that netviz only
 partly models — a provider MPLS cloud declared as a two-ended tunnel between the
 sites that matter.
 
 #### `W126` — tunnel MTU does not fit its underlay
 
-*Alias: `NG-T011`. Severity: warning.*
+*Alias: `NV-T011`. Severity: warning.*
 
 A tunnel declares an `mtu` larger than its underlay's `mtu` minus the
 encapsulation overhead of its own type.
@@ -1736,13 +1736,13 @@ hang" failure — invisible until someone copies a big file, and by then nobody
 suspects the diagram. `netviz list tunnels` prints the stack the budget is
 computed over.
 
-**Suppress with** `W126` / `NG-T011`, or an annotation on either tunnel. The
+**Suppress with** `W126` / `NV-T011`, or an annotation on either tunnel. The
 overheads netviz uses are the widely published worst case over IPv4; a
 deployment that has measured its own and knows it fits is the legitimate case.
 
 #### `W127` — tunnel carries traffic in the clear
 
-*Alias: `NG-T012`. Severity: warning.*
+*Alias: `NV-T012`. Severity: warning.*
 
 A tunnel's type encrypts nothing — `gre`, `vxlan`, `geneve`, `l2tp` or `pptp` —
 and no tunnel in its `over` chain does either. PPTP counts as cleartext however
@@ -1757,13 +1757,13 @@ IPsec tunnel is protected by the underlay, which is exactly why `over` exists �
 and so does `encrypted: true`, which records that the deployment protects it
 some other way.
 
-**Suppress with** `W127` / `NG-T012`, or an annotation on the tunnel. An
+**Suppress with** `W127` / `NV-T012`, or an annotation on the tunnel. An
 inventory that is entirely one data centre fabric will want
 `ignore = ["W127"]` in `netviz.toml`.
 
 #### `W128` — tunnel interface named by no tunnel
 
-*Alias: `NG-T013`. Severity: warning.*
+*Alias: `NV-T013`. Severity: warning.*
 
 An interface of `type: tunnel` is `enabled: true` and no `tunnel` document names
 it as an endpoint.
@@ -1776,13 +1776,13 @@ tunnel document describes one end of something the inventory never states the
 other end of, so the diagram shows a port that goes nowhere. Either the tunnel
 document is missing or the interface is left over from one that was deleted.
 
-**Suppress with** `W128` / `NG-T013`, or an annotation on the element. Saying
+**Suppress with** `W128` / `NV-T013`, or an annotation on the element. Saying
 `enabled: false` on the interface silences it *and* tells the next reader the
 overlay is not in service.
 
 #### `W129` — two tunnels share a VNI on one element
 
-*Alias: `NG-T014`. Severity: warning.*
+*Alias: `NV-T014`. Severity: warning.*
 
 Two VXLAN or Geneve tunnels terminating on the same element declare the same
 `vni`.
@@ -1792,14 +1792,14 @@ reusing one on the same element are either the same overlay written twice — on
 of the two documents is stale — or two overlays that will bridge into each
 other, joining broadcast domains the diagram shows as separate.
 
-**Suppress with** `W129` / `NG-T014`, or an annotation on either tunnel or on
+**Suppress with** `W129` / `NV-T014`, or an annotation on either tunnel or on
 the element. A VNI deliberately reused across a hub-and-spoke mesh, written as
 several point-to-point tunnels rather than one multipoint one, is the legitimate
 case — and writing it as one multipoint tunnel says it better.
 
 #### `W130` — prefix claimed by two broadcast domains
 
-*Alias: `NG-A010`. Severity: warning.*
+*Alias: `NV-A010`. Severity: warning.*
 
 One prefix holds addresses on interfaces that declare *different* VLANs. This is
 the address-plan overlap that is not a nesting: neither claim contains the
@@ -1827,13 +1827,13 @@ address named.
 
 Reported by [`netviz ipam`](ipam.md) as the overlapping-prefix conflict.
 
-**Suppress with** `W130` / `NG-A010`, or an annotation on any element addressed
+**Suppress with** `W130` / `NV-A010`, or an annotation on any element addressed
 in the prefix. The legitimate case is a deliberately duplicated plan — two
 identical lab pods, isolated from each other on purpose.
 
 #### `W131` — nested prefix in a different broadcast domain
 
-*Alias: `NG-A011`. Severity: warning.*
+*Alias: `NV-A011`. Severity: warning.*
 
 One prefix sits inside another, and the two are used in disjoint sets of VLANs:
 `10.0.0.0/16` on VLAN 10 with `10.0.5.0/24` on VLAN 20 beneath it.
@@ -1850,13 +1850,13 @@ interfaces that declare a `vlan` block are compared.
 
 Reported by [`netviz ipam`](ipam.md) as the nested-prefix conflict.
 
-**Suppress with** `W131` / `NG-A011`, or an annotation on any element addressed
+**Suppress with** `W131` / `NV-A011`, or an annotation on any element addressed
 in either prefix. The legitimate case is a summary address deliberately
 configured on a different VLAN from the segments it summarises.
 
 #### `W132` — address outside every prefix on its link
 
-*Alias: `NG-A012`. Severity: warning.*
+*Alias: `NV-A012`. Severity: warning.*
 
 The two interfaces a cable joins are both addressed in one family, and no prefix
 on either end overlaps a prefix on the other.
@@ -1877,13 +1877,13 @@ no socket is left to [`E012`](#e012--cable-terminates-on-an-interface-with-no-so
 Reported by [`netviz ipam`](ipam.md) as the outside-every-declared-prefix
 conflict.
 
-**Suppress with** `W132` / `NG-A012`, or an annotation on either element. The
+**Suppress with** `W132` / `NV-A012`, or an annotation on either element. The
 legitimate case is a link that is deliberately unnumbered on one side, or one
 whose peer is addressed by an ISP out of a range this inventory does not model.
 
 #### `W133` — patch run stops inside the panel
 
-*Alias: `NG-P002`. Severity: warning.*
+*Alias: `NV-P002`. Severity: warning.*
 
 A patch-panel position terminates a cable, and the position its coupler leads
 to terminates none.
@@ -1900,13 +1900,13 @@ state to record: the position is reserved, the cable exists, and the inventory
 is telling the truth about a job that is half done. Render `--layer physical`
 to see the segment that does exist.
 
-**Suppress with** `W133` / `NG-P002`, or an annotation on the cable or the
+**Suppress with** `W133` / `NV-P002`, or an annotation on the cable or the
 panel. Annotating it is the right move for a position deliberately held for a
 run that is not yet needed.
 
 #### `W134` — access points on overlapping channels
 
-*Alias: `NG-W011`. Severity: warning.*
+*Alias: `NV-W011`. Severity: warning.*
 
 Two `ap` radios in one broadcast domain are in the same band and their channels
 overlap. "One broadcast domain" is read as both halves of the phrase: the two
@@ -1932,11 +1932,11 @@ Overlap is computed by centring `width_mhz` on the primary channel; the true
 centre of a bonded channel depends on secondary channels no document states.
 The approximation can only make the rule warn more readily, never less.
 
-**Suppress with** `W134` / `NG-W011`, or an annotation on either element.
+**Suppress with** `W134` / `NV-W011`, or an annotation on either element.
 
 #### `W135` — BGP neighbour is not in the inventory
 
-*Alias: `NG-F013`. Severity: warning.*
+*Alias: `NV-F013`. Severity: warning.*
 
 A `neighbors[].address` matches no address the inventory configures, so the far
 end of the session cannot be found.
@@ -1952,12 +1952,12 @@ The other cause is a typo in an address that *was* meant to be internal, and
 that is worth a line of output. Between the two, silence would be the wrong
 default and an error would fail every inventory with an upstream.
 
-**Suppress with** `W135` / `NG-F013`, or an annotation on the device — which is
+**Suppress with** `W135` / `NV-F013`, or an annotation on the device — which is
 what to do for a genuinely external peer.
 
 #### `W136` — VRF with no interface bound to it
 
-*Alias: `NG-F014`. Severity: warning.*
+*Alias: `NV-F014`. Severity: warning.*
 
 A device declares a `vrfs` entry that no `interfaces[].vrf` names. The finding
 also counts the static routes placed in the instance, because those are what
@@ -1974,11 +1974,11 @@ A warning rather than an error because a VRF declared ahead of the interfaces
 that will join it is a normal state for an inventory to be in halfway through a
 migration.
 
-**Suppress with** `W136` / `NG-F014`, or an annotation on the device.
+**Suppress with** `W136` / `NV-F014`, or an annotation on the device.
 
 #### `W137` — declared draw with no power path
 
-*Alias: `NG-E016`. Severity: warning.*
+*Alias: `NV-E016`. Severity: warning.*
 
 A device declares `power.draw_watts`, declares no `power.inputs`, and is not
 `powered_by: poe` — so it says how much it draws and nothing about where from. A
@@ -1999,14 +1999,14 @@ outlet numbers come from walking the rack with a torch. Refusing the
 half-finished state would make the model unusable exactly while it is being
 adopted, which is the wrong trade for a fact that is missing rather than wrong.
 
-**Suppress with** `W137` / `NG-E016`, or an annotation on the device. The
+**Suppress with** `W137` / `NV-E016`, or an annotation on the device. The
 legitimate case is a device fed from something the inventory does not model as a
 `pdu` — a wall socket, a bench supply, a UPS nothing has a document for — where
 the draw is worth recording and there is no outlet to name.
 
 #### `W138` — stale diagram geometry
 
-*Alias: `NG-Y001`. Severity: warning.*
+*Alias: `NV-Y001`. Severity: warning.*
 
 A `kind: layout` document (§18) places something the inventory does not declare
 — usually a device that has since been deleted, sometimes a name that was
@@ -2033,13 +2033,13 @@ deleting a switch must not make `netviz validate` fail. The whole point of
 keeping geometry in a sidecar is that the model can be changed without asking
 the diagram's permission.
 
-**Suppress with** `W138` / `NG-Y001`, or an annotation on the layout document.
+**Suppress with** `W138` / `NV-Y001`, or an annotation on the layout document.
 The fix is normally `netviz layout --prune`, which drops exactly these
 entries and writes nothing else.
 
 #### `W139` — group with no members
 
-*Alias: `NG-S014`. Severity: warning.*
+*Alias: `NV-S014`. Severity: warning.*
 
 A `group` declares `members: []`, or omits `members` entirely.
 
@@ -2054,14 +2054,14 @@ state: a group created before the people who will be in it, or one deliberately
 emptied and kept so the name stays reserved. Both are reasonable, and neither is
 worth refusing to render an inventory over.
 
-**Suppress with** `W139` / `NG-S014`, or an annotation on the group. Worth
+**Suppress with** `W139` / `NV-S014`, or an annotation on the group. Worth
 annotating a group that is empty on purpose and expected to stay so — a
 placeholder for a team that does not exist yet, say — with the reason in
 `metadata.description`.
 
 #### `W140` — departed user still in a group
 
-*Alias: `NG-S015`. Severity: warning.*
+*Alias: `NV-S015`. Severity: warning.*
 
 A group lists a `user` whose `status` is `departed`. Only `person` accounts are
 judged: a `shared` or `service` account has nobody to depart.
@@ -2074,7 +2074,7 @@ they cannot be revoked from a record that no longer exists. Marking the account
 `departed` keeps the work visible until it has been done, and this finding is the
 worklist.
 
-**Suppress with** `W140` / `NG-S015`, or an annotation on the group or on the
+**Suppress with** `W140` / `NV-S015`, or an annotation on the group or on the
 user. The legitimate case is a group that is deliberately a historical record —
 who was on a project — rather than a grant of access.
 
@@ -2106,7 +2106,7 @@ inventory is shared with a newer netviz that does understand the token.
 
 #### `W142` — annotation about something that is gone
 
-*Alias: `NG-G001`. Severity: warning.*
+*Alias: `NV-G001`. Severity: warning.*
 
 A diagram annotation (§21) names an element the inventory does not declare. Two
 documents can do it: a `note` whose `anchor` points at an `element` or a `link`
@@ -2144,7 +2144,7 @@ rule about one that could fail a build would be exactly the leak that promise
 exists to prevent. Deleting a switch must not stop `netviz validate` because
 somebody once wrote a note about it.
 
-**Suppress with** `W142` / `NG-G001`, or an annotation on the note or area
+**Suppress with** `W142` / `NV-G001`, or an annotation on the note or area
 itself — an annotation document carries `metadata.annotations` like any other,
 and `netviz/ignore` on one silences findings about it. The legitimate case is
 a note about equipment that has been removed and whose removal is the point:
@@ -2153,7 +2153,7 @@ otherwise is to re-point the anchor or drop the member.
 
 #### `W143` — area that encloses nothing
 
-*Alias: `NG-G004`. Severity: warning.*
+*Alias: `NV-G004`. Severity: warning.*
 
 An `area` whose `selector` matches no element of the inventory. The box would be
 drawn round an empty set, so it is not drawn at all.
@@ -2188,7 +2188,7 @@ tool concludes, so a rule about one can never fail a build. It is also the rule
 most likely to be right tomorrow — an area written for a zone that is about to
 be populated is a normal thing to commit ahead of the elements.
 
-**Suppress with** `W143` / `NG-G004`, or an annotation on the area. The
+**Suppress with** `W143` / `NV-G004`, or an annotation on the area. The
 legitimate case is exactly that one: a zone declared before what goes in it.
 Otherwise the fix is in the selector — check the `namespace` prefix, the label
 key and its value, and the `kinds` — or turn it into a `members` list, which
@@ -2196,7 +2196,7 @@ says which elements were meant and reports each one that is missing.
 
 #### `W144` — element styled invisible
 
-*Alias: `NG-Z003`. Severity: warning.*
+*Alias: `NV-Z003`. Severity: warning.*
 
 An element's [`spec.style`](schema-reference.md#specstyle) sets `opacity: 0`.
 The element is drawn fully transparent, so nothing appears where it is — while
@@ -2217,7 +2217,7 @@ spec:
 
 Zero is legal on its own: it is the bottom of the range `opacity` accepts, and
 an editor dragging the slider to one end passes through it on its way somewhere
-else. That is why the value is not a schema error — `NG-Z001` judges each style
+else. That is why the value is not a schema error — `NV-Z001` judges each style
 value as it is written — and is reported here instead, where a combination the
 document has settled on is judged as a whole.
 
@@ -2231,7 +2231,7 @@ Leaving an element *out* is what the render filters are for. `--kind`, `--name`,
 `--namespace` and the rest take it out of the topology as well as out of the
 picture, so nothing is left pointing at where it used to be.
 
-**Suppress with** `W144` / `NG-Z003`, or an annotation on the element. The
+**Suppress with** `W144` / `NV-Z003`, or an annotation on the element. The
 legitimate case is the one no filter expresses: an element that has to stay in
 the graph — so a path still traces through it and a link still lands on it — and
 has to be absent from the drawing. Otherwise the fix is to raise the opacity, or
@@ -2239,7 +2239,7 @@ to filter the element out of the render.
 
 #### `W145` — unreadable label colour
 
-*Alias: `NG-Z005`. Severity: warning.*
+*Alias: `NV-Z005`. Severity: warning.*
 
 An element's `spec.style` gives `fill` and `fontColor` the same colour, so the
 label is drawn in the colour of the box behind it and cannot be read. The two
@@ -2277,12 +2277,12 @@ and never picks a contrasting one on your behalf, so the mistake survives every
 render until somebody looks at the picture.
 
 A warning rather than an error because each colour is legal on its own — a value
-that is not a colour is `NG-Z001`, refused the moment it is written — and only
+that is not a colour is `NV-Z001`, refused the moment it is written — and only
 the pair is a mistake. An editor that changes the fill first and the font colour
 a keystroke later is briefly in exactly this state, and a rule that failed the
 build in between would make writing a style one field at a time impossible.
 
-**Suppress with** `W145` / `NG-Z005`, or an annotation on the element. The
+**Suppress with** `W145` / `NV-Z005`, or an annotation on the element. The
 legitimate case is a shape whose label is meant not to show: a backdrop drawn in
 one flat colour, named by a `note` (§21) beside it rather than by its own text.
 Otherwise the fix is in `fontColor` — give it something that contrasts with
@@ -2292,7 +2292,7 @@ Otherwise the fix is in `fontColor` — give it something that contrasts with
 
 #### `W146` — network namespace with no interface
 
-*Alias: `NG-N026`. Severity: warning.*
+*Alias: `NV-N026`. Severity: warning.*
 
 A device declares a namespace in `spec.netns` and no interface names it
 (§23.1). A namespace is a stack, and a stack with no interface in it holds no
@@ -2309,13 +2309,13 @@ interfaces were renamed out from under it, or the `netns` line was written on on
 end of a veth pair and forgotten on the other — which is
 [`I005`](#i005--veth-pair-crosses-no-boundary) seen from the other side.
 
-**Suppress with** `W146` / `NG-N026`, or an annotation on the device. An
+**Suppress with** `W146` / `NV-N026`, or an annotation on the device. An
 inventory that declares namespaces before their contents should say
 `ignore = ["W146"]` in `netviz.toml` once.
 
 #### `W147` — policy rule looks up an empty table
 
-*Alias: `NG-F022`. Severity: warning.*
+*Alias: `NV-F022`. Severity: warning.*
 
 A rule in `spec.routing_policy` says *route this by table X*, and no route in
 `spec.routes` is placed in X (§16.4). The rule matches, the lookup finds nothing,
@@ -2332,13 +2332,13 @@ applies, `ip rule show` lists the rule, and traffic goes out the default uplink
 anyway — the half that is missing is in a different file from the half that is
 there. The other direction is [`W148`](#w148--routing-table-nothing-selects).
 
-**Suppress with** `W147` / `NG-F022`, or an annotation on the device. Worth
+**Suppress with** `W147` / `NV-F022`, or an annotation on the device. Worth
 suppressing when the table is filled by a routing daemon rather than by
 `spec.routes` — that is exactly what a table fed by BGP looks like from here.
 
 #### `W148` — routing table nothing selects
 
-*Alias: `NG-F023`. Severity: warning.*
+*Alias: `NV-F023`. Severity: warning.*
 
 A table is declared in `spec.route_tables` and no rule in `spec.routing_policy`
 looks it up (§16.2). A routing table is consulted only when something selects it,
@@ -2352,14 +2352,14 @@ never got typed. It is the mirror of
 [`W147`](#w147--policy-rule-looks-up-an-empty-table), and the two cannot both
 fire for one table.
 
-**Suppress with** `W148` / `NG-F023`, or an annotation on the device. A table
+**Suppress with** `W148` / `NV-F023`, or an annotation on the device. A table
 selected by something outside the inventory — a VPN client's own rule, a
 container runtime — is the case worth suppressing, and worth a `description` on
 the table saying which.
 
 #### `W149` — unreachable policy rule
 
-*Alias: `NG-F024`. Severity: warning.*
+*Alias: `NV-F024`. Severity: warning.*
 
 A rule sits below one that matches every packet of the same family (§16.4). The
 policy database is walked from the lowest priority upwards and the first match
@@ -2376,11 +2376,11 @@ either; it jumps forward, and what it jumps to is still reached.
 terminator instead of below it, and it never runs — with no error anywhere,
 because the rule is perfectly valid and simply never consulted.
 
-**Suppress with** `W149` / `NG-F024`, or an annotation on the device.
+**Suppress with** `W149` / `NV-F024`, or an annotation on the device.
 
 #### `W150` — security zone with no interface
 
-*Alias: `NG-B010`. Severity: warning.*
+*Alias: `NV-B010`. Severity: warning.*
 
 A zone is declared in `spec.zones` and holds no interface (§24.1). A zone is a
 *partition of the device's interfaces*, so one holding none is empty in the
@@ -2392,14 +2392,14 @@ no rules is a placeholder somebody has not filled in yet; a zone with no
 interfaces and four rules is a policy that used to work and stopped when the last
 interface moved out of it, and nothing else says so.
 
-**Suppress with** `W150` / `NG-B010`, or an annotation on the device. Worth
+**Suppress with** `W150` / `NV-B010`, or an annotation on the device. Worth
 suppressing for a zone whose interfaces are created at runtime — a container
 bridge, a VPN interface a daemon brings up — which the inventory has no
 interface to list.
 
 #### `W151` — interface in no zone
 
-*Alias: `NG-B011`. Severity: warning.*
+*Alias: `NV-B011`. Severity: warning.*
 
 A device divides its interfaces into zones and at least one interface is in none
 of them (§24.1). Reported once per device, naming every interface outside the
@@ -2426,13 +2426,13 @@ rule saying `from lan` does not reach it, so what it gets is whichever chain
 default applies — which on a default-deny firewall means it silently stops
 working, and on a default-permit one means it silently is not filtered.
 
-**Suppress with** `W151` / `NG-B011`, or an annotation on the device. A console
+**Suppress with** `W151` / `NV-B011`, or an annotation on the device. A console
 port and a dedicated out-of-band management interface are both legitimately
 outside every zone.
 
 #### `W152` — firewall mark nothing reads
 
-*Alias: `NG-B012`. Severity: warning.*
+*Alias: `NV-B012`. Severity: warning.*
 
 A rule in `spec.firewall.rules` writes a mark with `action: mark`, and no rule in
 `spec.routing_policy` matches it (§24.3). This is one half of the plan §16.9
@@ -2450,14 +2450,14 @@ mark being set, and the traffic goes out the default uplink exactly as it would
 have without any of it. The other direction is
 [`W153`](#w153--firewall-mark-nothing-writes).
 
-**Suppress with** `W152` / `NG-B012`, or an annotation on the device. A mark read
+**Suppress with** `W152` / `NV-B012`, or an annotation on the device. A mark read
 by something outside the inventory — a traffic-shaping class, a `tc` filter, a
 socket that reads `SO_MARK` — is the case worth suppressing, and worth a
 `description` on the rule saying which.
 
 #### `W153` — firewall mark nothing writes
 
-*Alias: `NG-B013`. Severity: warning.*
+*Alias: `NV-B013`. Severity: warning.*
 
 A rule in `spec.routing_policy` matches on `fwmark` and the device's
 `spec.firewall` never writes that mark (§24.3). The mirror of
@@ -2474,13 +2474,13 @@ claim about a file that does not exist.
 next one and is routed by whatever comes after — the failure that looks like it
 works, since `ip rule show` lists the rule and every command applied cleanly.
 
-**Suppress with** `W153` / `NG-B013`, or an annotation on the device. Worth
+**Suppress with** `W153` / `NV-B013`, or an annotation on the device. Worth
 suppressing when the mark is set by something the inventory does not describe: a
 `tc` action, a VPN client's own rules, a container runtime.
 
 #### `W154` — unreachable firewall rule
 
-*Alias: `NG-B014`. Severity: warning.*
+*Alias: `NV-B014`. Severity: warning.*
 
 A rule sits below one that already decided the traffic it is about (§24.2). The
 chain is walked from the lowest priority upwards and the first *terminal* match
@@ -2507,11 +2507,11 @@ a default-deny policy with a priority above the closing rule instead of below it
 and the service it was for does not work — with no error anywhere, because the
 rule is perfectly valid and simply never consulted.
 
-**Suppress with** `W154` / `NG-B014`, or an annotation on the device.
+**Suppress with** `W154` / `NV-B014`, or an annotation on the device.
 
 #### `I001` — locally administered MAC address
 
-*Alias: `NG-I010`. Severity: info.*
+*Alias: `NV-I010`. Severity: info.*
 
 Bit 1 of the MAC's first octet — the second-least-significant — says the address
 was assigned by the operator rather than drawn from a vendor's OUI (IEEE
@@ -2524,13 +2524,13 @@ cannot be looked up when tracing a port back to hardware, and because a
 hand-written address is the kind that gets duplicated into
 [`E003`](#e003--duplicate-mac-address).
 
-**Suppress with** `I001` / `NG-I010`, or an annotation on the element. If an
+**Suppress with** `I001` / `NV-I010`, or an annotation on the element. If an
 inventory uses locally administered addresses throughout, `ignore = ["I001"]`
 in `netviz.toml` is the right place to say so once.
 
 #### `I002` — enabled interface terminates no cable
 
-*Alias: `NG-C015`. Severity: info.*
+*Alias: `NV-C015`. Severity: info.*
 
 An interface is `enabled: true` and nothing is patched into it. Only the types a
 cable can terminate on are considered ([`E012`](#e012--cable-terminates-on-an-interface-with-no-socket)),
@@ -2545,7 +2545,7 @@ as likely: the port is in use and the cable document was never written. A port
 list with the unused ports marked is also what makes a patching decision
 possible without walking to the rack.
 
-**Suppress with** `I002` / `NG-C015`, or an annotation on the element. Better
+**Suppress with** `I002` / `NV-C015`, or an annotation on the element. Better
 still, say `enabled: false` on the port: the finding goes away *and* the next
 reader learns that the port is spare on purpose. That is what the example
 inventories do for their spare switch ports; their WAN interfaces, which face an
@@ -2557,7 +2557,7 @@ that inventory in one line.
 
 #### `I003` — tunnel on a non-standard port
 
-*Alias: `NG-T015`. Severity: info.*
+*Alias: `NV-T015`. Severity: info.*
 
 A tunnel declares a `port` other than the registered one for its type:
 WireGuard 51820, OpenVPN 1194, L2TP 1701, VXLAN 4789, Geneve 6081. GRE and IPsec
@@ -2568,13 +2568,13 @@ run directly over IP and carry no port, so they never trip it.
 printed because the port is the one fact a firewall rule needs, and the one most
 likely to have been copied from the tunnel next to it in the file.
 
-**Suppress with** `I003` / `NG-T015`, or an annotation on the tunnel. An
+**Suppress with** `I003` / `NV-T015`, or an annotation on the tunnel. An
 inventory that moves every tunnel off its default port should say
 `ignore = ["I003"]` in `netviz.toml` once.
 
 #### `I004` — person in no group
 
-*Alias: `NG-S016`. Severity: info.*
+*Alias: `NV-S016`. Severity: info.*
 
 A `user` with `type: person` and `status: active` is named by no group's
 `members`. A `service` or `shared` account is not judged — being in no group is
@@ -2587,13 +2587,13 @@ opposite reading — "this person is in no group, therefore they have no access"
 is a claim an auditor wants confirmed rather than assumed, and because an account
 that was *meant* to be in a group and is not looks exactly like this.
 
-**Suppress with** `I004` / `NG-S016`, or an annotation on the user. An inventory
+**Suppress with** `I004` / `NV-S016`, or an annotation on the user. An inventory
 that models people without modelling groups at all should say
 `ignore = ["I004"]` in `netviz.toml` once.
 
 #### `I005` — veth pair crosses no boundary
 
-*Alias: `NG-N027`. Severity: info.*
+*Alias: `NV-N027`. Severity: info.*
 
 Both ends of a veth pair are in the same network namespace (§23.2) — usually
 both in the machine's initial one, because that is what a forgotten `netns`
@@ -2606,7 +2606,7 @@ written on one end and forgotten on the other — a mistake that validates, draw
 a link, and leaves a namespace nothing reaches (which is then
 [`W146`](#w146--network-namespace-with-no-interface)).
 
-**Suppress with** `I005` / `NG-N027`, or an annotation on the device. A host that
+**Suppress with** `I005` / `NV-N027`, or an annotation on the device. A host that
 joins bridges this way as a matter of course should say `ignore = ["I005"]` in
 `netviz.toml` once.
 
@@ -2693,18 +2693,18 @@ schema rule is a usage error:
 
 <!-- run: rc=2 -->
 ```console
-$ netviz validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
+$ netviz validate --disable NV-D005
+error: --disable: 'NV-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NV-* alias from docs/schema.md §10, or '*'
 ```
 
-Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select
+Every mechanism accepts both spellings of an id — `W102` and `NV-C010` select
 the same rule — plus the wildcards `*`, `all` and `any`.
 
 ### 1. On the command line
 
 <!-- norun: flag forms with trailing shell comments, and neither line names an inventory -->
 ```bash
-netviz validate --disable W103 --disable NG-C010   # repeatable
+netviz validate --disable W103 --disable NV-C010   # repeatable
 netviz validate --strict                           # warnings become errors
 ```
 
@@ -2719,7 +2719,7 @@ The file sits at the root of the inventory tree and is entirely optional.
 ```toml
 [validate]
 strict = false                    # promote surviving warnings to errors
-ignore = ["W103", "NG-C010"]      # never report these at all
+ignore = ["W103", "NV-C010"]      # never report these at all
 
 [validate.severity]
 E004 = "warning"                  # re-grade rather than silence
@@ -2774,10 +2774,10 @@ where noted below. The ids are permanent whatever happens to the rules.
 Three of the implemented rules are graded more harshly than §10.2 and §10.3
 suggest, following §10.10:
 
-* `E003` (`NG-I008`) and `E004` (`NG-A004`) are errors rather than warnings,
+* `E003` (`NV-I008`) and `E004` (`NV-A004`) are errors rather than warnings,
   because a duplicate address is far more often a copy-paste mistake than a
   deliberate VRRP or anycast design.
-* [`E010`](#e010--multicast-mac-address) (`NG-I009`) is an error rather than a
+* [`E010`](#e010--multicast-mac-address) (`NV-I009`) is an error rather than a
   warning, because a multicast source address is not a design decision at all —
   no interface can have one.
 
@@ -2786,23 +2786,23 @@ Re-grade any of them in `netviz.toml` if your inventory is the exception.
 Seven further rules carry a carve-out that §10 does not spell out, in each case
 because the rule as written would fire on the configuration everybody has:
 
-* [`W112`](#w112--loopback-with-a-non-host-prefix) (`NG-A007`) exempts the
+* [`W112`](#w112--loopback-with-a-non-host-prefix) (`NV-A007`) exempts the
   host-scoped loopback addresses, so the `127.0.0.1/8` every operating system
   configures is not reported.
-* [`W113`](#w113--undeclared-vlan-referenced) (`NG-V004`) exempts VLAN 1, the
+* [`W113`](#w113--undeclared-vlan-referenced) (`NV-V004`) exempts VLAN 1, the
   802.1Q Default VLAN, which exists on every bridge without being declared and
   is what `access_vlan` defaults to.
-* [`E008`](#e008--a-member-is-not-free-to-be-aggregated) (`NG-I005`) exempts a
+* [`E008`](#e008--a-member-is-not-free-to-be-aggregated) (`NV-I005`) exempts a
   `lag` nested inside a `bridge`, which is how a bridged bond is expressed.
-* [`E005`](#e005--vlan-mismatch-across-a-link) (`NG-C011`) reports a differing
+* [`E005`](#e005--vlan-mismatch-across-a-link) (`NV-C011`) reports a differing
   `native_vlan` only when *both* trunks spell one out; leaving it off means "the
   default", not "a different VLAN".
-* [`W117`](#w117--both-ends-of-a-cable-on-one-element) (`NG-C004`) stays quiet
+* [`W117`](#w117--both-ends-of-a-cable-on-one-element) (`NV-C004`) stays quiet
   when both endpoints name the same *port*, which
   [`E002`](#e002--interface-terminated-by-more-than-one-cable) already reports.
-* [`W121`](#w121--disconnected-topology) (`NG-C014`) ignores islands of a single
+* [`W121`](#w121--disconnected-topology) (`NV-C014`) ignores islands of a single
   element, which are [`W103`](#w103--orphan-device)'s finding.
-* [`I002`](#i002--enabled-interface-terminates-no-cable) (`NG-C015`) ignores
+* [`I002`](#i002--enabled-interface-terminates-no-cable) (`NV-C015`) ignores
   `lag` aggregates, since [`W119`](#w119--cable-terminates-on-a-lag-aggregate)
   asks for the members to be cabled instead.
 

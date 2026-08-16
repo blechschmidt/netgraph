@@ -9,7 +9,7 @@ metadata:
 
     The switch itself is dual-corded: 'psu1' to the A-side strip, 'psu2' to the
     B-side one. Both strips are in this rack, and they are on different input
-    feeds, which is what makes 'redundant: true' true (NG-E015).
+    feeds, which is what makes 'redundant: true' true (NV-E015).
   location:
     site: hq
     room: mdf

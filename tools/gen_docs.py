@@ -440,7 +440,7 @@ def command_index(base: str) -> str:
 
 
 def rule_index() -> str:
-    """Every rule, with the ``NG-*`` alias the specification calls it by."""
+    """Every rule, with the ``NV-*`` alias the specification calls it by."""
     lines = ["| Id | Schema id | Severity | Rule |", "|---|---|---|---|"]
     for rule in RULES:
         aliases = ", ".join(f"`{alias}`" for alias in rule.aliases) or "—"

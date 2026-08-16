@@ -1,4 +1,4 @@
-# E012 (NG-C009) - a cable terminates on an interface that has no socket.
+# E012 (NV-C009) - a cable terminates on an interface that has no socket.
 #
 # The cable lands on 'pc-a:lo', a software loopback. 'eth0' is the port it was
 # meant for and is marked spare, which keeps W101 and I002 quiet about it.

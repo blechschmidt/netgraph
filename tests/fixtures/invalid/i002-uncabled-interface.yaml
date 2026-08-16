@@ -1,4 +1,4 @@
-# I002 (NG-C015) - an enabled interface terminates no cable.
+# I002 (NV-C015) - an enabled interface terminates no cable.
 #
 # 'pc-a:eth1' is up and addressed but nothing is patched into it. Either the
 # port is spare - say 'enabled: false' and the note goes away - or a cable

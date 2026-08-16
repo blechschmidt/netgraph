@@ -9,7 +9,7 @@
       "name": "sw-north-acc-01",
       "kind": "switch",
       "namespace": "sites/north/access",
-      "description": "Access switch 01, North campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+      "description": "Access switch 01, North campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NV-V009).\n",
       "labels": {
         "env": "prod",
         "role": "access",
@@ -773,7 +773,7 @@
       "name": "sw-south-acc-01",
       "kind": "switch",
       "namespace": "sites/south/access",
-      "description": "Access switch 01, South campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+      "description": "Access switch 01, South campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NV-V009).\n",
       "labels": {
         "env": "prod",
         "role": "access",
@@ -1145,7 +1145,7 @@
       "name": "sw-west-acc-01",
       "kind": "switch",
       "namespace": "sites/west/access",
-      "description": "Access switch 01, West annexe. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+      "description": "Access switch 01, West annexe. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NV-V009).\n",
       "labels": {
         "env": "prod",
         "role": "access",

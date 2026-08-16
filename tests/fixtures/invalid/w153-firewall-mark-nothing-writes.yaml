@@ -1,4 +1,4 @@
-# W153 (NG-B013) - a mark the policy database reads that nothing puts on a packet.
+# W153 (NV-B013) - a mark the policy database reads that nothing puts on a packet.
 #
 # The other half of W152, and the more common shape: the table is filled, the
 # rule that routes by the mark is written, and the firewall rule that would have

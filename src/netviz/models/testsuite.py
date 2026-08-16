@@ -85,7 +85,7 @@ __all__ = [
 #: out. Lower case like every other kind in §3: ``patchpanel``, not ``PatchPanel``.
 TEST_SUITE_KIND: Final = "testsuite"
 
-#: ``NG-K002`` — ceiling on the assertions one suite may hold. A suite longer
+#: ``NV-K002`` — ceiling on the assertions one suite may hold. A suite longer
 #: than this is several suites that have not been split, and every assertion
 #: costs at least one graph search.
 MAX_ASSERTIONS: Final = 1024
@@ -340,13 +340,13 @@ class Assertion(NetvizModel):
 
     @model_validator(mode="after")
     def _check_shape(self) -> Assertion:
-        """``NG-K003`` — every key present belongs to this assertion, and none is missing."""
+        """``NV-K003`` — every key present belongs to this assertion, and none is missing."""
         for key, owners in _KEYS.items():
             if getattr(self, _attribute(key)) is not None and self.assert_ not in owners:
                 raise field_error(
                     f"{key!r} is not a key of a {self.assert_!s} assertion; it belongs to "
                     f"{_listed(owners)}",
-                    rule="NG-K003",
+                    rule="NV-K003",
                     path=(key,),
                 )
         for key in _REQUIRED[self.assert_]:
@@ -360,7 +360,7 @@ class Assertion(NetvizModel):
                 raise field_error(
                     f"a {self.assert_!s} assertion needs {key!r}"
                     + (" or 'query'" if key == "select" else ""),
-                    rule="NG-K003",
+                    rule="NV-K003",
                     path=(key,),
                 )
         self._check_layer()
@@ -368,7 +368,7 @@ class Assertion(NetvizModel):
         return self
 
     def _check_layer(self) -> None:
-        """``NG-K003`` — the named view is one this assertion can be made about."""
+        """``NV-K003`` — the named view is one this assertion can be made about."""
         if self.layer is None:
             return
         allowed = (
@@ -380,12 +380,12 @@ class Assertion(NetvizModel):
             raise field_error(
                 f"a {self.assert_!s} assertion cannot be made about layer {self.layer!s}; "
                 f"expected one of {', '.join(sorted(str(layer) for layer in allowed))}",
-                rule="NG-K003",
+                rule="NV-K003",
                 path=("layer",),
             )
 
     def _check_count(self) -> None:
-        """``NG-K003`` — a ``count`` compares against something, and not against nothing.
+        """``NV-K003`` — a ``count`` compares against something, and not against nothing.
 
         A ``query`` assertion is exempt from the first half: with no bound it
         means "this matches nothing", which is a claim and the most useful one.
@@ -402,14 +402,14 @@ class Assertion(NetvizModel):
             raise field_error(
                 "a count assertion needs at least one of 'equals', 'at_least' or 'at_most'; "
                 "without one it claims nothing",
-                rule="NG-K003",
+                rule="NV-K003",
                 path=("equals",),
             )
         if self.at_least is not None and self.at_most is not None and self.at_least > self.at_most:
             raise field_error(
                 f"at_least {self.at_least} is above at_most {self.at_most}, so no count "
                 f"can satisfy this assertion",
-                rule="NG-K003",
+                rule="NV-K003",
                 path=("at_least",),
             )
 
@@ -431,7 +431,7 @@ class TestSuiteSpec(NetvizModel):
     #: What the suite is for, in one line. Printed as the suite's progress line.
     description: str | None = None
     #: The claims, graded in the order they are written. A suite that asserts
-    #: nothing is refused (``NG-K002``): it would report a green run having
+    #: nothing is refused (``NV-K002``): it would report a green run having
     #: checked nothing, which is worse than no suite at all.
     assertions: list[Assertion] = Field(min_length=1, max_length=MAX_ASSERTIONS)
 

@@ -56,9 +56,9 @@ __all__ = [
     "WirelessConfig",
 ]
 
-#: Interface types that can terminate a cable (``NG-C009``).
+#: Interface types that can terminate a cable (``NV-C009``).
 CABLEABLE_TYPES: Final[frozenset[str]] = frozenset({"ethernet", "wifi", "lag"})
-#: Minimum MTU for an interface that carries IPv6 addresses (``NG-I011``).
+#: Minimum MTU for an interface that carries IPv6 addresses (``NV-I011``).
 IPV6_MIN_MTU: Final = 1280
 
 
@@ -98,19 +98,19 @@ _IANA_IF_TYPE: Final[dict[InterfaceType, str]] = {
 }
 
 #: Types whose ``parent`` names the interface they are stacked on. A ``vlan``
-#: sub-interface must name one (``NG-I002``); a ``tunnel`` interface may name
+#: sub-interface must name one (``NV-I002``); a ``tunnel`` interface may name
 #: the underlay port its outer packets leave by, which is optional because the
 #: local end of a tunnel is often chosen by the routing table (§14.4).
 _PARENT_TYPES: Final[frozenset[InterfaceType]] = frozenset(
     {InterfaceType.VLAN, InterfaceType.TUNNEL}
 )
 
-#: Types that require ``members`` (§6.2, ``NG-I003``).
+#: Types that require ``members`` (§6.2, ``NV-I003``).
 AGGREGATE_TYPES: Final[frozenset[InterfaceType]] = frozenset(
     {InterfaceType.LAG, InterfaceType.BRIDGE}
 )
 
-#: Types that may carry a ``poe`` block (§17.3, ``NG-E006``). Power over
+#: Types that may carry a ``poe`` block (§17.3, ``NV-E006``). Power over
 #: Ethernet travels over the twisted pairs of the run, so the port has to be one
 #: a run lands on; ``lag`` is here because an aggregate of two PoE ports is how a
 #: multi-gigabit access point is fed, and ``wifi`` is not because a radio is
@@ -246,7 +246,7 @@ class IPv4Address(NetvizModel):
 
     The ``netmask`` form of the RFC 8344 ``subnet`` choice is accepted on input
     and normalised to ``prefix_length``; a non-contiguous mask is rejected
-    (``NG-A003``).
+    (``NV-A003``).
     """
 
     ip: ipaddress.IPv4Address
@@ -324,7 +324,7 @@ class IPv6Address(NetvizModel):
     """One entry of ``interfaces[].ipv6.addresses``.
 
     RFC 8344 has no ``netmask`` case for IPv6, so ``prefix_length`` is
-    mandatory (``NG-A001``). The address is normalised to the RFC 5952
+    mandatory (``NV-A001``). The address is normalised to the RFC 5952
     lower-case compressed form.
     """
 
@@ -455,7 +455,7 @@ class IPv6Config(_AddressFamily):
 
 
 def _check_unique_addresses(addresses: list[Any]) -> None:
-    """``NG-A002``: ``ip`` is the RFC 8344 list key, so it must be unique.
+    """``NV-A002``: ``ip`` is the RFC 8344 list key, so it must be unique.
 
     Compared as :mod:`ipaddress` objects rather than as strings: within one
     family that is the same equivalence — both are normalised by then — and it
@@ -495,13 +495,13 @@ class VlanConfig(NetvizModel):
             if self.trunk_vlans is not None:
                 raise field_error(
                     "'trunk_vlans' is not allowed in access mode",
-                    rule="NG-V002",
+                    rule="NV-V002",
                     path=("trunk_vlans",),
                 )
             if self.native_vlan is not None:
                 raise field_error(
                     "'native_vlan' is only allowed in trunk mode",
-                    rule="NG-V003",
+                    rule="NV-V003",
                     path=("native_vlan",),
                 )
             if self.access_vlan is None:
@@ -510,13 +510,13 @@ class VlanConfig(NetvizModel):
             if self.access_vlan is not None:
                 raise field_error(
                     "'access_vlan' is not allowed in trunk mode",
-                    rule="NG-V002",
+                    rule="NV-V002",
                     path=("access_vlan",),
                 )
             if self.trunk_vlans is None:
                 raise field_error(
                     "'trunk_vlans' is required in trunk mode",
-                    rule="NG-V002",
+                    rule="NV-V002",
                     path=("trunk_vlans",),
                 )
 
@@ -582,7 +582,7 @@ class Band(str, Enum):
 
     The band is not derivable from the channel number: channels 1 to 13 exist in
     both the 2.4 GHz and the 6 GHz plan and mean different frequencies, so a
-    document that states a channel has to state the band with it (``NG-W003``).
+    document that states a channel has to state the band with it (``NV-W003``).
     """
 
     B2_4 = "2.4GHz"
@@ -591,12 +591,12 @@ class Band(str, Enum):
 
     @property
     def channels(self) -> frozenset[int]:
-        """Every channel number this band numbers (``NG-W003``)."""
+        """Every channel number this band numbers (``NV-W003``)."""
         return _BAND_CHANNELS[self]
 
     @property
     def widths(self) -> frozenset[int]:
-        """The channel widths this band supports (``NG-W004``)."""
+        """The channel widths this band supports (``NV-W004``)."""
         return _BAND_WIDTHS[self]
 
     def centre_mhz(self, channel: int) -> int:
@@ -675,7 +675,7 @@ class Bss(NetvizModel):
 
     On an ``ap`` radio each entry is an SSID the radio beacons, with the VLAN
     its traffic is bridged into. On a ``station`` or ``mesh`` radio the single
-    entry names the BSS the radio is associated to, which is what ``NG-W010``
+    entry names the BSS the radio is associated to, which is what ``NV-W010``
     checks against the AP at the other end of the link.
     """
 
@@ -686,7 +686,7 @@ class Bss(NetvizModel):
     bssid: MacAddress | None = None
     #: The VLAN this SSID's traffic is bridged into; ``None`` means the radio's
     #: untagged domain. Checked against the device's VLAN database (``W113``)
-    #: and against what the AP actually carries (``NG-W009``).
+    #: and against what the AP actually carries (``NV-W009``).
     vlan: VlanId | None = None
     security: Security | None = None
     #: A hidden SSID is absent from the beacon, not absent from the air.
@@ -696,7 +696,7 @@ class Bss(NetvizModel):
 class WirelessConfig(NetvizModel):
     """``interfaces[].wireless`` — the radio configuration of a ``wifi`` port.
 
-    Only a ``wifi`` interface may carry it (``NG-W002``): the block is what
+    Only a ``wifi`` interface may carry it (``NV-W002``): the block is what
     turns an otherwise shapeless ``medium: wireless`` link into an association
     with a direction, a frequency and a name.
     """
@@ -704,24 +704,24 @@ class WirelessConfig(NetvizModel):
     role: RadioRole
     band: Band | None = None
     #: The primary 20 MHz channel. Requires ``band``, and must be one the band
-    #: numbers (``NG-W003``).
+    #: numbers (``NV-W003``).
     channel: WirelessChannel | None = None
     #: Total channel width in MHz — 20, 40, 80, 160 or 320. Requires ``band``,
-    #: which bounds it (``NG-W004``).
+    #: which bounds it (``NV-W004``).
     width_mhz: Literal[20, 40, 80, 160, 320] | None = None
     tx_power_dbm: TxPowerDbm | None = None
     bss: list[Bss] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_channel_plan(self) -> WirelessConfig:
-        """``NG-W003``/``NG-W004``: the frequency settings agree with the band."""
+        """``NV-W003``/``NV-W004``: the frequency settings agree with the band."""
         if self.band is None:
             for name in ("channel", "width_mhz"):
                 if getattr(self, name) is not None:
                     raise field_error(
                         f"'{name}' requires 'band'; channel numbers and widths mean "
                         "different frequencies in different bands",
-                        rule="NG-W003",
+                        rule="NV-W003",
                         path=(name,),
                     )
             return self
@@ -730,7 +730,7 @@ class WirelessConfig(NetvizModel):
             raise field_error(
                 f"channel {self.channel} is not a channel of the {self.band.value} band; "
                 f"{self.band.value} numbers {_channel_summary(self.band)}",
-                rule="NG-W003",
+                rule="NV-W003",
                 path=("channel",),
             )
         if self.width_mhz is not None and self.width_mhz not in self.band.widths:
@@ -738,19 +738,19 @@ class WirelessConfig(NetvizModel):
             raise field_error(
                 f"width_mhz {self.width_mhz} is not available in the {self.band.value} band; "
                 f"it supports {allowed} MHz",
-                rule="NG-W004",
+                rule="NV-W004",
                 path=("width_mhz",),
             )
         return self
 
     @model_validator(mode="after")
     def _check_bss(self) -> WirelessConfig:
-        """``NG-W005``/``NG-W006``: the BSS list fits the role it is written on."""
+        """``NV-W005``/``NV-W006``: the BSS list fits the role it is written on."""
         if self.role.is_client and len(self.bss) > 1:
             raise field_error(
                 f"a {self.role.value!r} radio associates to one BSS at a time, "
                 f"but {len(self.bss)} are listed",
-                rule="NG-W006",
+                rule="NV-W006",
                 path=("bss",),
             )
 
@@ -760,7 +760,7 @@ class WirelessConfig(NetvizModel):
             if entry.ssid in ssids:
                 raise field_error(
                     f"SSID {entry.ssid!r} is declared twice on this radio",
-                    rule="NG-W005",
+                    rule="NV-W005",
                     path=("bss", index, "ssid"),
                 )
             ssids.add(entry.ssid)
@@ -768,7 +768,7 @@ class WirelessConfig(NetvizModel):
                 if entry.bssid in bssids:
                     raise field_error(
                         f"BSSID {entry.bssid} is declared twice on this radio",
-                        rule="NG-W005",
+                        rule="NV-W005",
                         path=("bss", index, "bssid"),
                     )
                 bssids.add(entry.bssid)
@@ -831,32 +831,32 @@ class Interface(NetvizModel):
     ipv6: IPv6Config | None = None
     vlan: VlanConfig | None = None
     #: The routing instance this interface belongs to (§16.1). Names an entry of
-    #: the device's ``spec.vrfs`` (``NG-F002``); unset means the global instance,
+    #: the device's ``spec.vrfs`` (``NV-F002``); unset means the global instance,
     #: and *that* is what partitions the address namespace: an address is only
     #: in conflict with another address in the same VRF.
     vrf: ElementName | None = None
     #: Radio configuration; ``wifi`` interfaces only (§6.2.6).
     wireless: WirelessConfig | None = None
     #: Power sourcing equipment configuration; a port that hands power down the
-    #: cable (§17.3). Only on a type that terminates one (``NG-E006``).
+    #: cable (§17.3). Only on a type that terminates one (``NV-E006``).
     poe: PoeConfig | None = None
     #: ``if:lower-layer-if`` of a ``vlan`` sub-interface.
     parent: IfName | None = None
     #: ``if:lower-layer-if`` of a ``lag`` or ``bridge`` interface.
     members: list[IfName] | None = None
     #: The network namespace this interface lives in (§23). Names an entry of
-    #: the device's ``spec.netns`` (``NG-N022``); unset means the device's
+    #: the device's ``spec.netns`` (``NV-N022``); unset means the device's
     #: initial namespace. This is the *whole* stack the interface is in, not
     #: just its routing table — see :attr:`vrf`, which partitions the second.
     netns: ElementName | None = None
     #: The other end of the veth pair this interface is one end of (§23.2).
     #: Names another ``type: ethernet`` interface of the same element, which
-    #: must name this one back (``NG-N023``). Unset means an ordinary port.
+    #: must name this one back (``NV-N023``). Unset means an ordinary port.
     peer: IfName | None = None
 
     @model_validator(mode="after")
     def _check_veth(self) -> Interface:
-        """``NG-N023``: only an ethernet interface is one end of a veth pair.
+        """``NV-N023``: only an ethernet interface is one end of a veth pair.
 
         A veth end is ``ianaift:ethernetCsmacd`` and nothing else — that is the
         point of §23.2 — so ``peer`` on a ``loopback``, a ``bridge``, a ``vlan``
@@ -875,13 +875,13 @@ class Interface(NetvizModel):
             raise field_error(
                 f"'peer' makes this interface one end of a veth pair, which is a pair of "
                 f"'ethernet' interfaces (schema §23.2), not {self.type.value!r}",
-                rule="NG-N023",
+                rule="NV-N023",
                 path=("peer",),
             )
         if self.peer == self.name:
             raise field_error(
                 "'peer' must not be the interface itself: a veth pair has two ends",
-                rule="NG-N023",
+                rule="NV-N023",
                 path=("peer",),
             )
         return self
@@ -891,12 +891,12 @@ class Interface(NetvizModel):
         if self.type is InterfaceType.VLAN:
             if self.parent is None:
                 raise field_error(
-                    "'parent' is required for type 'vlan'", rule="NG-I002", path=("parent",)
+                    "'parent' is required for type 'vlan'", rule="NV-I002", path=("parent",)
                 )
             if self.parent == self.name:
                 raise field_error(
                     "'parent' must not be the interface itself",
-                    rule="NG-I002",
+                    rule="NV-I002",
                     path=("parent",),
                 )
             if self.vlan is None or self.vlan.mode is not VlanMode.ACCESS:
@@ -910,13 +910,13 @@ class Interface(NetvizModel):
                 raise field_error(
                     f"'parent' is only allowed for types 'vlan' and 'tunnel', "
                     f"not {self.type.value!r}",
-                    rule="NG-I002",
+                    rule="NV-I002",
                     path=("parent",),
                 )
             if self.parent == self.name:
                 raise field_error(
                     "'parent' must not be the interface itself",
-                    rule="NG-I002",
+                    rule="NV-I002",
                     path=("parent",),
                 )
 
@@ -924,28 +924,28 @@ class Interface(NetvizModel):
             if self.members is None:
                 raise field_error(
                     f"'members' is required for type {self.type.value!r}",
-                    rule="NG-I003",
+                    rule="NV-I003",
                     path=("members",),
                 )
             if not self.members:
-                raise field_error("'members' is empty", rule="NG-I003", path=("members",))
+                raise field_error("'members' is empty", rule="NV-I003", path=("members",))
             duplicates = _duplicates(self.members)
             if duplicates:
                 raise field_error(
                     f"duplicate members: {', '.join(duplicates)}",
-                    rule="NG-I003",
+                    rule="NV-I003",
                     path=("members",),
                 )
             if self.name in self.members:
                 raise field_error(
                     f"{self.name!r} lists itself as a member",
-                    rule="NG-I003",
+                    rule="NV-I003",
                     path=("members",),
                 )
         elif self.members is not None:
             raise field_error(
                 f"'members' is only allowed for types 'lag' and 'bridge', not {self.type.value!r}",
-                rule="NG-I003",
+                rule="NV-I003",
                 path=("members",),
             )
 
@@ -953,18 +953,18 @@ class Interface(NetvizModel):
 
     @model_validator(mode="after")
     def _check_wireless(self) -> Interface:
-        """``NG-W002``: only a radio has a radio configuration."""
+        """``NV-W002``: only a radio has a radio configuration."""
         if self.wireless is not None and self.type is not InterfaceType.WIFI:
             raise field_error(
                 f"'wireless' is only allowed for type 'wifi', not {self.type.value!r}",
-                rule="NG-W002",
+                rule="NV-W002",
                 path=("wireless",),
             )
         return self
 
     @model_validator(mode="after")
     def _check_poe(self) -> Interface:
-        """``NG-E006``: only a port a cable lands on can hand power down it.
+        """``NV-E006``: only a port a cable lands on can hand power down it.
 
         PoE travels over the twisted pairs of an ethernet run, so a ``loopback``,
         a ``vlan`` sub-interface, a ``bridge`` or a ``tunnel`` cannot source it —
@@ -976,19 +976,19 @@ class Interface(NetvizModel):
             raise field_error(
                 f"'poe' is only allowed on a port a cable terminates on ({permitted}), "
                 f"not on type {self.type.value!r}",
-                rule="NG-E006",
+                rule="NV-E006",
                 path=("poe",),
             )
         return self
 
     @model_validator(mode="after")
     def _check_mtu(self) -> Interface:
-        """``NG-I011``: an interface with IPv6 addresses needs at least 1280 bytes."""
+        """``NV-I011``: an interface with IPv6 addresses needs at least 1280 bytes."""
         if self.mtu is not None and self.mtu < IPV6_MIN_MTU and self.has_ipv6_addresses:
             raise field_error(
                 f"mtu {self.mtu} is below the IPv6 minimum of {IPV6_MIN_MTU} but the "
                 "interface carries IPv6 addresses",
-                rule="NG-I011",
+                rule="NV-I011",
                 path=("mtu",),
             )
         return self
@@ -1003,7 +1003,7 @@ class Interface(NetvizModel):
 
     @property
     def is_cableable(self) -> bool:
-        """``NG-C009``: only physical and aggregate interfaces can be cabled."""
+        """``NV-C009``: only physical and aggregate interfaces can be cabled."""
         return self.type.is_cableable
 
     @property
@@ -1012,7 +1012,7 @@ class Interface(NetvizModel):
 
         Asked wherever a rule is about a *socket* rather than about a port: a
         veth end is cableable by type and uncabled by nature, so ``I002`` and
-        ``NG-N024`` both have to be able to tell the two apart.
+        ``NV-N024`` both have to be able to tell the two apart.
         """
         return self.peer is not None
 

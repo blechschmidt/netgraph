@@ -1,4 +1,4 @@
-# E021 (NG-P001) - a cable terminates on a position the panel does not have.
+# E021 (NV-P001) - a cable terminates on a position the panel does not have.
 #
 # 'pp-a' is a four-position panel, so 'front/9' is a hole that was never
 # punched. The switch port looks patched and reaches nothing.

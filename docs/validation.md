@@ -79,7 +79,7 @@ collision in pass 1:
 ```console
 $ netviz -i tests/fixtures/invalid validate
 ...
-  e002-double-termination.yaml#0:4                NG-N002  metadata.name: duplicate element name 'pc-a' (first declared at e001-unknown-endpoint.yaml#0:7); this document is ignored
+  e002-double-termination.yaml#0:4                NV-N002  metadata.name: duplicate element name 'pc-a' (first declared at e001-unknown-endpoint.yaml#0:7); this document is ignored
 ...
   e005-vlan-mismatch.yaml#1:18                   I002  interface 'sw-b:GigabitEthernet0/1' is enabled but terminates no cable; mark it 'enabled: false' if the port is spare
 ...
@@ -131,9 +131,9 @@ rule, so `E004 = "warning"` is a perfectly ordinary line to write. Ids are
 permanent: once assigned, an id is never reused for a different rule, so a
 suppression written today keeps meaning what it meant.
 
-**The `NG-*` alias.** Every rule also answers to the identifier
+**The `NV-*` alias.** Every rule also answers to the identifier
 [§10 of the specification](schema.md#10-validation-rules) gives it — `E001` is
-`NG-C002` and `NG-C003`. Both spellings work in every suppression mechanism. The
+`NV-C002` and `NV-C003`. Both spellings work in every suppression mechanism. The
 aliases exist so the published specification and the implementation cannot drift
 apart, and the structured formats report both.
 
@@ -261,8 +261,8 @@ to nothing, and the message lists what you could have meant:
 
 <!-- run: rc=2 -->
 ```console
-$ netviz -i examples/quickstart validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
+$ netviz -i examples/quickstart validate --disable NV-D005
+error: --disable: 'NV-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NV-* alias from docs/schema.md §10, or '*'
 ```
 
 An unknown id in an *annotation* is ignored rather than fatal — inventory data
@@ -339,115 +339,115 @@ says why the rule exists, what it deliberately exempts, and how to suppress it.
 <!-- generated: rule-index -->
 | Id | Schema id | Severity | Rule |
 |---|---|---|---|
-| [`E001`](validation-rules.md#e001--unknown-cable-endpoint) | `NG-C002`, `NG-C003` | error | unknown cable endpoint |
-| [`E002`](validation-rules.md#e002--interface-terminated-by-more-than-one-cable) | `NG-C005` | error | interface terminated by more than one cable |
-| [`E003`](validation-rules.md#e003--duplicate-mac-address) | `NG-I008` | error | duplicate MAC address |
-| [`E004`](validation-rules.md#e004--duplicate-ip-address) | `NG-A004` | error | duplicate IP address |
-| [`E005`](validation-rules.md#e005--vlan-mismatch-across-a-link) | `NG-C011` | error | VLAN mismatch across a link |
-| [`E006`](validation-rules.md#e006--adapter-over-capacity) | `NG-X008` | error | adapter over capacity |
-| [`E007`](validation-rules.md#e007--cyclic-interface-stacking) | `NG-I004` | error | cyclic interface stacking |
-| [`E008`](validation-rules.md#e008--a-member-is-not-free-to-be-aggregated) | `NG-I005` | error | a member is not free to be aggregated |
-| [`E009`](validation-rules.md#e009--sub-interface-vlan-not-carried-by-its-parent) | `NG-V005` | error | sub-interface VLAN not carried by its parent |
-| [`E010`](validation-rules.md#e010--multicast-mac-address) | `NG-I009` | error | multicast MAC address |
-| [`E011`](validation-rules.md#e011--medium-disagrees-with-the-endpoint-type) | `NG-C006` | error | medium disagrees with the endpoint type |
-| [`E012`](validation-rules.md#e012--cable-terminates-on-an-interface-with-no-socket) | `NG-C009` | error | cable terminates on an interface with no socket |
-| [`E013`](validation-rules.md#e013--host-attachment-declared-twice) | `NG-X005` | error | host attachment declared twice |
-| [`E014`](validation-rules.md#e014--cyclic-adapter-attachment) | `NG-X006` | error | cyclic adapter attachment |
-| [`E015`](validation-rules.md#e015--attached_to-names-nothing-that-could-host-the-adapter) | `NG-X001` | error | attached_to names nothing that could host the adapter |
-| [`E016`](validation-rules.md#e016--unknown-tunnel-endpoint) | `NG-T002` | error | unknown tunnel endpoint |
-| [`E017`](validation-rules.md#e017--tunnel-endpoint-is-not-a-tunnel-interface) | `NG-T003` | error | tunnel endpoint is not a tunnel interface |
-| [`E018`](validation-rules.md#e018--over-names-no-tunnel) | `NG-T004` | error | over names no tunnel |
-| [`E019`](validation-rules.md#e019--cyclic-tunnel-encapsulation) | `NG-T005` | error | cyclic tunnel encapsulation |
-| [`E020`](validation-rules.md#e020--first-hop-is-not-on-link) | `NG-A013` | error | first hop is not on-link |
-| [`E021`](validation-rules.md#e021--cable-on-a-position-the-patch-panel-does-not-have) | `NG-P001` | error | cable on a position the patch panel does not have |
-| [`E022`](validation-rules.md#e022--patch-panel-position-terminated-twice) | `NG-P003` | error | patch-panel position terminated twice |
-| [`E023`](validation-rules.md#e023--patch-panel-where-an-active-element-is-required) | `NG-P004` | error | patch panel where an active element is required |
-| [`E024`](validation-rules.md#e024--patch-run-loops-back-into-its-own-panel) | `NG-P005` | error | patch run loops back into its own panel |
-| [`E025`](validation-rules.md#e025--two-elements-occupy-the-same-rack-unit) | `NG-U001` | error | two elements occupy the same rack unit |
-| [`E026`](validation-rules.md#e026--element-mounted-above-the-top-of-its-rack) | `NG-U002` | error | element mounted above the top of its rack |
-| [`E027`](validation-rules.md#e027--rack-declared-with-two-heights) | `NG-U003` | error | rack declared with two heights |
-| [`E028`](validation-rules.md#e028--wireless-link-is-not-an-association) | `NG-W007` | error | wireless link is not an association |
-| [`E029`](validation-rules.md#e029--duplicate-bssid) | `NG-W008` | error | duplicate BSSID |
-| [`E030`](validation-rules.md#e030--ssid-vlan-is-carried-nowhere-on-the-access-point) | `NG-W009` | error | SSID VLAN is carried nowhere on the access point |
-| [`E031`](validation-rules.md#e031--associated-to-an-ssid-the-access-point-does-not-advertise) | `NG-W010` | error | associated to an SSID the access point does not advertise |
-| [`E032`](validation-rules.md#e032--next-hop-is-not-on-link) | `NG-F008` | error | next hop is not on-link |
-| [`E033`](validation-rules.md#e033--route-sends-out-of-an-unknown-interface) | `NG-F009` | error | route sends out of an unknown interface |
-| [`E034`](validation-rules.md#e034--ospf-runs-on-an-interface-the-device-does-not-have) | `NG-F010` | error | OSPF runs on an interface the device does not have |
-| [`E035`](validation-rules.md#e035--bgp-session-disagrees-about-an-as-number) | `NG-F011` | error | BGP session disagrees about an AS number |
-| [`E036`](validation-rules.md#e036--duplicate-router-id) | `NG-F012` | error | duplicate router id |
-| [`E037`](validation-rules.md#e037--pdu-outlet-claimed-twice) | `NG-E010` | error | PDU outlet claimed twice |
-| [`E038`](validation-rules.md#e038--power-input-names-no-outlet-that-exists) | `NG-E011` | error | power input names no outlet that exists |
-| [`E039`](validation-rules.md#e039--pdu-load-exceeds-its-capacity) | `NG-E012` | error | PDU load exceeds its capacity |
-| [`E040`](validation-rules.md#e040--poe-allocation-exceeds-the-budget) | `NG-E013` | error | PoE allocation exceeds the budget |
-| [`E041`](validation-rules.md#e041--poe-powered-device-has-no-poe-uplink) | `NG-E014` | error | PoE-powered device has no PoE uplink |
-| [`E042`](validation-rules.md#e042--redundant-power-that-is-not-redundant) | `NG-E015` | error | redundant power that is not redundant |
-| [`E043`](validation-rules.md#e043--group-member-does-not-exist) | `NG-S010` | error | group member does not exist |
-| [`E044`](validation-rules.md#e044--group-member-is-not-an-identity) | `NG-S011` | error | group member is not an identity |
-| [`E045`](validation-rules.md#e045--group-membership-cycle) | `NG-S012` | error | group membership cycle |
-| [`E046`](validation-rules.md#e046--duplicate-account-identifier) | `NG-S013` | error | duplicate account identifier |
+| [`E001`](validation-rules.md#e001--unknown-cable-endpoint) | `NV-C002`, `NV-C003` | error | unknown cable endpoint |
+| [`E002`](validation-rules.md#e002--interface-terminated-by-more-than-one-cable) | `NV-C005` | error | interface terminated by more than one cable |
+| [`E003`](validation-rules.md#e003--duplicate-mac-address) | `NV-I008` | error | duplicate MAC address |
+| [`E004`](validation-rules.md#e004--duplicate-ip-address) | `NV-A004` | error | duplicate IP address |
+| [`E005`](validation-rules.md#e005--vlan-mismatch-across-a-link) | `NV-C011` | error | VLAN mismatch across a link |
+| [`E006`](validation-rules.md#e006--adapter-over-capacity) | `NV-X008` | error | adapter over capacity |
+| [`E007`](validation-rules.md#e007--cyclic-interface-stacking) | `NV-I004` | error | cyclic interface stacking |
+| [`E008`](validation-rules.md#e008--a-member-is-not-free-to-be-aggregated) | `NV-I005` | error | a member is not free to be aggregated |
+| [`E009`](validation-rules.md#e009--sub-interface-vlan-not-carried-by-its-parent) | `NV-V005` | error | sub-interface VLAN not carried by its parent |
+| [`E010`](validation-rules.md#e010--multicast-mac-address) | `NV-I009` | error | multicast MAC address |
+| [`E011`](validation-rules.md#e011--medium-disagrees-with-the-endpoint-type) | `NV-C006` | error | medium disagrees with the endpoint type |
+| [`E012`](validation-rules.md#e012--cable-terminates-on-an-interface-with-no-socket) | `NV-C009` | error | cable terminates on an interface with no socket |
+| [`E013`](validation-rules.md#e013--host-attachment-declared-twice) | `NV-X005` | error | host attachment declared twice |
+| [`E014`](validation-rules.md#e014--cyclic-adapter-attachment) | `NV-X006` | error | cyclic adapter attachment |
+| [`E015`](validation-rules.md#e015--attached_to-names-nothing-that-could-host-the-adapter) | `NV-X001` | error | attached_to names nothing that could host the adapter |
+| [`E016`](validation-rules.md#e016--unknown-tunnel-endpoint) | `NV-T002` | error | unknown tunnel endpoint |
+| [`E017`](validation-rules.md#e017--tunnel-endpoint-is-not-a-tunnel-interface) | `NV-T003` | error | tunnel endpoint is not a tunnel interface |
+| [`E018`](validation-rules.md#e018--over-names-no-tunnel) | `NV-T004` | error | over names no tunnel |
+| [`E019`](validation-rules.md#e019--cyclic-tunnel-encapsulation) | `NV-T005` | error | cyclic tunnel encapsulation |
+| [`E020`](validation-rules.md#e020--first-hop-is-not-on-link) | `NV-A013` | error | first hop is not on-link |
+| [`E021`](validation-rules.md#e021--cable-on-a-position-the-patch-panel-does-not-have) | `NV-P001` | error | cable on a position the patch panel does not have |
+| [`E022`](validation-rules.md#e022--patch-panel-position-terminated-twice) | `NV-P003` | error | patch-panel position terminated twice |
+| [`E023`](validation-rules.md#e023--patch-panel-where-an-active-element-is-required) | `NV-P004` | error | patch panel where an active element is required |
+| [`E024`](validation-rules.md#e024--patch-run-loops-back-into-its-own-panel) | `NV-P005` | error | patch run loops back into its own panel |
+| [`E025`](validation-rules.md#e025--two-elements-occupy-the-same-rack-unit) | `NV-U001` | error | two elements occupy the same rack unit |
+| [`E026`](validation-rules.md#e026--element-mounted-above-the-top-of-its-rack) | `NV-U002` | error | element mounted above the top of its rack |
+| [`E027`](validation-rules.md#e027--rack-declared-with-two-heights) | `NV-U003` | error | rack declared with two heights |
+| [`E028`](validation-rules.md#e028--wireless-link-is-not-an-association) | `NV-W007` | error | wireless link is not an association |
+| [`E029`](validation-rules.md#e029--duplicate-bssid) | `NV-W008` | error | duplicate BSSID |
+| [`E030`](validation-rules.md#e030--ssid-vlan-is-carried-nowhere-on-the-access-point) | `NV-W009` | error | SSID VLAN is carried nowhere on the access point |
+| [`E031`](validation-rules.md#e031--associated-to-an-ssid-the-access-point-does-not-advertise) | `NV-W010` | error | associated to an SSID the access point does not advertise |
+| [`E032`](validation-rules.md#e032--next-hop-is-not-on-link) | `NV-F008` | error | next hop is not on-link |
+| [`E033`](validation-rules.md#e033--route-sends-out-of-an-unknown-interface) | `NV-F009` | error | route sends out of an unknown interface |
+| [`E034`](validation-rules.md#e034--ospf-runs-on-an-interface-the-device-does-not-have) | `NV-F010` | error | OSPF runs on an interface the device does not have |
+| [`E035`](validation-rules.md#e035--bgp-session-disagrees-about-an-as-number) | `NV-F011` | error | BGP session disagrees about an AS number |
+| [`E036`](validation-rules.md#e036--duplicate-router-id) | `NV-F012` | error | duplicate router id |
+| [`E037`](validation-rules.md#e037--pdu-outlet-claimed-twice) | `NV-E010` | error | PDU outlet claimed twice |
+| [`E038`](validation-rules.md#e038--power-input-names-no-outlet-that-exists) | `NV-E011` | error | power input names no outlet that exists |
+| [`E039`](validation-rules.md#e039--pdu-load-exceeds-its-capacity) | `NV-E012` | error | PDU load exceeds its capacity |
+| [`E040`](validation-rules.md#e040--poe-allocation-exceeds-the-budget) | `NV-E013` | error | PoE allocation exceeds the budget |
+| [`E041`](validation-rules.md#e041--poe-powered-device-has-no-poe-uplink) | `NV-E014` | error | PoE-powered device has no PoE uplink |
+| [`E042`](validation-rules.md#e042--redundant-power-that-is-not-redundant) | `NV-E015` | error | redundant power that is not redundant |
+| [`E043`](validation-rules.md#e043--group-member-does-not-exist) | `NV-S010` | error | group member does not exist |
+| [`E044`](validation-rules.md#e044--group-member-is-not-an-identity) | `NV-S011` | error | group member is not an identity |
+| [`E045`](validation-rules.md#e045--group-membership-cycle) | `NV-S012` | error | group membership cycle |
+| [`E046`](validation-rules.md#e046--duplicate-account-identifier) | `NV-S013` | error | duplicate account identifier |
 | [`E047`](validation-rules.md#e047--declared-gateway-redundancy-is-not-met) | — | error | declared gateway redundancy is not met |
 | [`E048`](validation-rules.md#e048--declared-power-redundancy-is-not-met) | — | error | declared power redundancy is not met |
-| [`E049`](validation-rules.md#e049--cable-on-a-virtual-interface) | `NG-N024` | error | cable on a virtual interface |
-| [`E050`](validation-rules.md#e050--aggregate-spans-network-namespaces) | `NG-N025` | error | aggregate spans network namespaces |
-| [`W101`](validation-rules.md#w101--interface-neither-routes-nor-switches) | `NG-I013` | warning | interface neither routes nor switches |
-| [`W102`](validation-rules.md#w102--mtu-mismatch-across-a-link) | `NG-C010` | warning | MTU mismatch across a link |
-| [`W103`](validation-rules.md#w103--orphan-device) | `NG-C016` | warning | orphan device |
-| [`W104`](validation-rules.md#w104--ip-address-on-an-access-port) | `NG-V009` | warning | IP address on an access port |
-| [`W105`](validation-rules.md#w105--subnet-with-a-single-member) | `NG-A008` | warning | subnet with a single member |
-| [`W106`](validation-rules.md#w106--one-address-claimed-twice-in-a-subnet) | `NG-A009` | warning | one address claimed twice in a subnet |
-| [`W107`](validation-rules.md#w107--addresses-on-an-aggregate-member) | `NG-I006` | warning | addresses on an aggregate member |
-| [`W108`](validation-rules.md#w108--mac-address-on-a-loopback) | `NG-I007` | warning | MAC address on a loopback |
-| [`W109`](validation-rules.md#w109--device-that-cannot-be-cabled) | `NG-I012` | warning | device that cannot be cabled |
-| [`W110`](validation-rules.md#w110--network-or-broadcast-address-assigned) | `NG-A005` | warning | network or broadcast address assigned |
-| [`W111`](validation-rules.md#w111--overlapping-prefixes-on-one-element) | `NG-A006` | warning | overlapping prefixes on one element |
-| [`W112`](validation-rules.md#w112--loopback-with-a-non-host-prefix) | `NG-A007` | warning | loopback with a non-host prefix |
-| [`W113`](validation-rules.md#w113--undeclared-vlan-referenced) | `NG-V004` | warning | undeclared VLAN referenced |
-| [`W114`](validation-rules.md#w114--native-vlan-missing-from-trunk_vlans) | `NG-V006` | warning | native VLAN missing from trunk_vlans |
-| [`W115`](validation-rules.md#w115--every-vlan-trunked-to-a-host) | `NG-V007` | warning | every VLAN trunked to a host |
-| [`W116`](validation-rules.md#w116--lag-member-contradicts-its-aggregate) | `NG-V008` | warning | LAG member contradicts its aggregate |
-| [`W117`](validation-rules.md#w117--both-ends-of-a-cable-on-one-element) | `NG-C004` | warning | both ends of a cable on one element |
-| [`W118`](validation-rules.md#w118--cable-and-endpoint-disagree-about-speed) | `NG-C008` | warning | cable and endpoint disagree about speed |
-| [`W119`](validation-rules.md#w119--cable-terminates-on-a-lag-aggregate) | `NG-C012` | warning | cable terminates on a LAG aggregate |
-| [`W120`](validation-rules.md#w120--half-duplex-without-a-hub) | `NG-C013` | warning | half duplex without a hub |
-| [`W121`](validation-rules.md#w121--disconnected-topology) | `NG-C014` | warning | disconnected topology |
-| [`W122`](validation-rules.md#w122--one-hub-two-subnets) | `NG-H005` | warning | one hub, two subnets |
-| [`W123`](validation-rules.md#w123--cabled-adapter-with-no-host) | `NG-X002` | warning | cabled adapter with no host |
-| [`W124`](validation-rules.md#w124--adapter-attached-to-a-hub-or-a-switch) | `NG-X007` | warning | adapter attached to a hub or a switch |
-| [`W125`](validation-rules.md#w125--overlay-reaches-past-its-underlay) | `NG-T006` | warning | overlay reaches past its underlay |
-| [`W126`](validation-rules.md#w126--tunnel-mtu-does-not-fit-its-underlay) | `NG-T011` | warning | tunnel MTU does not fit its underlay |
-| [`W127`](validation-rules.md#w127--tunnel-carries-traffic-in-the-clear) | `NG-T012` | warning | tunnel carries traffic in the clear |
-| [`W128`](validation-rules.md#w128--tunnel-interface-named-by-no-tunnel) | `NG-T013` | warning | tunnel interface named by no tunnel |
-| [`W129`](validation-rules.md#w129--two-tunnels-share-a-vni-on-one-element) | `NG-T014` | warning | two tunnels share a VNI on one element |
-| [`W130`](validation-rules.md#w130--prefix-claimed-by-two-broadcast-domains) | `NG-A010` | warning | prefix claimed by two broadcast domains |
-| [`W131`](validation-rules.md#w131--nested-prefix-in-a-different-broadcast-domain) | `NG-A011` | warning | nested prefix in a different broadcast domain |
-| [`W132`](validation-rules.md#w132--address-outside-every-prefix-on-its-link) | `NG-A012` | warning | address outside every prefix on its link |
-| [`W133`](validation-rules.md#w133--patch-run-stops-inside-the-panel) | `NG-P002` | warning | patch run stops inside the panel |
-| [`W134`](validation-rules.md#w134--access-points-on-overlapping-channels) | `NG-W011` | warning | access points on overlapping channels |
-| [`W135`](validation-rules.md#w135--bgp-neighbour-is-not-in-the-inventory) | `NG-F013` | warning | BGP neighbour is not in the inventory |
-| [`W136`](validation-rules.md#w136--vrf-with-no-interface-bound-to-it) | `NG-F014` | warning | VRF with no interface bound to it |
-| [`W137`](validation-rules.md#w137--declared-draw-with-no-power-path) | `NG-E016` | warning | declared draw with no power path |
-| [`W138`](validation-rules.md#w138--stale-diagram-geometry) | `NG-Y001` | warning | stale diagram geometry |
-| [`W139`](validation-rules.md#w139--group-with-no-members) | `NG-S014` | warning | group with no members |
-| [`W140`](validation-rules.md#w140--departed-user-still-in-a-group) | `NG-S015` | warning | departed user still in a group |
+| [`E049`](validation-rules.md#e049--cable-on-a-virtual-interface) | `NV-N024` | error | cable on a virtual interface |
+| [`E050`](validation-rules.md#e050--aggregate-spans-network-namespaces) | `NV-N025` | error | aggregate spans network namespaces |
+| [`W101`](validation-rules.md#w101--interface-neither-routes-nor-switches) | `NV-I013` | warning | interface neither routes nor switches |
+| [`W102`](validation-rules.md#w102--mtu-mismatch-across-a-link) | `NV-C010` | warning | MTU mismatch across a link |
+| [`W103`](validation-rules.md#w103--orphan-device) | `NV-C016` | warning | orphan device |
+| [`W104`](validation-rules.md#w104--ip-address-on-an-access-port) | `NV-V009` | warning | IP address on an access port |
+| [`W105`](validation-rules.md#w105--subnet-with-a-single-member) | `NV-A008` | warning | subnet with a single member |
+| [`W106`](validation-rules.md#w106--one-address-claimed-twice-in-a-subnet) | `NV-A009` | warning | one address claimed twice in a subnet |
+| [`W107`](validation-rules.md#w107--addresses-on-an-aggregate-member) | `NV-I006` | warning | addresses on an aggregate member |
+| [`W108`](validation-rules.md#w108--mac-address-on-a-loopback) | `NV-I007` | warning | MAC address on a loopback |
+| [`W109`](validation-rules.md#w109--device-that-cannot-be-cabled) | `NV-I012` | warning | device that cannot be cabled |
+| [`W110`](validation-rules.md#w110--network-or-broadcast-address-assigned) | `NV-A005` | warning | network or broadcast address assigned |
+| [`W111`](validation-rules.md#w111--overlapping-prefixes-on-one-element) | `NV-A006` | warning | overlapping prefixes on one element |
+| [`W112`](validation-rules.md#w112--loopback-with-a-non-host-prefix) | `NV-A007` | warning | loopback with a non-host prefix |
+| [`W113`](validation-rules.md#w113--undeclared-vlan-referenced) | `NV-V004` | warning | undeclared VLAN referenced |
+| [`W114`](validation-rules.md#w114--native-vlan-missing-from-trunk_vlans) | `NV-V006` | warning | native VLAN missing from trunk_vlans |
+| [`W115`](validation-rules.md#w115--every-vlan-trunked-to-a-host) | `NV-V007` | warning | every VLAN trunked to a host |
+| [`W116`](validation-rules.md#w116--lag-member-contradicts-its-aggregate) | `NV-V008` | warning | LAG member contradicts its aggregate |
+| [`W117`](validation-rules.md#w117--both-ends-of-a-cable-on-one-element) | `NV-C004` | warning | both ends of a cable on one element |
+| [`W118`](validation-rules.md#w118--cable-and-endpoint-disagree-about-speed) | `NV-C008` | warning | cable and endpoint disagree about speed |
+| [`W119`](validation-rules.md#w119--cable-terminates-on-a-lag-aggregate) | `NV-C012` | warning | cable terminates on a LAG aggregate |
+| [`W120`](validation-rules.md#w120--half-duplex-without-a-hub) | `NV-C013` | warning | half duplex without a hub |
+| [`W121`](validation-rules.md#w121--disconnected-topology) | `NV-C014` | warning | disconnected topology |
+| [`W122`](validation-rules.md#w122--one-hub-two-subnets) | `NV-H005` | warning | one hub, two subnets |
+| [`W123`](validation-rules.md#w123--cabled-adapter-with-no-host) | `NV-X002` | warning | cabled adapter with no host |
+| [`W124`](validation-rules.md#w124--adapter-attached-to-a-hub-or-a-switch) | `NV-X007` | warning | adapter attached to a hub or a switch |
+| [`W125`](validation-rules.md#w125--overlay-reaches-past-its-underlay) | `NV-T006` | warning | overlay reaches past its underlay |
+| [`W126`](validation-rules.md#w126--tunnel-mtu-does-not-fit-its-underlay) | `NV-T011` | warning | tunnel MTU does not fit its underlay |
+| [`W127`](validation-rules.md#w127--tunnel-carries-traffic-in-the-clear) | `NV-T012` | warning | tunnel carries traffic in the clear |
+| [`W128`](validation-rules.md#w128--tunnel-interface-named-by-no-tunnel) | `NV-T013` | warning | tunnel interface named by no tunnel |
+| [`W129`](validation-rules.md#w129--two-tunnels-share-a-vni-on-one-element) | `NV-T014` | warning | two tunnels share a VNI on one element |
+| [`W130`](validation-rules.md#w130--prefix-claimed-by-two-broadcast-domains) | `NV-A010` | warning | prefix claimed by two broadcast domains |
+| [`W131`](validation-rules.md#w131--nested-prefix-in-a-different-broadcast-domain) | `NV-A011` | warning | nested prefix in a different broadcast domain |
+| [`W132`](validation-rules.md#w132--address-outside-every-prefix-on-its-link) | `NV-A012` | warning | address outside every prefix on its link |
+| [`W133`](validation-rules.md#w133--patch-run-stops-inside-the-panel) | `NV-P002` | warning | patch run stops inside the panel |
+| [`W134`](validation-rules.md#w134--access-points-on-overlapping-channels) | `NV-W011` | warning | access points on overlapping channels |
+| [`W135`](validation-rules.md#w135--bgp-neighbour-is-not-in-the-inventory) | `NV-F013` | warning | BGP neighbour is not in the inventory |
+| [`W136`](validation-rules.md#w136--vrf-with-no-interface-bound-to-it) | `NV-F014` | warning | VRF with no interface bound to it |
+| [`W137`](validation-rules.md#w137--declared-draw-with-no-power-path) | `NV-E016` | warning | declared draw with no power path |
+| [`W138`](validation-rules.md#w138--stale-diagram-geometry) | `NV-Y001` | warning | stale diagram geometry |
+| [`W139`](validation-rules.md#w139--group-with-no-members) | `NV-S014` | warning | group with no members |
+| [`W140`](validation-rules.md#w140--departed-user-still-in-a-group) | `NV-S015` | warning | departed user still in a group |
 | [`W141`](validation-rules.md#w141--unknown-redundancy-expectation) | — | warning | unknown redundancy expectation |
-| [`W142`](validation-rules.md#w142--annotation-about-something-that-is-gone) | `NG-G001` | warning | annotation about something that is gone |
-| [`W143`](validation-rules.md#w143--area-that-encloses-nothing) | `NG-G004` | warning | area that encloses nothing |
-| [`W144`](validation-rules.md#w144--element-styled-invisible) | `NG-Z003` | warning | element styled invisible |
-| [`W145`](validation-rules.md#w145--unreadable-label-colour) | `NG-Z005` | warning | unreadable label colour |
-| [`W146`](validation-rules.md#w146--network-namespace-with-no-interface) | `NG-N026` | warning | network namespace with no interface |
-| [`W147`](validation-rules.md#w147--policy-rule-looks-up-an-empty-table) | `NG-F022` | warning | policy rule looks up an empty table |
-| [`W148`](validation-rules.md#w148--routing-table-nothing-selects) | `NG-F023` | warning | routing table nothing selects |
-| [`W149`](validation-rules.md#w149--unreachable-policy-rule) | `NG-F024` | warning | unreachable policy rule |
-| [`W150`](validation-rules.md#w150--security-zone-with-no-interface) | `NG-B010` | warning | security zone with no interface |
-| [`W151`](validation-rules.md#w151--interface-in-no-zone) | `NG-B011` | warning | interface in no zone |
-| [`W152`](validation-rules.md#w152--firewall-mark-nothing-reads) | `NG-B012` | warning | firewall mark nothing reads |
-| [`W153`](validation-rules.md#w153--firewall-mark-nothing-writes) | `NG-B013` | warning | firewall mark nothing writes |
-| [`W154`](validation-rules.md#w154--unreachable-firewall-rule) | `NG-B014` | warning | unreachable firewall rule |
-| [`I001`](validation-rules.md#i001--locally-administered-mac-address) | `NG-I010` | info | locally administered MAC address |
-| [`I002`](validation-rules.md#i002--enabled-interface-terminates-no-cable) | `NG-C015` | info | enabled interface terminates no cable |
-| [`I003`](validation-rules.md#i003--tunnel-on-a-non-standard-port) | `NG-T015` | info | tunnel on a non-standard port |
-| [`I004`](validation-rules.md#i004--person-in-no-group) | `NG-S016` | info | person in no group |
-| [`I005`](validation-rules.md#i005--veth-pair-crosses-no-boundary) | `NG-N027` | info | veth pair crosses no boundary |
+| [`W142`](validation-rules.md#w142--annotation-about-something-that-is-gone) | `NV-G001` | warning | annotation about something that is gone |
+| [`W143`](validation-rules.md#w143--area-that-encloses-nothing) | `NV-G004` | warning | area that encloses nothing |
+| [`W144`](validation-rules.md#w144--element-styled-invisible) | `NV-Z003` | warning | element styled invisible |
+| [`W145`](validation-rules.md#w145--unreadable-label-colour) | `NV-Z005` | warning | unreadable label colour |
+| [`W146`](validation-rules.md#w146--network-namespace-with-no-interface) | `NV-N026` | warning | network namespace with no interface |
+| [`W147`](validation-rules.md#w147--policy-rule-looks-up-an-empty-table) | `NV-F022` | warning | policy rule looks up an empty table |
+| [`W148`](validation-rules.md#w148--routing-table-nothing-selects) | `NV-F023` | warning | routing table nothing selects |
+| [`W149`](validation-rules.md#w149--unreachable-policy-rule) | `NV-F024` | warning | unreachable policy rule |
+| [`W150`](validation-rules.md#w150--security-zone-with-no-interface) | `NV-B010` | warning | security zone with no interface |
+| [`W151`](validation-rules.md#w151--interface-in-no-zone) | `NV-B011` | warning | interface in no zone |
+| [`W152`](validation-rules.md#w152--firewall-mark-nothing-reads) | `NV-B012` | warning | firewall mark nothing reads |
+| [`W153`](validation-rules.md#w153--firewall-mark-nothing-writes) | `NV-B013` | warning | firewall mark nothing writes |
+| [`W154`](validation-rules.md#w154--unreachable-firewall-rule) | `NV-B014` | warning | unreachable firewall rule |
+| [`I001`](validation-rules.md#i001--locally-administered-mac-address) | `NV-I010` | info | locally administered MAC address |
+| [`I002`](validation-rules.md#i002--enabled-interface-terminates-no-cable) | `NV-C015` | info | enabled interface terminates no cable |
+| [`I003`](validation-rules.md#i003--tunnel-on-a-non-standard-port) | `NV-T015` | info | tunnel on a non-standard port |
+| [`I004`](validation-rules.md#i004--person-in-no-group) | `NV-S016` | info | person in no group |
+| [`I005`](validation-rules.md#i005--veth-pair-crosses-no-boundary) | `NV-N027` | info | veth pair crosses no boundary |
 <!-- /generated -->
 
 ## See also

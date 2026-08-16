@@ -33,8 +33,8 @@ own namespace like every other reference in the schema. It may name a ``user``
 **or another ``group``**, which is what makes a hierarchy expressible:
 ``everyone`` contains ``engineering`` contains ``alice``. The model refuses a
 group that names itself; the validator, which can see the whole tree, refuses the
-longer cycles (``NG-S012``) and everything else a single document cannot know —
-a member that resolves to nothing (``NG-S010``), or to a switch (``NG-S011``).
+longer cycles (``NV-S012``) and everything else a single document cannot know —
+a member that resolves to nothing (``NV-S010``), or to a switch (``NV-S011``).
 
 Why a user owns no interfaces
 -----------------------------
@@ -93,25 +93,25 @@ GROUP_KIND: Final = "group"
 #: The two kinds that make up the identity graph, in the order §3 lists them.
 IDENTITY_KINDS: Final[tuple[str, ...]] = (USER_KIND, GROUP_KIND)
 
-#: ``NG-S001`` — ceiling on ``uid`` and ``gid``. POSIX ids are 32-bit and
+#: ``NV-S001`` — ceiling on ``uid`` and ``gid``. POSIX ids are 32-bit and
 #: ``4294967295`` is reserved as "no such id" (``(uid_t) -1``), so the largest
 #: assignable one is one below it.
 MAX_POSIX_ID: Final = 2**32 - 2
 
-#: ``NG-S001`` — ceiling on a login. 32 is what ``useradd`` enforces on Linux and
+#: ``NV-S001`` — ceiling on a login. 32 is what ``useradd`` enforces on Linux and
 #: 64 is what a directory tends to allow, so the larger one is used: netviz
 #: records the account, it does not create it.
 MAX_LOGIN_LENGTH: Final = 64
 
-#: ``NG-S001`` — ceiling on an address, from the SMTP path limit of RFC 5321 §4.5.3.1.
+#: ``NV-S001`` — ceiling on an address, from the SMTP path limit of RFC 5321 §4.5.3.1.
 MAX_EMAIL_LENGTH: Final = 254
 
-#: ``NG-S002`` — ceiling on the keys one identity may carry. Generous: a person
+#: ``NV-S002`` — ceiling on the keys one identity may carry. Generous: a person
 #: with a laptop, a desktop, a phone and two spares is normal, and a list longer
 #: than this is a paste accident rather than a key ring.
 MAX_SSH_KEYS: Final = 32
 
-#: ``NG-S003`` — ceiling on the members one group may name directly. A group
+#: ``NV-S003`` — ceiling on the members one group may name directly. A group
 #: larger than this is a nested hierarchy that has not been written as one.
 MAX_GROUP_MEMBERS: Final = 4096
 
@@ -130,7 +130,7 @@ _EMAIL_RE: Final = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 #: One OpenSSH public key: an algorithm, base64 key material, an optional
 #: comment. The private half has a header this refuses, which is the point —
-#: ``NG-S002`` is the rule that stops a private key being committed to an
+#: ``NV-S002`` is the rule that stops a private key being committed to an
 #: inventory by somebody who copied the wrong file.
 _SSH_KEY_RE: Final = re.compile(
     r"^(?P<algorithm>[A-Za-z0-9@._-]+)"
@@ -150,8 +150,8 @@ class UserType(str, Enum):
 
     The distinction is not cosmetic: three of the rules in the ``S`` group only
     make sense for one of these. A service account belongs to no group in a great
-    many estates and reporting that as an oversight (``NG-S016``) would be noise;
-    a shared account has no single person to depart, so ``NG-S015`` has nothing
+    many estates and reporting that as an oversight (``NV-S016``) would be noise;
+    a shared account has no single person to depart, so ``NV-S015`` has nothing
     to say about it.
     """
 
@@ -176,7 +176,7 @@ class UserStatus(str, Enum):
     SUSPENDED = "suspended"
     #: The person is gone. The document is kept so that the group memberships
     #: they still hold are *visible* rather than merely deleted, which is what
-    #: ``NG-S015`` reports.
+    #: ``NV-S015`` reports.
     DEPARTED = "departed"
 
     def __str__(self) -> str:
@@ -200,68 +200,68 @@ def _normalise_ssh_key(value: Any) -> Any:
         return value
     text = " ".join(value.split())
     if not text:
-        raise field_error("an ssh key is empty", rule="NG-S002")
+        raise field_error("an ssh key is empty", rule="NV-S002")
     if text.startswith("-----BEGIN"):
         raise field_error(
             "that is a private key, not a public one; an inventory records the public half "
             "(the contents of the '.pub' file) and nothing else",
-            rule="NG-S002",
+            rule="NV-S002",
         )
     match = _SSH_KEY_RE.match(text)
     if match is None:
         raise field_error(
             f"{echo_value(text)} is not an ssh public key; expected "
             f"'<algorithm> <base64 key> [comment]', e.g. 'ssh-ed25519 AAAAC3Nz... alice@laptop'",
-            rule="NG-S002",
+            rule="NV-S002",
         )
     return text
 
 
 def _check_login(value: Any) -> Any:
-    """``NG-S001`` — reject a login pydantic would only call a pattern mismatch."""
+    """``NV-S001`` — reject a login pydantic would only call a pattern mismatch."""
     if not isinstance(value, str):
         return value
     if len(value) > MAX_LOGIN_LENGTH:
         raise field_error(
             f"a login is at most {MAX_LOGIN_LENGTH} characters; this one is {len(value)}",
-            rule="NG-S001",
+            rule="NV-S001",
         )
     if _LOGIN_RE.match(value) is None:
         raise field_error(
             f"{echo_value(value)} is not a login; expected letters, digits and "
             f"'. _ - @', starting with a letter, a digit or '_'",
-            rule="NG-S001",
+            rule="NV-S001",
         )
     return value
 
 
 def _check_email(value: Any) -> Any:
-    """``NG-S001`` — the shape a reader means by "an address"; see :data:`_EMAIL_RE`."""
+    """``NV-S001`` — the shape a reader means by "an address"; see :data:`_EMAIL_RE`."""
     if not isinstance(value, str):
         return value
     if len(value) > MAX_EMAIL_LENGTH:
         raise field_error(
             f"an address is at most {MAX_EMAIL_LENGTH} characters (RFC 5321); this one "
             f"is {len(value)}",
-            rule="NG-S001",
+            rule="NV-S001",
         )
     if _EMAIL_RE.match(value) is None:
         raise field_error(
             f"{echo_value(value)} is not an address; expected 'local@domain.tld'",
-            rule="NG-S001",
+            rule="NV-S001",
         )
     return value
 
 
 def _check_posix_id(value: Any) -> Any:
-    """``NG-S001`` — a ``uid``/``gid`` inside the 32-bit assignable range."""
+    """``NV-S001`` — a ``uid``/``gid`` inside the 32-bit assignable range."""
     if isinstance(value, bool) or not isinstance(value, int):
         return value
     if not 0 <= value <= MAX_POSIX_ID:
         raise field_error(
             f"{value} is not an assignable POSIX id; expected 0 to {MAX_POSIX_ID} "
             f"({MAX_POSIX_ID + 1} is reserved as 'no such id')",
-            rule="NG-S001",
+            rule="NV-S001",
         )
     return value
 
@@ -303,7 +303,7 @@ class UserSpec(NetvizModel):
     #: without netviz having to model the directory.
     email: EmailAddress | None = None
     #: POSIX user id, when the estate assigns one. Two users claiming one id is
-    #: ``NG-S013``.
+    #: ``NV-S013``.
     uid: PosixId | None = None
     #: Person, service or shared account. See :class:`UserType`.
     type: UserType = UserType.PERSON
@@ -311,7 +311,7 @@ class UserSpec(NetvizModel):
     status: UserStatus = UserStatus.ACTIVE
     #: The public keys the account authenticates with, normalised to one space
     #: between the algorithm, the material and the comment. Public halves only
-    #: (``NG-S002``).
+    #: (``NV-S002``).
     ssh_keys: list[SshPublicKey] = Field(default_factory=list, max_length=MAX_SSH_KEYS)
     #: How this element is drawn (§22): a ``fill``, a ``stroke``, a ``shape``
     #: and six more, each optional and each inheriting from the theme, then the
@@ -329,7 +329,7 @@ class UserSpec(NetvizModel):
                 raise field_error(
                     f"key {index + 1} is the key already given as key {first + 1}; "
                     f"a comment is not what makes two keys different",
-                    rule="NG-S002",
+                    rule="NV-S002",
                     path=("ssh_keys", index),
                 )
         return self
@@ -350,7 +350,7 @@ class User(ElementBase):
         """The account name, defaulting to ``metadata.name``.
 
         Materialised rather than left absent because everything downstream —
-        ``NG-S013``, an export, a diagram label — wants "the account", and
+        ``NV-S013``, an export, a diagram label — wants "the account", and
         making each of them re-apply the default is how they come to disagree.
         """
         return self.spec.login or self.metadata.name
@@ -413,10 +413,10 @@ class GroupSpec(NetvizModel):
 
     #: The users and groups in this group, as element references resolved
     #: outwards from the group's own namespace (§4.1). A nested group brings
-    #: everything it holds; ``NG-S012`` refuses a cycle.
+    #: everything it holds; ``NV-S012`` refuses a cycle.
     members: list[ElementRef] = Field(default_factory=list, max_length=MAX_GROUP_MEMBERS)
     #: POSIX group id, when the estate assigns one. Two groups claiming one id
-    #: is ``NG-S013``.
+    #: is ``NV-S013``.
     gid: PosixId | None = None
     #: Where mail to the whole group goes, when the group is also a list.
     email: EmailAddress | None = None
@@ -435,7 +435,7 @@ class GroupSpec(NetvizModel):
                 raise field_error(
                     f"member {index + 1} names {echo_value(member)}, which member "
                     f"{first + 1} already names",
-                    rule="NG-S003",
+                    rule="NV-S003",
                     path=("members", index),
                 )
         return self
@@ -453,19 +453,19 @@ class Group(ElementBase):
 
     @model_validator(mode="after")
     def _check_not_self(self) -> Group:
-        """``NG-S003`` — the one cycle a single document can see.
+        """``NV-S003`` — the one cycle a single document can see.
 
         A group naming its own ``metadata.name`` is refused here rather than by
         the validator, because it needs no inventory to know it is wrong and
         because the error then names the line it is on. Every longer loop needs
-        the tree and is ``NG-S012``.
+        the tree and is ``NV-S012``.
         """
         for index, member in enumerate(self.spec.members):
             if member == self.metadata.name:
                 raise field_error(
                     f"group {echo_value(self.metadata.name)} names itself as a member; "
                     f"a group cannot contain itself",
-                    rule="NG-S003",
+                    rule="NV-S003",
                     path=("spec", "members", index),
                 )
         return self
@@ -481,7 +481,7 @@ class Group(ElementBase):
 
     @property
     def is_empty(self) -> bool:
-        """Does the group hold nothing at all (``NG-S014``)?"""
+        """Does the group hold nothing at all (``NV-S014``)?"""
         return not self.spec.members
 
     def details(self) -> tuple[str, ...]:

@@ -103,7 +103,7 @@ TOOL_URL: Final = "https://github.com/blechschmidt/netviz"
 #: from the graph, and no severity setting can make that benign — so they are
 #: not in :data:`~netviz.rules.RULES`. They still need an id, because a SARIF
 #: result whose ``ruleId`` resolves to nothing in the driver loses its severity
-#: and its help link in code scanning. The ``NG-*`` id the model supplied, when
+#: and its help link in code scanning. The ``NV-*`` id the model supplied, when
 #: there is one, travels in :attr:`Diagnostic.alias`.
 LOAD_RULE: Final = Rule(
     "load",
@@ -146,7 +146,7 @@ class Diagnostic:
     severity: Severity
     #: One line, naming every element involved.
     message: str
-    #: Primary ``NG-*`` identifier from ``docs/schema.md`` §10, when there is one.
+    #: Primary ``NV-*`` identifier from ``docs/schema.md`` §10, when there is one.
     alias: str | None = None
     #: Fully-qualified name of the element the problem is anchored to.
     element: str | None = None
@@ -187,8 +187,8 @@ class Diagnostic:
     def title(self) -> str:
         """``E002 interface terminated by more than one cable``, for a heading.
 
-        A loader problem's own id is only ever ``load``, so the ``NG-*`` alias
-        leads when the model supplied one — ``NG-D005 document rejected by the
+        A loader problem's own id is only ever ``load``, so the ``NV-*`` alias
+        leads when the model supplied one — ``NV-D005 document rejected by the
         schema`` says something; ``load document rejected by the schema`` does
         not.
         """
@@ -513,7 +513,7 @@ def _sarif_rule(rule: Rule) -> dict[str, Any]:
         "tags": ["netviz", str(rule.severity)],
     }
     if rule.aliases:
-        # Not ``deprecatedIds``: the ``NG-*`` ids are the *specification's*
+        # Not ``deprecatedIds``: the ``NV-*`` ids are the *specification's*
         # names for the same rule and are still accepted everywhere, so calling
         # them deprecated would be a lie a reader could act on.
         properties["aliases"] = list(rule.aliases)

@@ -41,7 +41,7 @@ The standards are unusually concrete here, so nothing below is invented:
   computed from the first and a device's draw from the second.
 * **The standards** name which classes exist: ``802.3af`` stops at class 3,
   ``802.3at`` adds class 4, ``802.3bt`` adds 5 to 8. A class outside its
-  standard is ``NG-E004`` — a real configuration error, not a rounding one.
+  standard is ``NV-E004`` — a real configuration error, not a rounding one.
 * **RFC 3621** (Power Ethernet MIB) is where the per-port and per-switch nodes
   come from: ``pethPsePortPowerClassifications`` is the class, ``pethMainPsePower``
   is the shared budget, ``pethPsePortAdminEnable`` is ``enabled``.
@@ -114,7 +114,7 @@ POE_PD_WATTS: Final[Mapping[int, float]] = {
     8: 71.3,
 }
 
-#: Highest class each amendment defines. ``NG-E004`` refuses anything above it:
+#: Highest class each amendment defines. ``NV-E004`` refuses anything above it:
 #: an ``802.3af`` port cannot deliver class 4, so declaring one is a mistake
 #: about the hardware rather than a preference.
 POE_CLASS_MAX: Final[Mapping[str, int]] = {"802.3af": 3, "802.3at": 4, "802.3bt": 8}
@@ -156,7 +156,7 @@ class PowerSource(str, Enum):
     OUTLET = "outlet"
     #: The uplink. A ceiling access point or a camera has no power cord, and its
     #: power path is the cable that carries its traffic — which is why
-    #: ``NG-E014`` checks the far end of that cable offers PoE at all.
+    #: ``NV-E014`` checks the far end of that cable offers PoE at all.
     POE = "poe"
 
     def __str__(self) -> str:
@@ -168,7 +168,7 @@ PoeClass = Annotated[int, Field(strict=True, ge=0, le=8)]
 
 #: ``power.inputs[].outlet`` — an outlet as the PDU numbers it. Alphanumeric
 #: rather than digits alone so a two-bank PDU labelled ``A1``…``B12`` can be
-#: transcribed as it is printed; the outlet still has to exist (``NG-E011``).
+#: transcribed as it is printed; the outlet still has to exist (``NV-E011``).
 OutletId = Annotated[str, Field(min_length=1, max_length=16, pattern=r"^[A-Za-z0-9]+$")]
 
 
@@ -180,7 +180,7 @@ def _normalise_draw(value: Any) -> Any:
     ceremony. A number becomes the typical draw; a mapping is taken as written.
     """
     if isinstance(value, bool):
-        raise field_error("'draw_watts' is a number of watts, not a boolean", rule="NG-E003")
+        raise field_error("'draw_watts' is a number of watts, not a boolean", rule="NV-E003")
     if isinstance(value, (int, float)):
         return {"typical": value}
     return value
@@ -192,7 +192,7 @@ class PowerDraw(NetvizModel):
     ``typical`` is what a load schedule sums: the steady-state draw of the box as
     configured. ``maximum`` is the nameplate or PSU rating, which is what a
     breaker has to survive; it is optional because most equipment lists only one
-    figure, and it must not be below ``typical`` (``NG-E003``).
+    figure, and it must not be below ``typical`` (``NV-E003``).
 
     Both map to RFC 7460: ``eoPower`` for the load and ``eoPowerNameplate`` for
     the rating.
@@ -207,7 +207,7 @@ class PowerDraw(NetvizModel):
             raise field_error(
                 f"'maximum' is {self.maximum} W but 'typical' is {self.typical} W; the maximum "
                 f"draw cannot be below the typical one",
-                rule="NG-E003",
+                rule="NV-E003",
                 path=("maximum",),
             )
         return self
@@ -238,8 +238,8 @@ class PowerInput(NetvizModel):
     #: The PDU. An :data:`~netviz.models.scalars.ElementRef`, so it may be
     #: written fully qualified to pick one of several PDUs sharing a short name.
     pdu: ElementRef
-    #: The outlet on it, as the PDU numbers it. Must exist (``NG-E011``) and
-    #: must not already feed something else (``NG-E010``).
+    #: The outlet on it, as the PDU numbers it. Must exist (``NV-E011``) and
+    #: must not already feed something else (``NV-E010``).
     outlet: OutletId
     #: The power supply this feeds, e.g. ``psu1``. Documentation only.
     psu: str | None = Field(default=None, max_length=64)
@@ -254,13 +254,13 @@ class PowerInput(NetvizModel):
             if not separator:
                 raise field_error(
                     f"{echo_value(value)} is not an outlet reference; expected 'pdu:outlet'",
-                    rule="NG-E002",
+                    rule="NV-E002",
                 )
             if ":" in outlet:
                 raise field_error(
                     f"{echo_value(value)} contains more than one ':'; an outlet is named by "
                     f"one identifier",
-                    rule="NG-E002",
+                    rule="NV-E002",
                 )
             return {"pdu": pdu, "outlet": outlet}
         return value
@@ -282,7 +282,7 @@ class PoeConfig(NetvizModel):
     difference between "no PoE here" and "PoE turned off here".
 
     How much the port reserves is said in one of two ways, and never both
-    (``NG-E004``):
+    (``NV-E004``):
 
     * ``class`` — an IEEE classification. The reservation is the PSE-side figure
       for that class (:data:`POE_PSE_WATTS`), which is what the switch actually
@@ -298,12 +298,12 @@ class PoeConfig(NetvizModel):
     #: Which amendment the port implements (``pethPsePortType``).
     standard: PoeStandard
     #: The IEEE classification, 0 to 8. Refused above the standard's own
-    #: ceiling (``NG-E004``). Written ``class`` in YAML.
+    #: ceiling (``NV-E004``). Written ``class`` in YAML.
     pse_class: PoeClass | None = Field(default=None, alias="class")
     #: An explicit reservation in watts, instead of a class.
     budget_watts: Watts | None = None
     #: ``pethPsePortAdminEnable``. A disabled PSE port reserves nothing and
-    #: powers nothing, which is what ``NG-E014`` reports it for.
+    #: powers nothing, which is what ``NV-E014`` reports it for.
     enabled: Boolean = True
 
     @model_validator(mode="after")
@@ -312,7 +312,7 @@ class PoeConfig(NetvizModel):
             raise field_error(
                 "declare either 'class' or 'budget_watts', not both: a class already fixes "
                 "the reservation, and two answers cannot both be the budget",
-                rule="NG-E004",
+                rule="NV-E004",
                 path=("budget_watts",),
             )
         if self.pse_class is not None and self.pse_class > self.standard.max_class:
@@ -320,7 +320,7 @@ class PoeConfig(NetvizModel):
                 f"class {self.pse_class} is not defined by {self.standard}, which stops at "
                 f"class {self.standard.max_class} ({format_watts(self.standard.max_watts)} W); "
                 f"declare 'standard: 802.3bt' if the hardware really delivers it",
-                rule="NG-E004",
+                rule="NV-E004",
                 path=("class",),
             )
         return self
@@ -346,7 +346,7 @@ class PoeConfig(NetvizModel):
 
         The PD figure, not the PSE one: the difference is the cable loss the
         standard budgets for, and a camera drawing the PSE figure would be
-        outside the standard. ``NG-E014`` compares a declared draw against this.
+        outside the standard. ``NV-E014`` compares a declared draw against this.
         """
         if self.budget_watts is not None:
             return self.budget_watts
@@ -380,17 +380,17 @@ class PowerConfig(NetvizModel):
     draw_watts: Annotated[PowerDraw | None, BeforeValidator(_normalise_draw)] = None
     #: One entry per power supply, naming the outlet feeding it. Empty for a
     #: device fed over PoE, or for one whose feed is simply not recorded yet —
-    #: which is ``NG-E016``, a warning, so a partial inventory stays usable.
+    #: which is ``NV-E016``, a warning, so a partial inventory stays usable.
     inputs: list[PowerInput] = Field(default_factory=list, max_length=MAX_POWER_INPUTS)
     #: The feeds are meant to be independent: losing one must not lose the
-    #: device. Requires at least two inputs (``NG-E002``), and ``NG-E015``
+    #: device. Requires at least two inputs (``NV-E002``), and ``NV-E015``
     #: checks they land somewhere that makes the claim true.
     redundant: Boolean = False
     #: Where the device's own power comes from. ``poe`` says the uplink, and
-    #: excludes ``inputs`` (``NG-E005``).
+    #: excludes ``inputs`` (``NV-E005``).
     powered_by: PowerSource = PowerSource.OUTLET
     #: The PoE power this device can hand out across every PSE port together
-    #: (``pethMainPsePower``). ``NG-E013`` checks the ports fit inside it.
+    #: (``pethMainPsePower``). ``NV-E013`` checks the ports fit inside it.
     poe_budget_watts: Watts | None = None
 
     @model_validator(mode="after")
@@ -402,7 +402,7 @@ class PowerConfig(NetvizModel):
                 raise field_error(
                     f"input {index + 1} names outlet {entry}, which input {first + 1} already "
                     f"names; one outlet feeds one supply",
-                    rule="NG-E002",
+                    rule="NV-E002",
                     path=("inputs", index),
                 )
 
@@ -410,7 +410,7 @@ class PowerConfig(NetvizModel):
             raise field_error(
                 "'powered_by: poe' means the device takes its power over its uplink, so it "
                 "has no outlet inputs; drop 'inputs', or drop 'powered_by'",
-                rule="NG-E005",
+                rule="NV-E005",
                 path=("inputs",),
             )
 
@@ -418,7 +418,7 @@ class PowerConfig(NetvizModel):
             raise field_error(
                 f"'redundant: true' claims the device survives losing a feed, which needs at "
                 f"least two inputs; {_input_count(len(self.inputs))}",
-                rule="NG-E002",
+                rule="NV-E002",
                 path=("redundant",),
             )
         return self
@@ -449,7 +449,7 @@ class PowerConfig(NetvizModel):
 
 
 def _input_count(count: int) -> str:
-    """``it declares one`` / ``it declares none`` — the tail of NG-E002."""
+    """``it declares one`` / ``it declares none`` — the tail of NV-E002."""
     return "it declares none" if count == 0 else "it declares one"
 
 

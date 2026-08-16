@@ -1,4 +1,4 @@
-# W104 (NG-V009) - an access port of a layer-2-only switch carries an IP.
+# W104 (NV-V009) - an access port of a layer-2-only switch carries an IP.
 #
 # 'sw-a' forwards neither IPv4 nor IPv6, so its management address belongs on a
 # 'type: vlan' SVI rather than on the bridge port itself.

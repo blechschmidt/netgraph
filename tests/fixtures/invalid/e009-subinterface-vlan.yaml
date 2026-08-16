@@ -1,4 +1,4 @@
-# E009 (NG-V005) - a sub-interface encapsulates a VLAN its parent does not carry.
+# E009 (NV-V005) - a sub-interface encapsulates a VLAN its parent does not carry.
 #
 # 'eth0.20' expects tagged VLAN 20, but 'eth0' trunks only VLAN 10, so no frame
 # for the sub-interface can ever arrive.

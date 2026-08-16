@@ -184,7 +184,7 @@ class IconLibrary:
     way, and not otherwise.
     """
 
-    def __init__(self, prefix: str = "ng-icon") -> None:
+    def __init__(self, prefix: str = "nv-icon") -> None:
         self._prefix = prefix
         self._symbols: dict[tuple[str, str], str] = {}
 
@@ -232,7 +232,7 @@ class IconLibrary:
             return ""
         root = ElementTree.Element(
             _SVG_TAG,
-            {"class": "ng-defs", "width": "0", "height": "0", "aria-hidden": "true"},
+            {"class": "nv-defs", "width": "0", "height": "0", "aria-hidden": "true"},
         )
         root.append(defs)
         return ElementTree.tostring(root, encoding="unicode")

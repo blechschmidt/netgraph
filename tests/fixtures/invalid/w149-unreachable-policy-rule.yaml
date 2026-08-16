@@ -1,4 +1,4 @@
-# W149 (NG-F024) - a policy rule numbered above the rule that terminates the
+# W149 (NV-F024) - a policy rule numbered above the rule that terminates the
 # database.
 #
 # The walk goes from the lowest priority upwards and the first match decides,

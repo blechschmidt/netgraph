@@ -1,4 +1,4 @@
-# W107 (NG-I006) - a LAG member carries its own address.
+# W107 (NV-I006) - a LAG member carries its own address.
 #
 # 10.0.0.1/30 sits on 'eth0' rather than on 'bond0'. It is reachable only while
 # that one lane is up, which is the opposite of what bonding is for.

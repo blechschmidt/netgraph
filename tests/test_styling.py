@@ -122,7 +122,7 @@ def test_a_colour_may_be_a_hex_literal_or_a_name(value: str) -> None:
 def test_a_colour_that_is_not_one_is_refused(value: Any) -> None:
     with pytest.raises(Exception) as caught:
         Style(fill=value)
-    assert "NG-Z001" in str(caught.value)
+    assert "NV-Z001" in str(caught.value)
 
 
 def test_a_misspelt_colour_is_answered_with_the_nearest_legal_one() -> None:
@@ -171,14 +171,14 @@ def test_an_icon_name_that_could_be_a_path_is_refused(value: str) -> None:
     """An icon is chosen *from* the theme; a manifest never names a file."""
     with pytest.raises(Exception) as caught:
         Style(icon=value)
-    assert "NG-Z001" in str(caught.value)
+    assert "NV-Z001" in str(caught.value)
 
 
 def test_an_empty_style_block_is_refused() -> None:
     """Almost always a key indented one level too far. It would render nothing."""
     with pytest.raises(Exception) as caught:
         Style()
-    assert "NG-Z002" in str(caught.value)
+    assert "NV-Z002" in str(caught.value)
 
 
 def test_a_colour_keeps_the_spelling_the_document_used() -> None:
@@ -425,7 +425,7 @@ def test_a_theme_with_no_rules_is_refused() -> None:
                 "spec": {"rules": []},
             }
         )
-    assert "NG-Z004" in str(caught.value)
+    assert "NV-Z004" in str(caught.value)
 
 
 def test_a_theme_kept_beside_the_inventory_is_checked_but_not_applied() -> None:

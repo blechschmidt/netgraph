@@ -19,7 +19,7 @@ Because that is the case the promise is about. A diff must draw a removed node
 itself in the churn it caused. Here the arrangement still names `srv-nas` and
 `cbl-sw-nas`, and `netviz diff` uses it; the golden pins the coordinates.
 
-The tree therefore validates with three `NG-W138` warnings — an arrangement
+The tree therefore validates with three `NV-W138` warnings — an arrangement
 naming something the inventory no longer declares. That is not an oversight: it
 is the state a tree is *in* between deleting a device and running `netviz
 layout --prune`, which is exactly when someone wants to look at the diff.

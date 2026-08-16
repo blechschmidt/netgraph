@@ -12,7 +12,7 @@ Three things are added on the way out:
 * **A range.** The report carries the line and column of the offending value;
   the token there is re-read from the buffer so the squiggle covers the value
   and stops at it (:mod:`netviz.lsp.locate`).
-* **The rule as a code, with its documentation.** ``NG-C002`` is the identifier
+* **The rule as a code, with its documentation.** ``NV-C002`` is the identifier
   the specification uses and the one ``--disable`` takes, so it is what the
   editor shows, and ``codeDescription`` links to the rule's own section of
   ``docs/validation-rules.md``. Nobody should have to search for what a code

@@ -125,7 +125,7 @@ the shape will meet all of them:
   ([follow-up 26](../../docs/follow-ups.md)). `I002` exempts veth ends because
   they can never terminate a cable; the four interfaces on `srv-dock-03` that
   also never can are not distinguishable from a spare port, so the device
-  carries a `netviz/ignore: NG-C015` annotation saying which four and why.
+  carries a `netviz/ignore: NV-C015` annotation saying which four and why.
 
 ## Checking it
 

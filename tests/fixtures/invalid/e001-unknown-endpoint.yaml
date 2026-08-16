@@ -1,4 +1,4 @@
-# E001 (NG-C002) - a cable endpoint names a device that is not declared.
+# E001 (NV-C002) - a cable endpoint names a device that is not declared.
 #
 # 'pc-ghost' exists nowhere in this inventory. 'pc-a' is still counted as
 # cabled, so W103 does not pile onto the same mistake. The address sits in a

@@ -490,26 +490,26 @@ STALE: Final[dict[str, tuple[str, str]]] = {
     "note-about-a-ghost": (
         "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
-        "metadata: {name: ng-stale-note}\n"
+        "metadata: {name: nv-stale-note}\n"
         "spec:\n"
         "  text: about a machine that was skipped\n"
-        "  anchor: {element: ng-no-such-element}\n",
+        "  anchor: {element: nv-no-such-element}\n",
         "W142",
     ),
     "member-that-is-gone": (
         "apiVersion: netviz.dev/v1alpha1\n"
         "kind: area\n"
-        "metadata: {name: ng-stale-area}\n"
+        "metadata: {name: nv-stale-area}\n"
         "spec:\n"
-        "  members: [ng-no-such-element]\n",
+        "  members: [nv-no-such-element]\n",
         "W142",
     ),
     "selector-that-matches-nothing": (
         "apiVersion: netviz.dev/v1alpha1\n"
         "kind: area\n"
-        "metadata: {name: ng-empty-area}\n"
+        "metadata: {name: nv-empty-area}\n"
         "spec:\n"
-        "  selector: {namespace: ng-no-such-namespace}\n",
+        "  selector: {namespace: nv-no-such-namespace}\n",
         "W143",
     ),
 }

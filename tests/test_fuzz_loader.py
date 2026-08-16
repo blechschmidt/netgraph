@@ -437,7 +437,7 @@ def test_a_patch_panel_port_range_is_counted_before_it_is_expanded() -> None:
         tracemalloc.stop()
 
     assert peak < MEMORY_BUDGET_BYTES, f"peaked at {peak / 1e6:.0f} MB"
-    assert [error.rule for error in inventory.errors] == ["NG-P006"]
+    assert [error.rule for error in inventory.errors] == ["NV-P006"]
     assert "1024 positions" in inventory.errors[0].message
 
 
@@ -500,7 +500,7 @@ def test_a_document_at_the_nesting_limit_still_loads() -> None:
     depth = MAX_NESTING_DEPTH
     inventory = load_stream("a: " + "[" * depth + "]" * depth, name="regression.yaml")
     # ``kind`` is missing, which is the *schema*'s complaint and not the guard's.
-    assert [error.rule for error in inventory.errors] == ["NG-D001"]
+    assert [error.rule for error in inventory.errors] == ["NV-D001"]
 
 
 def test_an_oversized_range_span_is_not_echoed_in_full() -> None:
@@ -516,7 +516,7 @@ def test_an_oversized_range_span_is_not_echoed_in_full() -> None:
         "spec:\n  interfaces:\n    - range: e[1-" + "9" * 5000 + "]\n      type: ethernet\n",
         name="regression.yaml",
     )
-    assert [error.rule for error in inventory.errors] == ["NG-R003"]
+    assert [error.rule for error in inventory.errors] == ["NV-R003"]
     # Two clipped echoes plus prose and a location prefix; the point is that it
     # is a bounded multiple of the echo limit rather than of the input.
     assert len(str(inventory.errors[0])) < 4 * MAX_ECHOED_VALUE_LENGTH

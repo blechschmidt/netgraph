@@ -51,7 +51,7 @@ first-time installer they are simply how netviz behaves.
 - **Passive plant.** Patch panels with derived ports, racks, rack units and a rack-elevation
   view.
 - **`netviz validate`** — three passes (schema, reference resolution, semantics) over a
-  catalogue of graded rules, each with an `NG-*` alias, a documented reason and a fix.
+  catalogue of graded rules, each with an `NV-*` alias, a documented reason and a fix.
   `--strict` promotes warnings, `--disable` silences by id or alias, and the machine-readable
   forms are `--output-format json|sarif|github` for pipelines, code scanning and inline
   annotations. Exit codes: `0` clean, `1` findings, `2` usage.
@@ -199,10 +199,10 @@ first-time installer they are simply how netviz behaves.
 
   `spec.zones[]` divides a device's interfaces into named regions, and policy is written
   between *zones* rather than between interfaces so that a rule survives a port being
-  renamed or moved to a LAG. An interface is in at most one zone (`NG-B003`), which is the
+  renamed or moved to a LAG. An interface is in at most one zone (`NV-B003`), which is the
   defining property of a zone in every implementation and what makes `from lan` a statement
   about a packet rather than a question. `local` — the traffic that terminates on the
-  machine — is nameable without being declared and cannot be declared (`NG-B001`), and it is
+  machine — is nameable without being declared and cannot be declared (`NV-B001`), and it is
   also what turns the two zone fields into a hook: `to: local` is input, `from: local` is
   output, two real zones are forward. The schema never asks which chain a rule is in.
 
@@ -263,16 +263,16 @@ first-time installer they are simply how netviz behaves.
   `spec.route_tables[]` declares a table — a name and a number — and `spec.routes[].table`
   places a route in one. The three tables every stack is born with (`main`, `local`,
   `default`) are nameable without being declared and cannot be declared, by either name or
-  number (`NG-F015`). A VRF is a routing table too, so `table:` resolves against `spec.vrfs`
-  as readily (`NG-F019`) — but `vrf` and `table` on one route are a contradiction rather than
-  a refinement (`NG-F018`).
+  number (`NV-F015`). A VRF is a routing table too, so `table:` resolves against `spec.vrfs`
+  as readily (`NV-F019`) — but `vrf` and `table` on one route are a contradiction rather than
+  a refinement (`NV-F018`).
 
   `spec.routing_policy[]` is the database itself: an ordered list of rules, walked from the
   lowest `priority` upwards, first match deciding — the shape RFC 1812 §5.2.4.3 describes and
   every implementation implements. A rule selects on `src`, `dst`, `fwmark`, `iif`, `oif` and
   `dscp`, optionally inverted, and does one of five things: `lookup` a table, `blackhole`,
   `unreachable`, `prohibit`, or `goto` another priority. `priority` is the rule's identity as
-  well as its position, so it is unique per device per family (`NG-F020`); a rule that states
+  well as its position, so it is unique per device per family (`NV-F020`); a rule that states
   no `family` and no prefix is installed in both, which is what typing `ip rule` and
   `ip -6 rule` does by hand.
 
@@ -320,7 +320,7 @@ first-time installer they are simply how netviz behaves.
   schema cares about — it has a MAC, it carries 802.3 frames, it can be a bridge port, it can
   carry a VLAN sub-interface — so a type of its own would mean restating §6.2 for a port that
   behaves identically. What it does not have is a socket, and `interfaces[].peer` is what says
-  so: it names the other end, and the other end has to name it back (`NG-N023`), because a
+  so: it names the other end, and the other end has to name it back (`NV-N023`), because a
   veth pair is created as a pair and destroyed as a pair and a document describing half of one
   describes something the kernel cannot be asked for.
 
@@ -560,7 +560,7 @@ first-time installer they are simply how netviz behaves.
   for everything else — because these values end up inside Graphviz attributes and mxGraph
   style strings, and a free-form pass-through would be an injection. A typo is answered
   with the nearest legal spelling (`'navvy' is not a colour … did you mean 'navy'?`),
-  under `NG-Z001`.
+  under `NV-Z001`.
 
   **Themes.** A `kind: theme` document maps selectors — by kind, name, namespace glob,
   role or label — onto style blocks. `netviz render --theme NAME|PATH` applies one; two
@@ -951,7 +951,7 @@ first-time installer they are simply how netviz behaves.
   started by your editor rather than by you.
 
   Diagnostics are `netviz validate`'s, on the line and column that caused them, carrying
-  the `NG-*` rule id as the diagnostic code and a link to that rule's section of
+  the `NV-*` rule id as the diagnostic code and a link to that rule's section of
   [`docs/validation-rules.md`](docs/validation-rules.md). Completion is the JSON Schema for
   keys, enums and their documentation, *and the tree* for references: typing under a
   cable's `endpoints` offers the switches you have, and `sw-home:` offers the ports that
@@ -1130,7 +1130,7 @@ first-time installer they are simply how netviz behaves.
   because two spellings of one fact are how an inventory starts disagreeing with itself —
   and the reverse index is derived where it is needed.
 
-  Ten new rules, lettered `S` for *subject*: `NG-S001`–`NG-S003` on the documents, and
+  Ten new rules, lettered `S` for *subject*: `NV-S001`–`NV-S003` on the documents, and
   `E043`–`E046`, `W139`, `W140` and `I004` on the tree. The one worth knowing about is
   **`W140`**: a group that still lists somebody whose account is `departed`. Deleting a
   leaver's document removes them from the inventory *and* from every group naming them,
@@ -1226,7 +1226,7 @@ first-time installer they are simply how netviz behaves.
   [`docs/schema.md` §18](docs/schema.md#18-layout-diagram-geometry) and
   [`docs/rendering.md`](docs/rendering.md#stored-arrangements).
 
-- **`W138` / `NG-Y001`, stale diagram geometry.** A warning — never an error, because
+- **`W138` / `NV-Y001`, stale diagram geometry.** A warning — never an error, because
   deleting a switch must not make `netviz validate` fail — naming each layout key that
   no longer resolves. `netviz layout --prune` is the fix.
 
@@ -1346,18 +1346,23 @@ first-time installer they are simply how netviz behaves.
     fetch moved with it;
   - the pre-commit hook ids are `netviz-validate`, `netviz-test` and `netviz-fmt`;
   - the composite actions are `.github/actions/netviz-{render,review,validate}` and the
-    reusable workflows are `.github/workflows/netviz-{pages,review}.yml`.
+    reusable workflows are `.github/workflows/netviz-{pages,review}.yml`;
+  - the schema ids of the validation rules are `NV-*` — `NV-C005`, not `NG-C005` — wherever a
+    rule is named: `netviz.toml`, a `netviz/ignore` annotation, `--disable`, and the tables in
+    [`docs/schema.md`](docs/schema.md) §10. The short ids (`E002`, `W103`, `I001`) are
+    unchanged, because the letter in them is a severity and not a project.
 
   There is no compatibility shim for any of them. netviz has not been published, so nothing
   outside this repository can be reading the old names, and a shim would be a second spelling
   to keep working for the lifetime of the tool in exchange for a migration nobody has to do.
-  Renaming an existing tree is `sed -i s/netgraph/netviz/g` over its YAML plus a rename of
-  `netgraph.toml`.
+  Renaming an existing tree is `sed -i 's/netgraph/netviz/g; s/\bNG-/NV-/g'` over its YAML
+  plus a rename of `netgraph.toml`.
 
-  The GitHub repository, the container image and the demo site keep their URLs — those name a
-  location rather than the project, and moving them would break links that already exist.
-  `ghcr.io/blechschmidt/netviz:main` still gives you a container whose entrypoint is
-  `netviz`.
+  The GitHub repository was renamed too, which moved three URLs that name a location rather
+  than the project: the repository is <https://github.com/blechschmidt/netviz>, the demo site
+  is <https://blechschmidt.github.io/netviz/> — the old path 404s, it does not redirect — and
+  the image is `ghcr.io/blechschmidt/netviz`, which `container.yml` derives from
+  `github.repository` and so followed the slug on its own.
 
 ### Fixed
 
@@ -1432,7 +1437,7 @@ first-time installer they are simply how netviz behaves.
 
 - **Deleting one of a server's two PDUs took the server with it.** Clearing a power input is
   right; leaving `redundant: true` behind on the one feed that is left is not, because that
-  flag claims the device survives losing a feed and one feed does not. `E042` / `NG-E015` is
+  flag claims the device survives losing a feed and one feed does not. `E042` / `NV-E015` is
   a *load* error, so the server stopped loading altogether and every cable that ended on it
   started reporting a dangling endpoint. The flag now goes with the feed it was about.
 

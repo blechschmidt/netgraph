@@ -79,7 +79,7 @@ metadata:
   description: |
     Lobby camera, cabled straight to the access switch and powered over that
     cable. A class-2 PSE port delivers 6.49 W at the powered device, which is
-    what its 5 W draw is checked against (NG-E014).
+    what its 5 W draw is checked against (NV-E014).
   labels:
     site: hq
     role: camera

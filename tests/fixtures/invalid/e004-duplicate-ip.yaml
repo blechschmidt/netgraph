@@ -1,4 +1,4 @@
-# E004 (NG-A004) - one IP address is assigned twice in the same prefix.
+# E004 (NV-A004) - one IP address is assigned twice in the same prefix.
 #
 # Neither port declares a 'vlan' block, so both sit in the untagged domain and
 # 10.0.0.1 really is claimed twice.

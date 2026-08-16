@@ -11,8 +11,8 @@ metadata:
     env: prod
   annotations:
     # wan0 faces the ISP, which is not an element of this inventory, so it
-    # terminates no cable on purpose (NG-C015 / I002).
-    netviz/ignore: NG-C015
+    # terminates no cable on purpose (NV-C015 / I002).
+    netviz/ignore: NV-C015
 spec:
   vendor: MikroTik
   model: hEX S

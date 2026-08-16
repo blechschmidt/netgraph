@@ -348,7 +348,7 @@ ZONE_ID_PREFIX: Final = "zone:"
 #: -- ``src_zone`` is simply absent -- so it lives here rather than in the model:
 #: it is a *drawing* of the absence, and the drawing needs somewhere to put the
 #: line. Chosen so it cannot collide with a declared zone, which ``ElementName``
-#: keeps to the same grammar ``local`` is in and ``NG-B001`` keeps off ``local``.
+#: keeps to the same grammar ``local`` is in and ``NV-B001`` keeps off ``local``.
 ANY_ZONE: Final = "any"
 
 
@@ -733,7 +733,7 @@ class RoutingView:
     #: ``(name, rd)`` per declared VRF, in declaration order.
     vrfs: tuple[tuple[str, str], ...] = ()
     #: The instances an interface is actually bound to, in interface order. A
-    #: declared VRF nothing is bound to holds no address (``NG-F014``), so it is
+    #: declared VRF nothing is bound to holds no address (``NV-F014``), so it is
     #: not an instance this router takes part in and cannot group it.
     bound_vrfs: tuple[str, ...] = ()
     #: Every static route the device holds, already rendered (``0.0.0.0/0 via
@@ -1979,7 +1979,7 @@ def splice_patch_panels(
         The spliced edges in the original order, and one message per run that
         does not arrive anywhere: a coupler with nothing patched on the far
         side, a panel port cabled twice, or a loop of panels. The validator
-        reports each of those as well (``NG-P001``…``NG-P005``); the graph layer
+        reports each of those as well (``NV-P001``…``NV-P005``); the graph layer
         drops the run because ``--force`` must still produce a picture.
     """
     touching = {edge.id for edge in edges if _panel_ends(edge, panels)}
@@ -1988,7 +1988,7 @@ def splice_patch_panels(
 
     dangling: list[str] = []
     # ``(panel, port)`` -> the one segment landing on it. A second cable on the
-    # same port is ``NG-P003``; the first one declared wins so the walk stays
+    # same port is ``NV-P003``; the first one declared wins so the walk stays
     # deterministic, and the loser is dropped rather than silently followed —
     # splicing it too would reuse the segments beyond the panel and draw one
     # run twice.
@@ -2080,7 +2080,7 @@ def _walk_run(
     """Follow ``first`` from ``start`` through the couplers it reaches.
 
     Returns the run and, when it does not arrive at a second active port, the
-    reason — which is the same fact ``NG-P002`` or ``NG-P005`` reports about the
+    reason — which is the same fact ``NV-P002`` or ``NV-P005`` reports about the
     inventory, said about this one run.
     """
     segments: list[Edge] = [first]
@@ -2197,7 +2197,7 @@ def rack_elevations(
         labels.setdefault(key, location.rack_label)
         slots = placed.setdefault(key, [])
         if location.rack_height is not None:
-            # ``NG-U003`` refuses two elements that disagree; the tallest wins
+            # ``NV-U003`` refuses two elements that disagree; the tallest wins
             # here so a rendering under ``--force`` still holds everything.
             heights[key] = max(heights.get(key, 0), location.rack_height)
             declared[key] = True
@@ -2309,7 +2309,7 @@ def _identity_view(inventory: Inventory) -> tuple[dict[str, Node], tuple[Edge, .
 
     An edge runs from the group to the member, which is the direction the fact is
     written in and the direction a reader follows to answer "who is in this?". A
-    member that does not resolve is simply not drawn: ``NG-S010`` is the place
+    member that does not resolve is simply not drawn: ``NV-S010`` is the place
     that says so, and ``--force`` has to keep producing a picture.
     """
     nodes = {fqn: Node.for_identity(fqn, element) for fqn, element in identities(inventory)}
@@ -2344,7 +2344,7 @@ def _security_view(nodes: Mapping[str, Node]) -> tuple[dict[str, Node], tuple[Ed
     thing.
 
     A device whose ``spec.firewall`` names a zone it does not declare cannot
-    exist (``NG-B004``), so every edge here has both ends. What the view does
+    exist (``NV-B004``), so every edge here has both ends. What the view does
     mint is the two zones nobody declares: ``local`` for a rule about traffic
     terminating on the machine, and ``any`` for a rule that left a zone unset.
     Both appear only when the policy names them.
@@ -2402,7 +2402,7 @@ def security_views(fqn: str, device: Device) -> tuple[SecurityView, ...]:
     ]
     declared = {zone.name for zone in spec.zones}
     for name in (LOCAL_ZONE, ANY_ZONE):
-        if name in declared:  # pragma: no cover - NG-B001 refuses both
+        if name in declared:  # pragma: no cover - NV-B001 refuses both
             continue
         count, translations = counted(name)
         if count or translations:
@@ -2519,7 +2519,7 @@ def _routed_view(
 
     An edge keeps being identified by ``<element>:<interface>#<prefix>`` rather
     than by the stack it now leaves from. Interface names are unique within a
-    device (``NG-I001``), so that is still unambiguous, and it means a stored
+    device (``NV-I001``), so that is still unambiguous, and it means a stored
     waypoint or a highlighted hop survives a machine growing its first namespace.
 
     Nodes come out as the addressed stacks in inventory order — each machine's
@@ -2785,7 +2785,7 @@ def _routing_view(
     * a **BGP session** is declared, by address, on one or both ends; it is drawn
       once however many times it is declared, and a session whose address matches
       nothing in the inventory is reported in :attr:`Graph.dangling` rather than
-      drawn to a node that does not exist (``NG-F013``);
+      drawn to a node that does not exist (``NV-F013``);
     * an **OSPF adjacency** is *discovered*, so it is derived the way the protocol
       derives it: two interfaces that run OSPF in the same area and are addressed
       in one subnet form one. Deriving it from the subnets rather than from the
@@ -3258,7 +3258,7 @@ def _build_edges(inventory: Inventory) -> tuple[tuple[Edge, ...], tuple[str, ...
     :attr:`Inventory.interface_owners`, because a patch panel port terminates a
     cable exactly as a device port does (§15.1). Adapter attachments still
     resolve against the active elements: an adapter hangs off a host, and a
-    panel is not one (``NG-P004``).
+    panel is not one (``NV-P004``).
     """
     edges: list[Edge] = []
     dangling: list[str] = []

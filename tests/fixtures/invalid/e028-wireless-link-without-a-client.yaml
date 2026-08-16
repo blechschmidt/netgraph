@@ -1,4 +1,4 @@
-# E028 (NG-W007) - a wireless link is not an AP-to-client association.
+# E028 (NV-W007) - a wireless link is not an AP-to-client association.
 #
 # Both radios beacon. Neither will associate to the other, so the link the
 # document draws is two access points shouting past each other.

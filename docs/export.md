@@ -1133,7 +1133,7 @@ fold it is recorded in the [manifest](#the-skip-manifest).
 An `--out` that resolves inside the inventory is refused, and the reason is
 worth knowing rather than merely obeying: a generated `10-netviz.yaml` sitting
 under the tree netviz loads is a document netviz will try to load on the next
-run, and `NG-D001` reports it as YAML with no `kind:` — a diagnostic with no
+run, and `NV-D001` reports it as YAML with no `kind:` — a diagnostic with no
 obvious relation to what you did. The generated tree is a build artefact and
 belongs outside the source, the same way a rendered diagram does.
 

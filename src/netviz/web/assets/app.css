@@ -572,7 +572,7 @@ main {
  * from Graphviz's own <g class="edge">, and a transparent band on top of that
  * would silently blank it. Hence `stroke` and not `fill`, and pointer events
  * only where the stroke is. */
-.viewport svg .ng-link-hit {
+.viewport svg .nv-link-hit {
   stroke: transparent;
   fill: none;
   pointer-events: stroke;
@@ -581,7 +581,7 @@ main {
 
 /* The route of the selected link, drawn over Graphviz's own line. Visible only
  * while a bend is being dragged, when Graphviz's line is a frame behind. */
-.viewport svg .ng-link-route {
+.viewport svg .nv-link-route {
   stroke: var(--selected);
   stroke-width: 1.6;
   stroke-dasharray: 6 3;
@@ -591,19 +591,19 @@ main {
 
 /* A grab handle. Big enough to hit at a normal zoom, and cheap enough to draw
  * one per bend on a link with sixty-four of them. */
-.viewport svg .ng-handle {
+.viewport svg .nv-handle {
   fill: var(--bg);
   stroke: var(--selected);
   stroke-width: 1.6;
   cursor: grab;
 }
 
-.viewport svg .ng-handle:hover { fill: var(--selected); }
-.viewport svg .ng-handle:active { cursor: grabbing; }
+.viewport svg .nv-handle:hover { fill: var(--selected); }
+.viewport svg .nv-handle:active { cursor: grabbing; }
 
 /* The midpoint handle is hollow and a size smaller: it is not a bend yet, it is
  * where one would go. */
-.viewport svg .ng-handle-add {
+.viewport svg .nv-handle-add {
   fill: var(--bg);
   stroke-dasharray: 3 2;
   opacity: .75;
@@ -611,12 +611,12 @@ main {
 
 /* A nudged label's handle, in the colour a label is drawn in rather than the
  * selection's, so "this moves the words" needs no explaining. */
-.viewport svg .ng-handle-label {
+.viewport svg .nv-handle-label {
   stroke: var(--info);
   fill: var(--bg);
 }
 
-.canvas.panning svg .ng-handle { cursor: grabbing; }
+.canvas.panning svg .nv-handle { cursor: grabbing; }
 
 /* The namespace containers of §2: the overlay containers.js appends *behind*
  * the drawing, so that a frame is the paper its members sit on rather than a
@@ -626,7 +626,7 @@ main {
  * annotation band and the link band use, so the middle of a site stays
  * clickable for the racks inside it. The header does take them across its whole
  * width, because that is what it is for. */
-.viewport svg .ng-container {
+.viewport svg .nv-container {
   fill: none;
   stroke: var(--line);
   stroke-width: 1.2;
@@ -636,7 +636,7 @@ main {
   rx: 4;
 }
 
-.viewport svg .ng-container-picked {
+.viewport svg .nv-container-picked {
   stroke: var(--selected);
   stroke-width: 1.6;
   stroke-dasharray: 10 4;
@@ -644,17 +644,17 @@ main {
 
 /* A shallower namespace is drawn fainter, so three nested frames read as three
  * levels rather than as one thick border. */
-.viewport svg .ng-container[data-depth="1"] { opacity: 0.45; }
-.viewport svg .ng-container[data-depth="2"] { opacity: 0.7; }
+.viewport svg .nv-container[data-depth="1"] { opacity: 0.45; }
+.viewport svg .nv-container[data-depth="2"] { opacity: 0.7; }
 
-.viewport svg .ng-container-header {
+.viewport svg .nv-container-header {
   fill: color-mix(in srgb, var(--line) 25%, transparent);
   stroke: none;
   pointer-events: all;
   cursor: move;
 }
 
-.viewport svg .ng-container-label {
+.viewport svg .nv-container-label {
   fill: var(--muted);
   pointer-events: all;
   cursor: move;
@@ -663,7 +663,7 @@ main {
 
 /* The fold triangle. Bigger hit area than it looks, because it is a glyph a
  * few points across and a target nobody can hit is a command nobody has. */
-.viewport svg .ng-container-toggle {
+.viewport svg .nv-container-toggle {
   fill: var(--fg);
   cursor: pointer;
   pointer-events: all;
@@ -673,11 +673,11 @@ main {
   stroke-width: 10;
 }
 
-.viewport svg .ng-container-toggle:hover { fill: var(--selected); }
+.viewport svg .nv-container-toggle:hover { fill: var(--selected); }
 
 /* The container a drag is currently over. Filled rather than outlined: while
  * something is in the air, "it would land here" is the only question. */
-.viewport svg .ng-container-drop {
+.viewport svg .nv-container-drop {
   fill: color-mix(in srgb, var(--selected) 12%, transparent);
   stroke: var(--selected);
   stroke-width: 2;
@@ -687,15 +687,15 @@ main {
 
 /* A corner handle on a container. Drawn like an annotation's -- it means the
  * same thing -- under its own class for the same reason that one has one. */
-.viewport svg .ng-container-handle {
+.viewport svg .nv-container-handle {
   fill: var(--bg);
   stroke: var(--selected);
   stroke-width: 1.6;
   cursor: nwse-resize;
 }
 
-.viewport svg .ng-container-handle:hover { fill: var(--selected); }
-.canvas.panning svg .ng-container-handle { cursor: grabbing; }
+.viewport svg .nv-container-handle:hover { fill: var(--selected); }
+.canvas.panning svg .nv-container-handle { cursor: grabbing; }
 
 /* The commentary of §21: the overlay notes.js appends inside the drawing.
  *
@@ -703,7 +703,7 @@ main {
  * background with nothing to click, so this band is its hit area -- a stroke
  * along its outline, the same trick the link band uses, so that the middle of a
  * zone stays clickable for the devices inside it. */
-.viewport svg .ng-anno-band {
+.viewport svg .nv-anno-band {
   stroke: transparent;
   fill: none;
   pointer-events: stroke;
@@ -712,11 +712,11 @@ main {
 
 /* One that follows its members has no box to move. Saying so with the cursor
  * costs nothing and means the refusal is not the first anybody hears of it. */
-.viewport svg .ng-anno-band[data-follows] { cursor: not-allowed; }
+.viewport svg .nv-anno-band[data-follows] { cursor: not-allowed; }
 
 /* What the canvas is acting on. A long dash, like the element halo, because it
  * means the same thing -- and no fill, because an area already has one. */
-.viewport svg .ng-anno-picked {
+.viewport svg .nv-anno-picked {
   fill: none;
   stroke: var(--selected);
   stroke-width: 1.6;
@@ -726,17 +726,17 @@ main {
 }
 
 /* A grab handle on a note or a zone. Drawn like a bend's -- it means the same
- * thing -- but under a class of its own, because links.js claims `.ng-handle`
+ * thing -- but under a class of its own, because links.js claims `.nv-handle`
  * for itself the moment one is pressed. */
-.viewport svg .ng-anno-handle {
+.viewport svg .nv-anno-handle {
   fill: var(--bg);
   stroke: var(--selected);
   stroke-width: 1.6;
   cursor: nwse-resize;
 }
 
-.viewport svg .ng-anno-handle:hover { fill: var(--selected); }
-.canvas.panning svg .ng-anno-handle { cursor: grabbing; }
+.viewport svg .nv-anno-handle:hover { fill: var(--selected); }
+.canvas.panning svg .nv-anno-handle { cursor: grabbing; }
 
 /* Typing a note's text, over the note itself. In client pixels rather than
  * inside the SVG: it is a text box, not part of the drawing, and it belongs to
@@ -790,9 +790,9 @@ main {
  * overlay of its own rather than as a class on each shape. That is what lets an
  * element whose contents cull.js has parked still show a ring -- there is no
  * shape left to put a class on, and it is still selected. See select.js. */
-.viewport svg g.ng-selection { pointer-events: none; }
+.viewport svg g.nv-selection { pointer-events: none; }
 
-.viewport svg .ng-halo {
+.viewport svg .nv-halo {
   fill: color-mix(in srgb, var(--selected) 10%, transparent);
   stroke: var(--selected);
   stroke-width: 1.5;
@@ -880,7 +880,7 @@ main {
  * in drawing units worked back from the current zoom, so that they come out the
  * same size on screen however far the diagram has been shrunk. Everything that
  * does *not* depend on the zoom is here. */
-.viewport svg .ng-lod-frame {
+.viewport svg .nv-lod-frame {
   fill: none;
   stroke: var(--muted);
   opacity: .7;
@@ -888,7 +888,7 @@ main {
 
 /* The one thing that stays legible when the labels go: which namespace this
  * block of shapes is, and how much is in it. */
-.viewport svg .ng-lod-label {
+.viewport svg .nv-lod-label {
   fill: var(--muted);
   font-family: Helvetica, Arial, sans-serif;
   font-weight: 600;

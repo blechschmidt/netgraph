@@ -1,4 +1,4 @@
-# W134 (NG-W011) - two access points in one broadcast domain overlap.
+# W134 (NV-W011) - two access points in one broadcast domain overlap.
 #
 # Channels 1 and 3 at 2.4 GHz are 10 MHz apart and 20 MHz wide, so the two
 # radios share spectrum: they take turns instead of adding their capacity up.

@@ -1,4 +1,4 @@
-# W125 (NG-T006) - an overlay terminates where its underlay does not reach.
+# W125 (NV-T006) - an overlay terminates where its underlay does not reach.
 #
 # The OpenVPN tunnel runs over 'wg-a-b', which only joins pc-a and pc-b, yet it
 # also terminates on pc-c: the outer packets to that third endpoint have no

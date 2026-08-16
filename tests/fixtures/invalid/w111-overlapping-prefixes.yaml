@@ -1,4 +1,4 @@
-# W111 (NG-A006) - two interfaces of one device sit in the same prefix.
+# W111 (NV-A006) - two interfaces of one device sit in the same prefix.
 #
 # 'eth0' and 'eth1' are both in 10.0.0.0/24, so nothing in the routing table
 # says which of them a packet for that subnet should leave by.

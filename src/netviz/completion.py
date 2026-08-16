@@ -12,7 +12,7 @@ completers below close that gap:
     tree that does not load yet (the file being edited is half-written, which
     is precisely when completion is asked for) simply offers nothing.
 ``--disable``
-    Rule ids with their summaries, plus the ``NG-*`` aliases once the typed
+    Rule ids with their summaries, plus the ``NV-*`` aliases once the typed
     prefix looks like one, and the ``*`` wildcard.
 ``--choose``
     The ``RULE=FIX`` pairs ``validate --fix`` accepts, narrowed to that rule's
@@ -373,7 +373,7 @@ def complete_rule(
 ) -> list[CompletionItem]:
     """Validation rule ids, with their one-line summaries.
 
-    The ``NG-*`` aliases are offered only once the typed prefix looks like one:
+    The ``NV-*`` aliases are offered only once the typed prefix looks like one:
     listing both vocabularies for an empty prefix would double the candidate
     list with synonyms of what is already in it.
     """

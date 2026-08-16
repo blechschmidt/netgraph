@@ -1,4 +1,4 @@
-# W127 (NG-T012) - a tunnel carries traffic in the clear.
+# W127 (NV-T012) - a tunnel carries traffic in the clear.
 #
 # GRE encrypts nothing and this one runs over no encrypting tunnel, so every
 # packet it carries crosses the underlay readable. GRE runs directly over IP,
