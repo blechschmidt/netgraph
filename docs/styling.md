@@ -640,17 +640,27 @@ YAML or the theme — which is the same rule as everywhere else on this page.
 
 ## In the editor
 
-[`netgraph web`](commands/web.md) will grow a docked **style inspector**: the
-resolved appearance of whatever is selected, field by field, with the rung each
-value came from named beside it — so the panel can say *this navy is the
-theme's, not yours* rather than leaving you to guess. Changes made there are
-ordinary `spec.style.*` edits, going through the same
-[operations](editing.md), the same validation gate and the same undo stack as
-every other write; and **reset to theme** *unsets* the field rather than writing
-the inherited value into the document, which is the only version of that button
-that keeps working when the theme changes. `netgraph web --theme` already picks
-the stylesheet the inspector resolves against, since it names a file on the
-machine running the server rather than in the browser.
+[`netgraph web`](commands/web.md) has a docked **style inspector**: the resolved
+appearance of whatever is selected, field by field, with the rung each value
+came from named beside it — so the panel can say *this navy is the theme's, not
+yours* rather than leaving you to guess. Changes made there are ordinary
+`spec.style.*` edits, going through the same [operations](editing.md), the same
+validation gate and the same undo stack as every other write; and **reset to
+theme** *unsets* the field rather than writing the inherited value into the
+document, which is the only version of that button that keeps working when the
+theme changes. `netgraph web --theme` picks the stylesheet the inspector
+resolves against, since it names a file on the machine running the server rather
+than in the browser.
+
+It reads a map the render carries rather than the picture on screen, which is
+what lets it name the rung at all — by the time a colour is an SVG attribute,
+the element, the theme, the icon set and the palette have collapsed into one hex
+literal. Two consequences worth knowing. A view that does not draw the selection
+has no appearance for it to show, and the panel says so instead of going blank.
+And with the **changes drawer** open the canvas is a diff, so the colours on
+screen are the changeset's marks — added, removed, changed — rather than the
+values in the rows; the panel says that too, and stays editable, because a diff
+is a way of looking at the tree and not a reason to stop styling it.
 
 ---
 
