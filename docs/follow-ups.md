@@ -2529,6 +2529,31 @@ is really attached to is drawn nowhere. It interacts with nothing in entry 24's
 list, since no reference to these interfaces resolves by anything but the name
 they already have.
 
+## 27. A diff drops the namespace boxes, because it never collapses anything
+
+Found while fixing the style inspector, which had the same shape of bug on the
+same route and is now fixed: `/api/diff` published no resolved styles, so the
+panel emptied itself for as long as the changes drawer or the history scrubber
+was open. It publishes no `containers` either, and that half is still open —
+with `group_by_namespace` on, `/api/graph?view=l1` reports four container frames
+for `examples/home-lab` and `/api/diff` of the same view reports none. The
+editor's whole container layer is drawn off that payload, so opening the drawer
+takes the boxes off the page, and with them the drop targets, the headers and
+the fold triangles.
+
+It is not the one line the styles fix was. `render_diff` builds its two graphs
+and draws the overlay over their union; it never calls `collapse_targets` or
+`collapse_namespaces`, so a diff also silently ignores whatever the user has
+folded. Publishing containers without that would describe frames for namespaces
+the diff has not folded and the drawing beside it has, which is worse than
+publishing none. The fix is therefore to fold in `render_diff` the way
+`render_inventory` folds — after the filters, before the fingerprint, keeping
+the unfolded graph for the container payload — which also means deciding what a
+folded namespace's aggregate node should be marked as when its members changed
+in different directions. Probably "changed" whenever any member is anything but
+untouched, but that is a claim about a shape nobody has drawn yet, and it should
+be drawn before it is asserted.
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.
