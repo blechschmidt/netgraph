@@ -2203,34 +2203,83 @@ step summary.
 
 ---
 
-## 21. A rename leaves the geometry keyed by the old name
+## 21. ~~A rename leaves the geometry keyed by the old name~~ — fixed
 
-Found while making a delete take its geometry with it (`netgraph.edit.cascade`).
-The delete half is fixed; the rename half is not, and it is the same defect one
-operation over.
+**Status:** closed 2026-08-16. `netgraph.edit.rename` is the plan,
+`tests/test_rename.py` the guard.
 
-`netgraph edit rename sw-a sw-b` rewrites every *reference* to `sw-a` — a cable
-end, a tunnel's `over`, an adapter's `attached_to` — in the spelling its author
-chose. It does not rewrite the **layout keys** that place it, nor a note's
-anchor or an area's member list. So a rename hands back a tree carrying a `W138`
-and possibly a `W142`, and the arrangement of the renamed device is lost: it is
-drawn wherever the engine puts it, and `netgraph layout --prune` will drop the
-coordinates rather than move them.
+Found while making a delete take its geometry with it (`netgraph.edit.cascade`),
+and it was the same defect one operation over. `netgraph edit rename sw-a sw-b`
+rewrote every *reference* to `sw-a` — a cable end, a tunnel's `over`, an
+adapter's `attached_to` — and nothing else, so the **layout keys** that placed
+it, a note's anchor and an area's member list were left naming a name that no
+longer existed: a `W138`, possibly a `W142`, and an arrangement lost silently,
+because the element was then drawn wherever the engine put it and `netgraph
+layout --prune` dropped the coordinates rather than moving them.
 
-It is visible today in `tests/fixtures/drawio/arranged-edited.plan.json`, where
-`hosts/srv-app` is renamed to `srv-web` and the golden still carries a node key
-spelled `hosts/srv-app`.
+### What changed
 
-The fix has the same three parts as the cascade and can reuse two of them:
-`_placed_element` already says which element a layout key depends on, and
-`annotation_references` already walks a note's anchor and an area's members. What
-a rename needs on top is the *spelling* rule — a short key stays short if a short
-key still resolves, exactly as `reference_text` decides for a reference — because
-rewriting `sw-a` to `sites/hq/sw-b` in a document that sits in `sites/hq/` would
-be correct and unreadable.
+`plan_rename(inventory, old=…, new=…)` returns what else a rename has to
+rewrite, computed without touching anything, the way `plan_cascade` does for a
+delete — and it reuses the two pieces the cascade had already built rather than
+re-deciding either question: `placed_element` says which element a layout key
+depends on, `annotation_references` walks a note's anchor and an area's members.
+`_repoint` in `netgraph.edit.apply` carries the plan out, so `edit move` gets it
+too — a move that changes an element's namespace is a rename of its address.
 
-Not done here because it is a change to `rename`, and this entry is what stops it
-being forgotten rather than an argument that it does not matter.
+The third part, which a delete never needed because a delete never has to *write*
+a name, is the spelling rule, and it is `reference_text`'s: the shape the author
+chose first, then the shapes that are still correct, and the fully-qualified name
+last. So a layout in `sites/hq/` that wrote `sw-a` writes `sw-b`, one at the root
+that wrote `sites/hq/sw-a` writes `sites/hq/sw-b`, and a short key is promoted
+only when it stops resolving — which is what a rename across namespaces, or onto
+a short name a second element already answers to, actually does to it.
+
+A key is re-spelled in place rather than re-appended: `ruamel`'s `insert` puts it
+back at the position it held, with the comment that was beside it, so renaming a
+device arranged in three blocks of a hand-edited layout file is a three-line
+diff. The derived ids §18 allows are carried too — `adp-usb-eth#upstream` and
+`tunnel:sites/hq/vx-100` decorate an address at either end, and neither
+decoration is part of the name.
+
+`tests/fixtures/drawio/arranged-edited.plan.json`, the reproduction this entry
+named, now carries `hosts/srv-web` at the coordinates `hosts/srv-app` had. That
+took one more change than the rename itself: `netgraph import drawio` orders the
+geometry write *after* the renames and builds it from the arrangement the tree
+held before the import, so it was putting the old key straight back into the file
+the rename had just fixed — the same shape as the deleted-key bug fixed one entry
+earlier, and fixed the same way, by teaching `_geometry_operations` what the
+import is about to rename.
+
+### The guard
+
+`tests/test_rename.py`, and the invariant is the cascade's one operation over:
+**a rename never leaves a finding behind, and everything the arrangement places
+is still drawn exactly where it was.** Both are asserted for every element of
+every arranged and annotated fixture in the repository. The second is the one
+that matters, and the one "no new warning" would not catch on its own: it
+compares the *resolved* geometry, so a key left spelled the old way simply stops
+placing anything and shows up as a box that moved.
+
+### Left out deliberately
+
+An area's `selector`. It names a pattern, not an element, and netgraph cannot
+tell whether the pattern was meant to match the old name or merely happened to —
+`namespace: sites/north` survives a rename inside that namespace, and a
+`labels:` query may or may not. Rewriting one would be guessing, and §21 already
+reports what a selector matches.
+
+Group keys, for the opposite reason: a group key is a *namespace*, and renaming
+an element never renames the folder it is in. Renaming a namespace is
+`netgraph edit move` over every element in it, and each of those moves carries
+its own geometry.
+
+Nothing was done about a layout key spelled short in a document where a short key
+never resolved — `tunnel:vx-100` at the root of a tree whose tunnel is in
+`sites/hq/`. It placed nothing before the rename and places nothing after it;
+`W138` does not report it because a `:` makes the key a derived id it cannot
+judge, and inventing a diagnostic for it belongs with `netgraph layout --prune`,
+which builds the drawing that could answer it.
 
 ---
 

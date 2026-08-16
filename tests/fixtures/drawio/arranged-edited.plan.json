@@ -117,10 +117,28 @@
           "after": 697.0
         },
         {
+          "path": "spec.views.l1.nodes.hosts/srv-web",
+          "after": {
+            "position": {
+              "x": 407.0,
+              "y": 232.0
+            }
+          }
+        },
+        {
           "path": "spec.views.l1.nodes.hosts/pc-2",
           "before": {
             "position": {
               "x": 733.0,
+              "y": 232.0
+            }
+          }
+        },
+        {
+          "path": "spec.views.l1.nodes.hosts/srv-app",
+          "before": {
+            "position": {
+              "x": 407.0,
               "y": 232.0
             }
           }
@@ -154,7 +172,7 @@
                     "y": 232.0
                   }
                 },
-                "hosts/srv-app": {
+                "hosts/srv-web": {
                   "position": {
                     "x": 407.0,
                     "y": 232.0

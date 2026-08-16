@@ -2233,10 +2233,12 @@ def edit_delete_command(
 def edit_rename_command(
     app: AppContext, address: str, new_name: str, dry_run: bool, as_json: bool, force: bool
 ) -> None:
-    """Rename an element, and every reference to it across the tree.
+    """Rename an element, and everything that names it across the tree.
 
-    A reference keeps the spelling its author chose: a short name stays short
-    where a short name still resolves, and a qualified one stays qualified.
+    That is three things, not one: the references to it, the layout keys that
+    place it (§18), and the note anchors and area members about it (§21). Each
+    keeps the spelling its author chose — a short name stays short where a short
+    name still resolves, and a qualified one stays qualified.
     """
     _run_edit(
         app,

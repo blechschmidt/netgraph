@@ -96,6 +96,8 @@ from netgraph.edit.operations import (
     SetGeometry,
     SetLinkGeometry,
 )
+from netgraph.edit.references import NameIndex
+from netgraph.edit.rename import respelled_key
 from netgraph.layout.document import inline_entry
 from netgraph.layout.geometry import COORDINATE_PLACES, round_coordinate
 from netgraph.layout.resolve import resolve_key
@@ -1080,6 +1082,7 @@ def _geometry_operations(state: _State) -> tuple[Operation, ...]:
         )
 
     doomed = _doomed_keys(state)
+    renamed, after = _renamed_keys(state)
     operations: list[Operation] = []
     for (layout, namespace), entries in sorted(pending.items()):
         merged = {
@@ -1088,10 +1091,11 @@ def _geometry_operations(state: _State) -> tuple[Operation, ...]:
             if placed_element(key, inventory=state.inventory, namespace=namespace) not in doomed
         }
         merged.update(entries)
+        placed = _respell(state, merged, namespace, renamed, after)
         operations.append(
             SetGeometry(
                 view=view,
-                nodes=dict(sorted(merged.items())),
+                nodes=dict(sorted(placed.items())),
                 layout=layout,
                 namespace=namespace,
                 file=state.options.file if (layout, namespace) == default else None,
@@ -1114,6 +1118,58 @@ def _doomed_keys(state: _State) -> frozenset[str]:
     if not addresses:
         return frozenset()
     return frozenset(plan_cascade(state.inventory, addresses).elements)
+
+
+def _renamed_keys(state: _State) -> tuple[Mapping[str, str], NameIndex]:
+    """The renames this import makes, and the name table they leave behind.
+
+    The geometry write runs *after* the renames and replaces a whole section,
+    so it has to speak the new names: the entries it carries across were read
+    from the tree as it was before the import, and writing them back unchanged
+    would put the old key straight back into the file the rename had just
+    fixed. The name table is returned with it because deciding how to *spell*
+    the new key means resolving against the tree as it will be.
+    """
+    renamed: dict[str, str] = {}
+    for operation in state.renames:
+        if not isinstance(operation, RenameElement):  # pragma: no cover - only renames are here
+            continue
+        namespace = namespace_of(operation.address)
+        renamed[operation.address] = (
+            f"{namespace}/{operation.new_name}" if namespace else operation.new_name
+        )
+    index = NameIndex(state.inventory.elements if renamed else ())
+    for old, new in renamed.items():
+        index = index.replaced(old, new)
+    return renamed, index
+
+
+def _respell(
+    state: _State,
+    entries: Mapping[str, Any],
+    namespace: str,
+    renamed: Mapping[str, str],
+    after: NameIndex,
+) -> dict[str, Any]:
+    """``entries`` with the keys of renamed elements written the new way.
+
+    The renamed keys are written last, so that a rename onto a spelling the
+    document already carries — stale geometry left by an earlier element of that
+    name — leaves the live element's coordinates rather than the dead one's.
+    That is the same way round :func:`netgraph.edit.apply._rekey` decides it.
+    """
+    if not renamed:
+        return dict(entries)
+    placed: dict[str, Any] = {}
+    moved: dict[str, Any] = {}
+    for key, entry in entries.items():
+        new = renamed.get(placed_element(key, inventory=state.inventory, namespace=namespace))
+        if new is None:
+            placed[key] = entry
+        else:
+            moved[respelled_key(key, new=new, namespace=namespace, index=after)] = entry
+    placed.update(moved)
+    return placed
 
 
 def _owner_of(inventory: Inventory, key: str, view: str) -> tuple[str, str] | None:

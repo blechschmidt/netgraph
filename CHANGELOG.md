@@ -1133,6 +1133,21 @@ publish a version whose section is missing or empty — see
 
 ### Fixed
 
+- **`netgraph edit rename` lost the arrangement of the element it renamed.** A rename
+  rewrote every *reference* to the element — a cable end, a tunnel's `over`, an adapter's
+  `attached_to` — and nothing else. But two more places write a name down, and both are
+  mapping keys rather than values: the §18 layout entries that position it, and the §21 note
+  anchors and area member lists about it. So a rename handed back a tree carrying a `W138`
+  and possibly a `W142`, and the coordinates were silently orphaned — the element was
+  redrawn wherever the engine put it, and `netgraph layout --prune` then dropped the
+  position rather than moving it. All three move together now, in every view of every layout
+  document, derived `#upstream` and `tunnel:` keys included, and each is written in the
+  spelling its document was already using: a short key stays short while a short key still
+  resolves, a qualified one stays qualified, and only a spelling that would now resolve to
+  something else — or to nothing — is promoted. `netgraph edit move` gets the same treatment,
+  which is where the promotion actually earns its keep. An area's `selector` is deliberately
+  left alone: it names a pattern rather than an element, and rewriting one would be guessing.
+
 - **The address rules now know that a namespace partitions the address space.** Without this
   a perfectly ordinary container host is reported once per container: `E004` on two containers
   built from one image, `W111` on both ends of every routed veth pair, `W105` on the bridge

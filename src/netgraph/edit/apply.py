@@ -96,6 +96,7 @@ from netgraph.edit.references import (
     references_of,
     rewrite_reference,
 )
+from netgraph.edit.rename import RenamePlan, plan_rename
 from netgraph.edit.roundtrip import YamlDocument, YamlFile
 from netgraph.edit.tree import EditableTree
 from netgraph.errors import SchemaError
@@ -745,13 +746,24 @@ def _requalify(
 
 
 def _repoint(context: _Context, *, old: str, new: str) -> None:
-    """Rewrite every reference to ``old`` so that it names ``new``.
+    """Rewrite everything that names ``old`` so that it names ``new``.
 
-    The spelling each document used is kept wherever it still resolves; see
-    :func:`~netgraph.edit.references.reference_text`.
+    Three places write a name down, and a rename that reaches only the first of
+    them hands back a tree with new warnings in it:
+
+    * a **reference** — a cable end, a tunnel's ``over``, an adapter's
+      ``attached_to`` — rewritten through :mod:`~netgraph.edit.references`;
+    * a **layout key** (§18), which is an address used as a mapping key;
+    * a **note anchor** or an **area member** (§21).
+
+    The spelling each document used is kept wherever it still resolves, for all
+    three; see :func:`~netgraph.edit.references.reference_text`, which decides
+    it, and :mod:`~netgraph.edit.rename`, which applies that decision to the two
+    that are not references.
     """
-    after = context.index.replaced(old, new)
-    for reference in dependents_of(old, context.inventory.elements, context.index):
+    index = context.index
+    after = index.replaced(old, new)
+    for reference in dependents_of(old, context.inventory.elements, index):
         if reference.source == old:  # pragma: no cover - nothing references itself
             continue
         holder = context.locate(reference.source)
@@ -759,6 +771,66 @@ def _repoint(context: _Context, *, old: str, new: str) -> None:
             new, namespace=reference.namespace, written=reference.target, index=after
         )
         rewrite_reference(context.document(holder), reference, replacement)
+    _carry_arrangement(context, plan_rename(context.inventory, old=old, new=new, index=index))
+
+
+def _carry_arrangement(context: _Context, plan: RenamePlan) -> None:
+    """Move the renamed element's geometry and annotations onto its new name.
+
+    Nothing is written when the plan is empty, which is the ordinary case: an
+    inventory with no layout document and no note must come out of a rename
+    byte-identical apart from the name itself, and in particular must not gain
+    an empty ``spec.views`` block.
+    """
+    if plan.empty:
+        return
+    for layout in dict.fromkeys(entry.layout for entry in plan.geometry):
+        source = context.inventory.layout_sources.get(layout)
+        if source is None or source.relative is None:  # pragma: no cover - always indexed
+            continue
+        data = context.tree.document(source.relative, source.index).touch()
+        for entry in plan.geometry:
+            if entry.layout != layout:
+                continue
+            section = get_field(data, ("spec", "views", entry.view, entry.section))
+            if isinstance(section, MutableMapping) and entry.key in section:
+                _rekey(section, entry.key, entry.new_key)
+    for repointed in plan.annotations:
+        relative, index = _locate_annotation(
+            context, _annotation_address(repointed.kind, repointed.fqn)
+        )
+        document = context.tree.document(relative, index).touch()
+        set_field(document, repointed.path, repointed.new_written)
+
+
+def _rekey(section: MutableMapping[Any, Any], key: str, new_key: str) -> None:
+    """Rename one mapping key in place, keeping its position and its comment.
+
+    Position matters because a hand-arranged layout file is read by a person:
+    the keys are usually in the order the diagram was built, and re-appending
+    the one that was renamed would move it to the bottom and turn a one-line
+    diff into a whole-block one. ``ruamel``'s ``insert`` is what puts it back
+    where it was; the comment written beside the key is carried across by hand,
+    because it is filed under the key's own text.
+    """
+    comments = getattr(section, "ca", None)
+    # A key spelled the new way already — stale geometry left by an earlier
+    # element of that name — loses to the entry that places the live one, and
+    # goes first so that the position computed below is the one it will land at.
+    if new_key in section:
+        del section[new_key]
+        if comments is not None:
+            comments.items.pop(new_key, None)
+    position = list(section).index(key)
+    value = section.pop(key)
+    comment = comments.items.pop(key, None) if comments is not None else None
+    insert = getattr(section, "insert", None)
+    if insert is not None:
+        insert(position, new_key, value)
+    else:  # pragma: no cover - every touched document is a round-trip tree
+        section[new_key] = value
+    if comment is not None and comments is not None:
+        comments.items[new_key] = comment
 
 
 # --------------------------------------------------------------------------- #

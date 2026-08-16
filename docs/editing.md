@@ -69,7 +69,7 @@ diagram uses:
 | `CreateElement(kind, name, namespace, spec, metadata, file)` | `create` | Adds a document declaring a new element. |
 | `CopyElement(address, name, namespace, suffix, keep_unique, rewrite, file)` | `copy` | Writes a second element built from an existing one; see [copying](#copying-cutting-and-pasting). |
 | `DeleteElement(address, cascade)` | `delete` | Removes it, and the file if it was the last document in it; `cascade` takes what [cannot outlive it](#deleting-asks-first). |
-| `RenameElement(address, new_name)` | `rename` | Changes `metadata.name`, and every reference to it. |
+| `RenameElement(address, new_name)` | `rename` | Changes `metadata.name`, every reference to it, the geometry that placed it and the annotations about it. |
 | `MoveElement(address, file, index)` | `move` | Moves the document, verbatim, possibly to another namespace. |
 | `SetField(address, path, value)` | `set` | Writes a value at a field path. |
 | `UnsetField(address, path)` | `unset` | Removes it. |
@@ -252,6 +252,32 @@ directions: the references *to* the moved element are re-spelled, and the
 references the moved document *makes* are re-spelled too, because a plain name
 resolves outwards from the folder its document sits in and a document that
 changes folders can otherwise silently start naming something else.
+
+### The rename reaches the drawing too
+
+A reference is not the only place a name is written down. Two more are, and both
+of them are keys rather than values, which is why they went unnoticed for
+longer:
+
+**Geometry (§18).** A layout document places a node under a key that *is* the
+element's address — including the derived ids §18 allows, `adp-usb-eth#upstream`
+for an adapter's attachment and `tunnel:sites/hq/vx-100` for a tunnel drawn as a
+box. The key moves with the name, in every view of every layout document, so an
+element arranged on the L1 and the L2 diagram keeps both arrangements. A rename
+that left the key behind produced a
+[`W138`](validation-rules.md#w138--stale-diagram-geometry) and an arrangement
+lost silently: the element was redrawn wherever the engine put it, and `netgraph
+layout --prune` then dropped the coordinates rather than moving them.
+
+**Annotations (§21).** A note's `spec.anchor` and an area's `spec.members[]`
+name elements, and a stale one is
+[`W142`](validation-rules.md#w142--annotation-about-something-that-is-gone).
+Both are re-spelled by the rule above, so a member list written short stays
+short.
+
+An area's `selector` is deliberately left alone. It names a *pattern* rather than
+an element, and netgraph cannot tell whether the pattern was meant to match the
+old name or merely happened to — rewriting one would be guessing.
 
 ### Deleting asks first
 

@@ -29,6 +29,9 @@ spelling each document used. :mod:`netgraph.edit.cascade` says what a *delete*
 therefore has to take with it — the links that cannot exist without it, the §21
 annotations the loader would refuse without it, the §18 geometry that placed it —
 and a delete either takes all of it or refuses and names what is in the way.
+:mod:`netgraph.edit.rename` is the same three layers for a rename: the geometry
+and the annotations move onto the new name rather than being left behind, in the
+spelling the document that holds them was already using.
 
 **Safe.** :mod:`netgraph.edit.session` hashes every file it reads and refuses to
 write over one that moved, and loads and validates the tree as it *would be*
@@ -114,6 +117,7 @@ from netgraph.edit.operations import (
 from netgraph.edit.paths import format_field_path, parse_field_path
 from netgraph.edit.placement import COLLECTION_STEMS, FileFacts, choose_file
 from netgraph.edit.references import NameIndex, Reference, ReferenceRole, references_of
+from netgraph.edit.rename import RenamePlan, plan_rename
 from netgraph.edit.roundtrip import YamlDocument, YamlFile
 from netgraph.edit.session import EditSession, EditSummary, Mark
 from netgraph.edit.tree import EditableTree, TreeSnapshot, digest_of
@@ -165,6 +169,7 @@ __all__ = [
     "RemoveFile",
     "RemoveInterface",
     "RenameElement",
+    "RenamePlan",
     "RoundTripError",
     "SetField",
     "SetGeometry",
@@ -195,6 +200,7 @@ __all__ = [
     "parse_field_path",
     "paste_plan",
     "plan_cascade",
+    "plan_rename",
     "references_of",
     "strip_unique",
     "unique_fields_markdown",
