@@ -420,9 +420,11 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         section="Editing the inventory",
         keys=("Delete", "Backspace"),
         detail=(
-            "Removes everything selected, or the focused element when nothing is. "
-            "Asks once, listing what goes and the cables that dangle as a result, "
-            "and writes it as one change. 'netgraph edit delete' / 'disconnect'."
+            "Removes everything selected, or the focused element when nothing is, "
+            "and everything that cannot survive it: the cables, the tunnels over "
+            "them, the notes anchored to them, the coordinates that placed them. "
+            "Asks once when that is more than you named, and writes the lot as one "
+            "change. 'netgraph edit delete --cascade' / 'disconnect'."
         ),
         where="canvas",
         needs="write",

@@ -2203,6 +2203,37 @@ step summary.
 
 ---
 
+## 21. A rename leaves the geometry keyed by the old name
+
+Found while making a delete take its geometry with it (`netgraph.edit.cascade`).
+The delete half is fixed; the rename half is not, and it is the same defect one
+operation over.
+
+`netgraph edit rename sw-a sw-b` rewrites every *reference* to `sw-a` — a cable
+end, a tunnel's `over`, an adapter's `attached_to` — in the spelling its author
+chose. It does not rewrite the **layout keys** that place it, nor a note's
+anchor or an area's member list. So a rename hands back a tree carrying a `W138`
+and possibly a `W142`, and the arrangement of the renamed device is lost: it is
+drawn wherever the engine puts it, and `netgraph layout --prune` will drop the
+coordinates rather than move them.
+
+It is visible today in `tests/fixtures/drawio/arranged-edited.plan.json`, where
+`hosts/srv-app` is renamed to `srv-web` and the golden still carries a node key
+spelled `hosts/srv-app`.
+
+The fix has the same three parts as the cascade and can reuse two of them:
+`_placed_element` already says which element a layout key depends on, and
+`annotation_references` already walks a note's anchor and an area's members. What
+a rename needs on top is the *spelling* rule — a short key stays short if a short
+key still resolves, exactly as `reference_text` decides for a reference — because
+rewriting `sw-a` to `sites/hq/sw-b` in a document that sits in `sites/hq/` would
+be correct and unreadable.
+
+Not done here because it is a change to `rename`, and this entry is what stops it
+being forgotten rather than an argument that it does not matter.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

@@ -25,8 +25,10 @@ one, exactly — so an undo stack is a list and undo is applying it backwards.
 
 **Reference-aware.** :mod:`netgraph.edit.references` reads the references off the
 models, so a rename rewrites every mention of the element across the tree in the
-spelling each document used, and a delete either takes the cables and tunnels
-that terminate on the element with it or refuses and names them.
+spelling each document used. :mod:`netgraph.edit.cascade` says what a *delete*
+therefore has to take with it — the links that cannot exist without it, the §21
+annotations the loader would refuse without it, the §18 geometry that placed it —
+and a delete either takes all of it or refuses and names what is in the way.
 
 **Safe.** :mod:`netgraph.edit.session` hashes every file it reads and refuses to
 write over one that moved, and loads and validates the tree as it *would be*
@@ -48,6 +50,7 @@ from netgraph.edit.arrange import (
     describe_arrangement,
 )
 from netgraph.edit.batch import Batch, BatchResult
+from netgraph.edit.cascade import CascadePlan, plan_cascade
 from netgraph.edit.clipboard import (
     CLIPBOARD_FORMAT,
     DEFAULT_SUFFIX,
@@ -133,6 +136,7 @@ __all__ = [
     "AppliedOperation",
     "Batch",
     "BatchResult",
+    "CascadePlan",
     "CascadeRequired",
     "ConflictError",
     "Connect",
@@ -190,6 +194,7 @@ __all__ = [
     "operations_to_json",
     "parse_field_path",
     "paste_plan",
+    "plan_cascade",
     "references_of",
     "strip_unique",
     "unique_fields_markdown",

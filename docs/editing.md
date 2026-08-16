@@ -68,7 +68,7 @@ diagram uses:
 |---|---|---|
 | `CreateElement(kind, name, namespace, spec, metadata, file)` | `create` | Adds a document declaring a new element. |
 | `CopyElement(address, name, namespace, suffix, keep_unique, rewrite, file)` | `copy` | Writes a second element built from an existing one; see [copying](#copying-cutting-and-pasting). |
-| `DeleteElement(address, cascade)` | `delete` | Removes it, and the file if it was the last document in it. |
+| `DeleteElement(address, cascade)` | `delete` | Removes it, and the file if it was the last document in it; `cascade` takes what [cannot outlive it](#deleting-asks-first). |
 | `RenameElement(address, new_name)` | `rename` | Changes `metadata.name`, and every reference to it. |
 | `MoveElement(address, file, index)` | `move` | Moves the document, verbatim, possibly to another namespace. |
 | `SetField(address, path, value)` | `set` | Writes a value at a field path. |
@@ -77,7 +77,7 @@ diagram uses:
 | `AddInterface(address, interface, index)` | `add-interface` | Appends to `spec.interfaces`. |
 | `RemoveInterface(address, name, cascade)` | `remove-interface` | Removes a port, and what terminated on it. |
 | `Connect(a, b, spec, name, namespace, file)` | `connect` | Creates a cable between two interfaces. |
-| `Disconnect(address)` | `disconnect` | Removes a cable. |
+| `Disconnect(address, cascade)` | `disconnect` | Removes a cable, and the geometry that routed it. |
 | `SetGeometry(view, nodes, edges, groups, routing, layout, namespace, file)` | `set-geometry` | Writes one view of a [`kind: layout`](schema.md#18-layout-diagram-geometry) document. |
 | `SetLinkGeometry(view, link, waypoints, routing, label, layout, namespace, file)` | `set-link-geometry` | Writes one *link's* geometry into that document: its bends, its routing style and where its label sits. |
 | `CreateAnnotation(kind, name, namespace, spec, metadata, file)` | `create-annotation` | Adds a `note`, `area` or `legend` document ([§21](schema.md#21-diagram-annotations-notes-areas-and-legends)). |
@@ -274,6 +274,44 @@ their memberships rather than taking the groups with them, which is the right wa
 round; marking the account `status: departed` instead keeps the memberships
 *visible* until they have been revoked
 ([`W140`](validation-rules.md#w140--departed-user-still-in-a-group)).
+
+Clearing a reference tidies up what it makes untrue as well as what it leaves
+empty: dropping one of two power inputs also drops `redundant: true`, because
+that flag claims the device survives losing a feed and one feed does not
+([`E042`](validation-rules.md#e042--redundant-power-that-is-not-redundant)) — and
+since that is a *load* error, leaving it
+behind would take the device out of the inventory and dangle every cable on it.
+
+### The delete reaches the drawing too
+
+An element is drawn as well as declared, and both go:
+
+**Annotations (§21)** follow the same structural-or-optional rule, decided by
+§21's own coherence checks rather than by a table. A note anchored to the deleted
+element and *placed* somewhere keeps its text and loses its anchor; a note that
+is only anchored cannot be drawn at all without it and is a dependent, named in
+the refusal and removed by `--cascade`. An area drops the doomed members, and
+goes only if that would leave it with no members, no selector and no rectangle.
+The rule in one line: **an annotation is removed exactly when clearing its
+references would leave a document the loader refuses.**
+
+**Geometry (§18) is never a dependency.** The positions, waypoints and group
+boxes that placed what is being deleted are dropped without being asked about,
+because coordinates for something that is gone are not a claim about the network
+— they are litter, and the diagnostic for them
+([`W138`](validation-rules.md#w138--stale-diagram-geometry)) exists precisely
+because deletes used to leave them. A `netgraph edit delete` of one switch used
+to hand back a tree with
+a warning per cable it took; it now hands back the tree it found, minus the
+switch. A section, a view, a document and a file left empty by the last entry are
+each dropped in turn.
+
+This is deliberately *not* `netgraph layout --prune`, which drops every key the
+current drawing lacks — including the position of a device merely filtered out of
+the view. A cascade removes the geometry of what it is itself removing. Derived
+keys spelled `subnet:` and `rack:` are left alone for the same reason: those nodes
+exist because of what the *surviving* elements say, and whether the last one has
+gone is a question only the layout engine can answer.
 
 ## Placement
 

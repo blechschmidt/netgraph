@@ -312,7 +312,7 @@ netgraph [GLOBAL OPTIONS] edit delete [OPTIONS] ADDRESS
 <!-- generated: options edit delete -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--cascade` | — | off | Also delete the cables and tunnels that terminate on it, and clear the optional references to it. |
+| `--cascade` | — | off | Also delete the cables and tunnels that terminate on it, and the notes and areas that cannot be drawn without it, and clear the optional references to it. |
 | `-n`, `--dry-run` | — | off | Write nothing; print the unified diff the edit would apply. |
 | `--json` | — | off | Print the applied operations and their inverses as JSON, so a caller can keep an undo stack. |
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
@@ -383,6 +383,7 @@ netgraph [GLOBAL OPTIONS] edit disconnect [OPTIONS] ADDRESS
 <!-- generated: options edit disconnect -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
+| `--cascade` | — | off | Also delete the notes and areas that cannot be drawn without the cable. |
 | `-n`, `--dry-run` | — | off | Write nothing; print the unified diff the edit would apply. |
 | `--json` | — | off | Print the applied operations and their inverses as JSON, so a caller can keep an undo stack. |
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |

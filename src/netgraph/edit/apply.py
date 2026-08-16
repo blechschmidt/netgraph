@@ -46,12 +46,13 @@ comment that sat above the key, and no semantic operation carries either.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, MutableMapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
 import yaml as pyyaml
 
+from netgraph.edit.cascade import CascadePlan, ClearedReference, plan_cascade
 from netgraph.edit.clipboard import dedupe_name, strip_unique
 from netgraph.edit.errors import AddressError, CascadeRequired, EditError, OperationError
 from netgraph.edit.operations import (
@@ -76,7 +77,14 @@ from netgraph.edit.operations import (
     UnsetField,
     WriteFile,
 )
-from netgraph.edit.paths import MISSING, get_field, parse_field_path, set_field, unset_field
+from netgraph.edit.paths import (
+    MISSING,
+    FieldPath,
+    get_field,
+    parse_field_path,
+    set_field,
+    unset_field,
+)
 from netgraph.edit.placement import check_file, choose_file, namespace_of_file
 from netgraph.edit.references import (
     NameIndex,
@@ -449,78 +457,189 @@ def _delete(context: _Context, operation: DeleteElement) -> tuple[Operation, ...
 
 def _remove_elements(
     context: _Context, targets: Sequence[_Located], *, cascade: bool
-) -> tuple[str, ...]:
-    """Delete these elements, and whatever cannot survive without them.
+) -> CascadePlan:
+    """Delete these elements, and everything that cannot outlive them.
+
+    The set is :func:`~netgraph.edit.cascade.plan_cascade`'s, which is three
+    layers deep: the elements whose *structure* depends on a target, the
+    annotations §21 would refuse to load without it, and the §18 geometry that
+    placed it. The first two are dependents and need ``cascade``; the third
+    never does, because coordinates for something that is gone are not a
+    dependency — they are litter, and leaving them behind is how deleting one
+    switch used to hand back a tree with eight new ``W138`` warnings in it.
 
     Returns:
-        Every fully-qualified name that was removed, in load order.
+        The plan that was carried out, so a caller can say what it did.
 
     Raises:
-        CascadeRequired: Something refers to a target and ``cascade`` is off.
+        CascadeRequired: Something depends on a target and ``cascade`` is off.
     """
-    index = context.index
-    doomed = {located.fqn for located in targets}
-    holders: dict[str, _Located] = {located.fqn: located for located in targets}
-
-    # A link dies with either of its ends, and a tunnel dies with the tunnel it
-    # runs inside -- so the closure has to be taken rather than one pass made.
-    pending = list(doomed)
-    clearing: list[Reference] = []
-    while pending:
-        target = pending.pop()
-        for reference in dependents_of(target, context.inventory.elements, index):
-            if reference.source in doomed:
-                continue
-            if reference.role.is_structural:
-                doomed.add(reference.source)
-                holders[reference.source] = context.locate(reference.source)
-                pending.append(reference.source)
-            else:
-                clearing.append(reference)
-
-    asked_for = {located.fqn for located in targets}
-    dependents = sorted({reference.source for reference in clearing} | (doomed - asked_for))
-    if dependents and not cascade:
-        listed = ", ".join(dependents)
+    plan = plan_cascade(
+        context.inventory, (located.fqn for located in targets), index=context.index
+    )
+    if plan.takes_more and not cascade:
+        listed = ", ".join(plan.dependents)
         raise CascadeRequired(
-            f"{', '.join(sorted(asked_for))} is referred to by {listed}; "
+            f"{', '.join(plan.asked)} is referred to by {listed}; "
             f"delete those too with --cascade, or change them first",
             address=targets[0].fqn,
-            dependents=dependents,
+            dependents=plan.dependents,
         )
 
-    # Clear the optional references before the documents go, so that a document
-    # holding both a reference to a doomed element and a doomed element of its
-    # own is handled in one pass.
-    for reference in clearing:
-        if reference.source in doomed:
-            continue
-        holder = context.locate(reference.source)
-        drop_reference(context.document(holder), reference)
-        _tidy_after_drop(context, holder, reference)
+    # Order matters once and only once: every *edit* to a surviving document is
+    # made before any document is *removed*, because removing one renumbers the
+    # documents after it in its file and a path computed beforehand would then
+    # land on the wrong one. So the edits go first, the removals are collected
+    # rather than made as they are found, and the sweep takes the highest index
+    # in each file first.
+    doomed = list(_drop_geometry(context, plan))
+    for cleared in plan.cleared:
+        _clear_reference(context, cleared)
+    doomed.extend(_doomed_documents(context, plan))
 
-    # Highest document index first, so removing one does not renumber the next.
-    for fqn in sorted(doomed, key=lambda name: (holders[name].relative, -holders[name].index)):
-        located = holders[fqn]
-        context.tree.remove_document(located.relative, located.index)
-    return tuple(sorted(doomed))
+    for relative, index in sorted(set(doomed), key=lambda entry: (entry[0], -entry[1])):
+        context.tree.remove_document(relative, index)
+    return plan
+
+
+def _doomed_documents(context: _Context, plan: CascadePlan) -> Iterator[tuple[str, int]]:
+    """Where every document the plan removes lives, elements and annotations alike."""
+    for fqn in plan.elements:
+        located = context.locate(fqn)
+        yield located.relative, located.index
+    for doomed in plan.annotations:
+        yield _locate_annotation(context, _annotation_address(doomed.kind, doomed.fqn))
+
+
+def _annotation_address(kind: str, fqn: str) -> DeleteAnnotation:
+    """An annotation's fully-qualified name, as the operation that names one."""
+    return DeleteAnnotation(kind=kind, name=short_name(fqn), namespace=namespace_of(fqn))
+
+
+def _clear_reference(context: _Context, cleared: ClearedReference) -> None:
+    """Drop one reference from a document that survives the delete.
+
+    An element's reference is dropped through :mod:`~netgraph.edit.references`,
+    which checks that the raw document still reads as the model said before it
+    touches it — the check that stops a value a *template* contributed from
+    being edited in the document that merely inherited it. An annotation's is a
+    plain path, because §21 has no templates and no inheritance.
+    """
+    if cleared.reference is not None:
+        holder = context.locate(cleared.holder)
+        drop_reference(context.document(holder), cleared.reference)
+        _tidy_after_drop(context, holder, cleared.reference)
+        return
+    relative, index = _locate_annotation(context, _annotation_address(cleared.kind, cleared.holder))
+    document = context.tree.document(relative, index).touch()
+    container = get_field(document, cleared.path[:-1])
+    key = cleared.path[-1]
+    if isinstance(container, list) and isinstance(key, int):
+        container.pop(key)
+    elif isinstance(container, dict) and key in container:
+        del container[key]
+    _tidy_annotation(document, cleared.path)
+
+
+def _tidy_annotation(document: Any, path: FieldPath) -> None:
+    """Remove what a dropped annotation reference leaves behind that means nothing.
+
+    An anchor with neither ``element`` nor ``link`` is refused by §21, and so is
+    an empty ``members`` list on an area that has a selector or a rectangle. The
+    key that held the reference is dropped when nothing is left in it.
+    """
+    parent = get_field(document, path[:-1])
+    if isinstance(parent, (dict, list)) and not parent:
+        unset_field(document, path[:-1])
+
+
+def _drop_geometry(context: _Context, plan: CascadePlan) -> Iterator[tuple[str, int]]:
+    """Take the deleted things out of every layout document that placed them (§18).
+
+    The entries are removed from the raw document rather than rewritten through
+    ``SetGeometry``, so the comments, the key order and the inline flow style of
+    a hand-arranged file survive somebody deleting one switch out of forty. A
+    section and a view that end up empty are dropped in turn — a view holding
+    ``nodes: {}`` places nothing and says so at the top of the file.
+
+    Yields:
+        The layout documents left placing nothing at all, for the caller's own
+        removal pass rather than removed here: a removal renumbers the documents
+        after it in its file, so every removal a delete makes has to happen in
+        one sorted sweep or two of them can land on the wrong document.
+    """
+    for fqn in sorted({entry.layout for entry in plan.geometry}):
+        source = context.inventory.layout_sources.get(fqn)
+        if source is None or source.relative is None:  # pragma: no cover - always indexed
+            continue
+        data = context.tree.document(source.relative, source.index).touch()
+        spec = get_field(data, ("spec",))
+        views = get_field(spec, ("views",)) if isinstance(spec, dict) else MISSING
+        if not isinstance(views, dict):  # pragma: no cover - a layout always has views
+            continue
+        for entry in plan.geometry:
+            if entry.layout != fqn:
+                continue
+            view = views.get(entry.view)
+            section = view.get(entry.section) if isinstance(view, dict) else None
+            if isinstance(section, dict):
+                section.pop(entry.key, None)
+        if _tidy_layout(data, views):
+            yield source.relative, source.index
+
+
+def _tidy_layout(data: Any, views: dict[str, Any]) -> bool:
+    """Drop every level of a layout document the last entry left empty.
+
+    Returns:
+        ``True`` when the document now places nothing and should be removed.
+    """
+    for view in list(views):
+        geometry = views[view]
+        if not isinstance(geometry, dict):  # pragma: no cover - schema-checked on load
+            continue
+        for section in ("nodes", "edges", "groups"):
+            if section in geometry and not geometry[section]:
+                del geometry[section]
+        if not set(geometry) - {"routing"}:
+            del views[view]
+    if views:
+        return False
+    spec = get_field(data, ("spec",))
+    spec.pop("views", None)
+    if not spec:
+        data.pop("spec", None)
+    return not _has_geometry(data)
 
 
 def _tidy_after_drop(context: _Context, holder: _Located, reference: Reference) -> None:
-    """Remove what a dropped reference leaves behind that means nothing on its own.
+    """Remove what a dropped reference leaves behind that is no longer true.
 
-    ``spec.power.inputs`` is the case: the schema refuses ``powered_by: outlet``
-    with no inputs (§17), so dropping the last input has to drop the block that
-    declared it rather than leave a document the loader rejects.
+    ``spec.power.inputs`` is the only case, and it has two halves, both of them
+    §17's own arithmetic rather than a policy invented here:
+
+    * **No inputs left.** An empty list says nothing, so the key goes, and the
+      ``power`` block goes with it if the list was all it said. A device that
+      also declares ``powered_by`` or a draw keeps those: they are facts about
+      the hardware, not about the PDU that was deleted.
+    * **One input left, under ``redundant: true``.** That flag claims the device
+      survives losing a feed, which needs two (``NG-E015``); with one it is a
+      false statement about the network, and a delete that leaves one behind is
+      a delete that silently made the inventory wrong. It goes with the feed it
+      was about.
     """
     if reference.role is not ReferenceRole.POWER_INPUT:
         return
     document = context.tree.document(holder.relative, holder.index).touch()
+    power = get_field(document, ("spec", "power"))
     inputs = get_field(document, ("spec", "power", "inputs"))
-    if isinstance(inputs, list) and not inputs:
-        power = get_field(document, ("spec", "power"))
+    if not isinstance(inputs, list) or not isinstance(power, dict):  # pragma: no cover - schema
+        return
+    if len(inputs) < 2 and power.get("redundant"):
+        del power["redundant"]
+    if not inputs:
         del power["inputs"]
-        if isinstance(power, dict) and not power:
+        if not power:
             unset_field(document, ("spec", "power"))
 
 
@@ -950,7 +1069,7 @@ def _disconnect(context: _Context, operation: Disconnect) -> tuple[Operation, ..
         raise EditError(
             f"{located.fqn} is a {located.element.kind}, not a cable; use 'delete' for it"
         )
-    _remove_elements(context, [located], cascade=False)
+    _remove_elements(context, [located], cascade=operation.cascade)
     return None
 
 

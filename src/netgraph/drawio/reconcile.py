@@ -84,6 +84,7 @@ from netgraph.drawio.markup import html_to_markup, markup_html, plain_text
 from netgraph.drawio.model import Cell, Diagram, absolute_geometry
 from netgraph.drawio.notes import Level, Note
 from netgraph.drawio.styles import NOTE_SHAPE
+from netgraph.edit.cascade import placed_element, plan_cascade
 from netgraph.edit.operations import (
     Connect,
     CreateAnnotation,
@@ -1057,6 +1058,13 @@ def _geometry_operations(state: _State) -> tuple[Operation, ...]:
     a key goes to is decided by which one already holds it — so two people
     arranging two sites, each in their own layout file, do not end up with one
     file holding both and a duplicate-key conflict in the other.
+
+    "The entries it already holds" is read from the tree as it was *before* this
+    import, which still places everything the import deletes — so the deleted
+    keys are taken out here. Otherwise the geometry write, which runs last,
+    would put back the coordinates the delete had just cleaned up, and a diagram
+    with one node dragged onto it would come back with a stale ``W138`` per
+    node removed.
     """
     if not state.moves:
         return ()
@@ -1071,9 +1079,14 @@ def _geometry_operations(state: _State) -> tuple[Operation, ...]:
             {"position": {"x": position[0], "y": position[1]}}
         )
 
+    doomed = _doomed_keys(state)
     operations: list[Operation] = []
     for (layout, namespace), entries in sorted(pending.items()):
-        merged = dict(_existing_nodes(state.inventory, layout, namespace, view))
+        merged = {
+            key: entry
+            for key, entry in _existing_nodes(state.inventory, layout, namespace, view)
+            if placed_element(key, inventory=state.inventory, namespace=namespace) not in doomed
+        }
         merged.update(entries)
         operations.append(
             SetGeometry(
@@ -1085,6 +1098,22 @@ def _geometry_operations(state: _State) -> tuple[Operation, ...]:
             )
         )
     return tuple(operations)
+
+
+def _doomed_keys(state: _State) -> frozenset[str]:
+    """Every element this import removes, cascade included.
+
+    :func:`~netgraph.edit.cascade.plan_cascade` rather than the deletion list,
+    because a deleted device takes its cables and they are placed too — and it
+    is the same function the delete itself will run, so the geometry that is
+    written back and the geometry that is cleaned up cannot disagree.
+    """
+    addresses = [
+        operation.address for operation in state.deletions if isinstance(operation, DeleteElement)
+    ]
+    if not addresses:
+        return frozenset()
+    return frozenset(plan_cascade(state.inventory, addresses).elements)
 
 
 def _owner_of(inventory: Inventory, key: str, view: str) -> tuple[str, str] | None:

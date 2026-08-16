@@ -463,17 +463,31 @@ class Connect(Operation):
 
 @dataclass(frozen=True)
 class Disconnect(Operation):
-    """Remove a cable. The devices it joined are untouched."""
+    """Remove a cable. The devices it joined are untouched.
+
+    ``cascade`` means what it means on :class:`DeleteElement`, and it is here
+    for the same reason: a cable is not only a cable. A note may be anchored to
+    it, and a note whose only tie to the canvas is that anchor is a document
+    §21 refuses without one — so it goes too, or the disconnect is refused. The
+    geometry that routed the cable is dropped either way, because a waypoint
+    for a link that is gone is not a dependency, it is litter.
+    """
 
     op: ClassVar[str] = "disconnect"
 
     address: str
+    cascade: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        return {"op": self.op, "address": self.address}
+        payload: dict[str, Any] = {"op": self.op, "address": self.address}
+        if self.cascade:
+            payload["cascade"] = True
+        return payload
 
     def describe(self) -> str:
-        return f"disconnect {self.address}"
+        return f"disconnect {self.address}" + (
+            " and everything that needs it" if self.cascade else ""
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -946,7 +960,7 @@ _FIELDS: Final[dict[str, tuple[tuple[str, ...], tuple[str, ...]]]] = {
     "add-interface": (("address", "interface"), ("index",)),
     "remove-interface": (("address", "name"), ("cascade",)),
     "connect": (("a", "b"), ("spec", "name", "namespace", "file")),
-    "disconnect": (("address",), ()),
+    "disconnect": (("address",), ("cascade",)),
     "set-geometry": (
         ("view",),
         ("nodes", "edges", "groups", "routing", "layout", "namespace", "file"),

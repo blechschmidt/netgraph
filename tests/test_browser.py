@@ -2462,26 +2462,56 @@ def test_deleting_a_file_with_unsaved_typing_keeps_the_only_copy(
     expect(page.locator("#source")).to_have_value(re.compile(r"worth keeping", re.S))
 
 
-def test_a_delete_the_inventory_refuses_says_what_refers_to_it(
+def test_a_delete_asks_what_goes_with_it_and_then_takes_it(
     open_editor: OpenEditor,
 ) -> None:
-    """A refusal has to name the thing doing the refusing, on screen.
+    """One delete, one question, and the cascade carried out.
 
     ``pc-desk`` is cabled to the switch, so deleting it alone would leave a
-    cable pointing at nothing and the edit layer refuses. What matters here is
-    that the page says which element is in the way rather than failing quietly:
-    the refusal is the only thing standing between a diagram gesture and a
-    broken inventory.
+    cable pointing at nothing. The command line refuses that and asks for
+    ``--cascade``; a canvas cannot, because a person who dragged a box to the
+    bin has already said what they want. So the editor names the cable *before*
+    the fact — read off ``/api/cascade``, which is the mutation layer's own
+    answer rather than a guess made from the picture — and then does all of it
+    as one change.
     """
     editor = open_editor(writable=True)
-    editor.console.allow("400")
+    # The question comes after a round trip to /api/cascade, so it is waited for
+    # through Playwright rather than polled for in Python -- a blocking poll here
+    # would never let the dialog event be delivered.
+    with editor.page.expect_event("dialog") as caught:
+        _delete_element(editor, "hosts/pc-desk")
+    question = caught.value.message
+    caught.value.accept()
 
-    _delete_element(editor, "hosts/pc-desk")
+    assert editor.settles(
+        lambda: not (editor.root / "hosts" / "pc-desk.yaml").exists(),
+        timeout=TIMEOUT_MS / 1000,
+    ), "the delete reached no file"
+    assert "cables/cbl-sw-desk" in question, question
+    assert "one end of it is hosts/pc-desk" in question, "and said why it goes"
+    assert "Ctrl-Z" in question
+    expect(editor.page.locator("#viewport")).not_to_contain_text("pc-desk")
 
-    expect(editor.page.locator("#toast")).to_contain_text("cables/cbl-sw-desk")
-    expect(editor.page.locator("#toast")).to_contain_text("cascade")
-    assert (editor.root / "hosts" / "pc-desk.yaml").exists(), "nothing was written"
-    expect(editor.page.locator("#viewport")).to_contain_text("pc-desk")
+
+def test_a_delete_that_takes_nothing_else_does_not_interrupt(
+    open_editor: OpenEditor,
+) -> None:
+    """The other half: a question nobody needs asked is a question not asked.
+
+    ``sw-spare`` is cabled to nothing, so there is nothing to warn about — and
+    a confirmation that always appears is one that stops being read.
+    """
+    editor = open_editor(writable=True, extra={"spare.yaml": SPARE_SWITCH})
+    asked: list[str] = []
+    editor.page.on("dialog", lambda dialog: (asked.append(dialog.message), dialog.accept()))
+
+    _delete_element(editor, "sw-spare")
+
+    assert editor.settles(
+        lambda: not (editor.root / "spare.yaml").exists(), timeout=TIMEOUT_MS / 1000
+    )
+    assert asked == []
 
 
 def test_a_create_the_inventory_refuses_writes_nothing_and_says_why(
@@ -4188,9 +4218,12 @@ def test_deleting_a_selection_asks_once_and_undoes_in_one_step(
     assert sorted(selected(editor)) == ["hosts/pc-desk", "hosts/srv-nas"]
 
     asked: list[str] = []
-    editor.page.once("dialog", lambda dialog: (asked.append(dialog.message), dialog.accept()))
+    editor.page.on("dialog", lambda dialog: (asked.append(dialog.message), dialog.accept()))
     editor.page.locator("#canvas").focus()
-    editor.press("Delete")
+    # The question follows a round trip to /api/cascade, so it is waited for
+    # through Playwright: a blocking poll would never let the event be delivered.
+    with editor.page.expect_event("dialog"):
+        editor.press("Delete")
 
     assert editor.settles(
         lambda: editor.session is not None and editor.session.revision != 1,
@@ -4198,9 +4231,11 @@ def test_deleting_a_selection_asks_once_and_undoes_in_one_step(
     ), "the bulk delete reached no file"
     assert len(asked) == 1, "a bulk delete must ask once, not once per element"
     # It listed what goes -- and the cables that go with them, which is the part
-    # a person cannot work out from the picture.
+    # a person cannot work out from the picture. Both come from the server's own
+    # plan now, so the list is the mutation layer's answer rather than a guess.
     assert "pc-desk" in asked[0] and "srv-nas" in asked[0]
     assert "cbl-sw-desk" in asked[0], asked[0]
+    assert "cbl-sw-nas" in asked[0], "srv-nas's cable too"
 
     after = _tree(editor.root)
     assert "hosts/pc-desk.yaml" not in after

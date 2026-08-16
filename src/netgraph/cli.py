@@ -2200,8 +2200,9 @@ def _copy_note(plan: CopyPlan) -> str | None:
 @click.option(
     "--cascade",
     is_flag=True,
-    help="Also delete the cables and tunnels that terminate on it, and clear the "
-    "optional references to it.",
+    help="Also delete the cables and tunnels that terminate on it, and the notes "
+    "and areas that cannot be drawn without it, and clear the optional references "
+    "to it.",
 )
 @_edit_flags
 @click.pass_obj
@@ -2210,7 +2211,10 @@ def edit_delete_command(
 ) -> None:
     """Remove an element, and the file if it was the last document in it.
 
-    Refuses, and names them, when other elements refer to it.
+    Refuses, and names them, when other documents depend on it. The diagram
+    geometry that placed it is dropped either way: coordinates for something
+    that is gone are not a dependency, and leaving them behind is what
+    ``netgraph layout --prune`` used to have to clean up afterwards.
     """
     _run_edit(
         app,
@@ -2321,15 +2325,25 @@ def edit_connect_command(
 
 @edit_command.command("disconnect")
 @click.argument("address", shell_complete=complete_element)
+@click.option(
+    "--cascade",
+    is_flag=True,
+    help="Also delete the notes and areas that cannot be drawn without the cable.",
+)
 @_edit_flags
 @click.pass_obj
 def edit_disconnect_command(
-    app: AppContext, address: str, dry_run: bool, as_json: bool, force: bool
+    app: AppContext, address: str, cascade: bool, dry_run: bool, as_json: bool, force: bool
 ) -> None:
-    """Remove a cable. The devices it joined are untouched."""
+    """Remove a cable. The devices it joined are untouched.
+
+    Its waypoints and its label position go with it — a route for a link that
+    is gone places nothing. A note anchored to it and placed nowhere else is a
+    document §21 refuses without the anchor, so that one needs ``--cascade``.
+    """
     _run_edit(
         app,
-        [Disconnect(address=address)],
+        [Disconnect(address=address, cascade=cascade)],
         dry_run=dry_run,
         as_json=as_json,
         force=force,

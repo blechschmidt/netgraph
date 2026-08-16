@@ -1476,9 +1476,10 @@ var netgraphSession = (function () {
     return netgraphSelect.targets();
   }
 
-  /** A count, worded. */
-  function many(count, noun) {
-    return count + " " + noun + (count === 1 ? "" : "s");
+  /** A count, worded. `plural` is for the nouns English does not pluralise
+   * with an s -- "layout entries", not "layout entrys". */
+  function many(count, noun, plural) {
+    return count + " " + (count === 1 ? noun : (plural || noun + "s"));
   }
 
   /** The selection when it is worth acting on as one, or null.
@@ -1719,9 +1720,10 @@ var netgraphSession = (function () {
           : (netgraphNotes.token() || selected[0] || here());
         K.prompt({
           title: "Delete",
-          detail: "An element goes with whatever cannot survive it; a cable leaves "
-            + "both devices where they are. A note, an area or a legend takes "
-            + "nothing with it — nothing in an inventory refers to one.",
+          detail: "An element goes with whatever cannot survive it — the cables, "
+            + "the tunnels over them, the notes anchored to them and the "
+            + "coordinates that placed them. You are asked first when it is more "
+            + "than what you named, and Ctrl-Z puts all of it back either way.",
           fields: [{
             name: "address",
             label: "element",
@@ -1731,21 +1733,7 @@ var netgraphSession = (function () {
           confirm: "Delete",
           onSubmit: function (values) {
             if (!values.address) { return "name what to delete"; }
-            var annotation = netgraphNotes.parse(values.address);
-            var link = !annotation && isLink(values.address);
-            var operation = annotation
-              ? {
-                op: "delete-annotation",
-                kind: annotation.kind,
-                name: annotation.name,
-                namespace: annotation.namespace
-              }
-              : (link
-                ? { op: "disconnect", address: values.address.split("#")[0] }
-                : { op: "delete", address: values.address });
-            ops([operation], annotation
-              ? "deleted " + annotation.kind + " " + annotation.fqn
-              : (link ? "disconnected " : "deleted ") + values.address).catch(function () {});
+            deleteOne(values.address);
           }
         });
       }
@@ -2030,47 +2018,127 @@ var netgraphSession = (function () {
     });
   }
 
+  /** Delete one thing the canvas can name: an element, a link or an annotation.
+   *
+   * An annotation is answered here rather than through the cascade, because
+   * nothing in an inventory refers to one: a note is only ever about something,
+   * never depended on by it, so deleting one takes nothing and needs no
+   * question. Everything else goes through `cascading`.
+   */
+  function deleteOne(address) {
+    var annotation = netgraphNotes.parse(address);
+    if (annotation) {
+      ops([{
+        op: "delete-annotation",
+        kind: annotation.kind,
+        name: annotation.name,
+        namespace: annotation.namespace
+      }], "deleted " + annotation.kind + " " + annotation.fqn).catch(function () {});
+      return;
+    }
+    cascading([address], isLink(address) ? "disconnected " + address : "deleted " + address);
+  }
+
   /** Delete a whole selection, once, having said exactly what goes.
    *
    * Two things this owes the person pressing Delete on eleven shapes:
    *
    *   * **One question.** Eleven confirmations is eleven chances to click
-   *     through without reading. The prompt lists what will go, in full for a
-   *     handful and counted for a rack.
-   *   * **The collateral, before the fact.** A cable dies with either of its
-   *     ends -- that is netgraph.edit's rule, not this file's -- so the cables
-   *     that will dangle are named here, and the batch carries `cascade` so the
-   *     server does not have to ask a second time. The set comes from the
-   *     records the drawing arrived with; see select.js.
+   *     through without reading, so there is one, and it lists what will go —
+   *     in full for a handful and counted for a rack.
+   *   * **The collateral, before the fact, and *exactly*.** See `cascading`.
+   */
+  function deleteMany(selected) {
+    var annotations = selected.filter(function (token) { return netgraphNotes.parse(token); });
+    var elements = selected.filter(function (token) { return !netgraphNotes.parse(token); });
+    cascading(elements, "deleted " + many(selected.length, "element"), {
+      extra: annotations.map(function (token) {
+        var note = netgraphNotes.parse(token);
+        return {
+          op: "delete-annotation",
+          kind: note.kind,
+          name: note.name,
+          namespace: note.namespace
+        };
+      }),
+      named: annotations,
+      done: function () { netgraphSelect.clear({ quiet: true }); }
+    });
+  }
+
+  /** Ask what a delete would take, say so if it is more, then do all of it.
+   *
+   * The whole point of the round trip: **the canvas is not the inventory.** It
+   * shows the cables that would dangle, so a client-side guess gets those
+   * right; it does not show the tunnel three levels up that runs over one of
+   * them, the note anchored to a switch in a view you are not looking at, the
+   * group that lists it as a member, or the eleven layout entries that placed
+   * all of it. `GET /api/cascade` is netgraph.edit answering with the set it
+   * will actually remove, so the question put to the person is the truth.
+   *
+   * Then it cascades, always. A delete that stops halfway to ask for a flag is
+   * a delete that has already decided the answer is yes — the useful thing is
+   * to say what "yes" costs, once, and make one Ctrl-Z undo it. Which is also
+   * why this is *one* batch: the elements, the annotations that cannot survive
+   * them and the geometry that placed them are one entry in the undo stack.
    *
    * The links go first and the elements after, so a cable that is both selected
    * *and* collateral is removed once rather than named twice.
    */
-  function deleteMany(selected) {
-    var links = netgraphSelect.links();
-    var nodes = netgraphSelect.nodes();
-    var collateral = netgraphSelect.dangling();
-    var lines = [
-      "Delete " + many(selected.length, "element") + "?",
-      "",
-      listed(nodes.concat(links))
-    ];
-    if (collateral.length) {
-      lines.push("");
-      lines.push("These links terminate on them and will go too:");
-      lines.push(listed(collateral));
-    }
-    lines.push("");
-    lines.push("This is one change: Ctrl-Z puts all of it back.");
-    if (!window.confirm(lines.join("\n"))) { return; }
-    var batch = links.map(function (address) {
-      return { op: "disconnect", address: address.split("#")[0] };
-    }).concat(nodes.map(function (address) {
-      return { op: "delete", address: address, cascade: true };
-    }));
-    ops(batch, "deleted " + many(selected.length, "element")).then(function () {
-      netgraphSelect.clear({ quiet: true });
+  function cascading(addresses, said, options) {
+    var settings = options || {};
+    var extra = settings.extra || [];
+    if (!addresses.length && !extra.length) { return; }
+    var query = addresses.map(function (address) {
+      return "address=" + encodeURIComponent(address);
+    }).join("&");
+    var asked = addresses.length ? fetch("/api/cascade?" + query, { cache: "no-store" })
+      .then(readBody) : Promise.resolve(null);
+    asked.then(function (plan) {
+      if (plan && plan.takes_more
+        && !window.confirm(cascadeQuestion(addresses.concat(settings.named || []), plan))) {
+        return;
+      }
+      var links = addresses.filter(isLink);
+      var nodes = addresses.filter(function (address) { return !isLink(address); });
+      var batch = links.map(function (address) {
+        return { op: "disconnect", address: address.split("#")[0], cascade: true };
+      }).concat(nodes.map(function (address) {
+        return { op: "delete", address: address, cascade: true };
+      })).concat(extra);
+      ops(batch, said).then(settings.done || function () {}, function () {});
     }, function () {});
+  }
+
+  /** The question a cascading delete asks, built from the server's own plan.
+   *
+   * One section per *kind* of consequence, because they are different promises:
+   * a document that goes is gone, a document that merely loses a reference to
+   * the deleted thing survives with everything else it said, and geometry is
+   * counted rather than listed — nobody wants eleven coordinates read back at
+   * them, and a stale one is the litter this is here to stop being left behind.
+   */
+  function cascadeQuestion(named, plan) {
+    var lines = ["Delete " + many(named.length, "element") + "?", "", listed(named)];
+    var going = (plan.elements || []).map(function (entry) {
+      return entry.address + " — " + entry.reason;
+    }).concat((plan.annotations || []).map(function (entry) {
+      return entry.kind + " " + entry.address + " — " + entry.reason;
+    }));
+    if (going.length) {
+      lines.push("", "These cannot survive it and go too:", listed(going));
+    }
+    if ((plan.cleared || []).length) {
+      lines.push("", "These stay, and stop naming it:", listed(plan.cleared.map(function (entry) {
+        return entry.address + " — loses " + entry.what;
+      })));
+    }
+    if ((plan.geometry || []).length) {
+      lines.push("", many(plan.geometry.length, "layout entry", "layout entries")
+        + " that placed them are dropped.");
+    }
+    lines.push("", "This is one change: Ctrl-Z puts all of it back.");
+    return lines.join("\n");
   }
 
   /** How many names a confirmation spells out before it counts the rest. */

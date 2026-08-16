@@ -105,6 +105,8 @@ from netgraph.edit import (
     paste_plan,
 )
 from netgraph.edit.batch import describe as describe_batch
+from netgraph.edit.cascade import describe as describe_cascade
+from netgraph.edit.cascade import plan_cascade
 from netgraph.edit.tree import digest_of
 from netgraph.errors import NetgraphError
 from netgraph.fixes import Fix, apply_fix, fixes_for, offers_for
@@ -1627,6 +1629,52 @@ class EditingSession:
                 "served": result.served_before if result is not None else 0,
             },
             "message": _impact_summary(report, len(isolated), len(removed)),
+        }
+
+    def cascade(self, addresses: Sequence[str]) -> dict[str, Any]:
+        """What deleting ``addresses`` would take with it. Reads only.
+
+        The editor asks this *before* it deletes, so that the question it puts
+        to the person pressing Delete is the truth rather than a guess made from
+        the picture: the cables that die with a switch are visible on the canvas,
+        but the tunnel three levels up that runs over one of them is not, and
+        neither is the note anchored to it or the group that lists it.
+
+        Nothing here changes a file, a revision or the undo stack. The plan is
+        computed against the tree as it stands and thrown away; the delete that
+        follows recomputes it, so two browsers deleting at once cannot act on
+        each other's stale answer — the revision check is what catches that, and
+        it is on the write, where it belongs.
+
+        Args:
+            addresses: What is to be deleted, in any spelling an address takes.
+                A link may be named with the ``#`` suffix the canvas puts on
+                one; it is dropped, because that suffix names a *drawn edge* and
+                what is being deleted is the cable.
+
+        Returns:
+            :meth:`~netgraph.edit.cascade.CascadePlan.to_dict`, plus the
+            ``revision`` it was computed at, the resolved ``asked`` addresses
+            and a ``message`` naming the whole of it in one line. Addresses that
+            resolve to nothing come back under ``unknown`` rather than raising:
+            a stale selection is a normal thing for a canvas to hold, and the
+            delete that follows will refuse them one at a time and say so.
+        """
+        with self._lock:
+            inventory = self.inventory()
+            revision = self._revision
+        resolved: list[str] = []
+        unknown: list[str] = []
+        for address in addresses:
+            fqn = inventory.lookup(address.split("#")[0]).fqn
+            (resolved if fqn is not None else unknown).append(fqn or address)
+        plan = plan_cascade(inventory, resolved)
+        return {
+            "revision": revision,
+            "unknown": unknown,
+            "takes_more": plan.takes_more,
+            "message": describe_cascade(plan).removeprefix(", and "),
+            **plan.to_dict(),
         }
 
     def baselines(self) -> tuple[str, ...]:

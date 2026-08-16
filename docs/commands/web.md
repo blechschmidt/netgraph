@@ -479,6 +479,43 @@ keyboard is — and **selection** is a long dash, with somebody else's selection
 short one. Three patterns, not three shades, so they are told apart without
 colour.
 
+### Delete takes what cannot survive
+
+On the command line, deleting a cabled switch is refused and you are told to
+pass `--cascade`. On a canvas that would be theatre: somebody who dragged a box
+to the bin has already said what they want, and a gesture that stops to ask for
+a flag it will then be given is a gesture with one extra step in it. **The
+editor always cascades.** What it owes you instead is the truth about what that
+costs, before the fact and once:
+
+> Delete 1 element?
+>
+> switches/sw-home
+>
+> These cannot survive it and go too:
+> cables/cbl-rtr-sw — one end of it is switches/sw-home:port1
+> …
+>
+> 8 layout entries that placed them are dropped.
+>
+> This is one change: Ctrl-Z puts all of it back.
+
+That list is **not** read off the picture. `GET /api/cascade` asks
+[`netgraph.edit`](../editing.md#deleting-asks-first) for the set it will
+actually remove, so it includes the things a diagram cannot show you: the tunnel
+three levels up that runs over a cable that runs to the switch, the note
+anchored to it in a view you are not looking at, the group that lists it as a
+member, and the coordinates in every `kind: layout` document that placed any of
+it. A client-side guess would get the cables right and everything else wrong.
+
+**A delete that takes nothing but what you named does not ask at all** — a
+confirmation that always appears is one that stops being read. Deleting an
+uncabled spare switch, a note, an area or a legend is immediate.
+
+And the whole of it is one entry in the undo stack: the elements, the
+annotations and the geometry go together, and one `Ctrl-Z` brings them back
+byte for byte, comments included.
+
 ### Selecting several things
 
 Most of the editor acts on a **selection**, and a selection is a set:
@@ -500,9 +537,9 @@ elements, 3 links, 2 selected"* and each selected entry as pressed.
 With more than one thing selected, the gestures that can mean a set act on all
 of it, as **one change**:
 
-* **Delete** asks once — listing what goes, and the cables that will dangle as a
-  result — and writes the lot as a single entry in the undo stack. One `Ctrl-Z`
-  puts all of it back.
+* **Delete** asks once — listing what goes — and writes the lot as a single
+  entry in the undo stack. One `Ctrl-Z` puts all of it back. See
+  [Delete takes what cannot survive](#delete-takes-what-cannot-survive).
 * **Set a field**, **Remove a field** and **Move to another file** apply to
   every selected element in one batch, so twelve switches gain `spec.site` in
   one validated, conflict-checked write.
@@ -664,7 +701,7 @@ cable it, undo both — without dispatching a single mouse event.
 |---|---|---|---|---|
 | `n` | Create an element… | the diagram | `--write` | Asks for a kind and a name, and writes the document. 'netgraph edit create'. |
 | `c` | Connect this element… | the diagram | `--write` | Cables the focused element to another, port to port. 'netgraph edit connect'. |
-| `Delete` / `Backspace` | Delete the selection | the diagram | `--write` | Removes everything selected, or the focused element when nothing is. Asks once, listing what goes and the cables that dangle as a result, and writes it as one change. 'netgraph edit delete' / 'disconnect'. |
+| `Delete` / `Backspace` | Delete the selection | the diagram | `--write` | Removes everything selected, or the focused element when nothing is, and everything that cannot survive it: the cables, the tunnels over them, the notes anchored to them, the coordinates that placed them. Asks once when that is more than you named, and writes the lot as one change. 'netgraph edit delete --cascade' / 'disconnect'. |
 | `Ctrl-C` | Copy the selection | the diagram | a folder | Puts the selected elements on the system clipboard as JSON — the documents themselves, plus any cable whose two ends are both selected. Paste it into another netgraph window, or into a text editor to read it. 'netgraph edit copy'. |
 | `Ctrl-X` | Cut the selection | the diagram | `--write` | Copy, and then delete what was copied — as one change, so one Ctrl-Z puts the documents back. Asks first, listing what goes. |
 | `Ctrl-V` | Paste | the diagram | `--write` | Writes the clipboard fragment into this inventory: new documents, with free names, the internal cables rewired to the copies, and positions offset from the originals — or dropped where you last right-clicked. A fragment from another inventory pastes the same way. |

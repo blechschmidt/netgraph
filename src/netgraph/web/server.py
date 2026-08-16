@@ -18,6 +18,7 @@ document stream in the browser and renders what it is sent::
     GET  /api/file/<path>     one file's text, with the hash a write must quote
     PUT  /api/file/<path>     that file back, refusing a stale one
     POST /api/ops             a batch of netgraph.edit operations, applied
+    GET  /api/cascade         what deleting the named elements would take with it
     POST /api/arrange         align, distribute or snap a selection
     POST /api/copy            a selection, serialised for the system clipboard
     POST /api/cut             the same, and the selection deleted, as one change
@@ -118,6 +119,7 @@ __all__ = [
     "ARRANGE_PATH",
     "ASSETS",
     "BINDINGS_PATH",
+    "CASCADE_PATH",
     "CHANGES_PATH",
     "COPY_PATH",
     "CUT_PATH",
@@ -187,6 +189,11 @@ DIFF_PATH: Final = "/api/diff"
 #: (``?fail=<address>&layer=l1``). Read-only: the failure overlay changes no
 #: file, no revision and no undo stack.
 IMPACT_PATH: Final = "/api/impact"
+#: What deleting the named elements would take with it (``?address=``, repeated).
+#: Read-only, and answered by a read-only session too: this is the question the
+#: editor asks *before* it deletes, so the confirmation it shows names what
+#: :mod:`netgraph.edit` will actually do rather than what the picture suggests.
+CASCADE_PATH: Final = "/api/cascade"
 #: The commits that changed this inventory, for the timeline scrubber.
 HISTORY_PATH: Final = "/api/history"
 #: One of them, drawn as the diff against its parent (``?rev=<commit>``).
@@ -387,6 +394,8 @@ class _Handler(LocalHandler):
                 ),
                 body=body,
             )
+        elif path == CASCADE_PATH:
+            self._json(HTTPStatus.OK, session.cascade(query.get("address", [])), body=body)
         elif path == HISTORY_PATH:
             self._json(
                 HTTPStatus.OK,

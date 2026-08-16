@@ -385,6 +385,57 @@ def test_a_cut_answers_the_fragment_and_the_change_together(session: EditingSess
     assert _tree_bytes(session.root) == before
 
 
+# --------------------------------------------------------------------------- #
+# What a delete would take
+# --------------------------------------------------------------------------- #
+
+
+def test_a_cascade_answers_what_the_delete_would_take(session: EditingSession) -> None:
+    """The question the editor asks before it puts a confirmation up."""
+    before = _tree_bytes(session.root)
+    plan = session.cascade(["sw-home"])
+
+    assert plan["asked"] == ["switches/sw-home"]
+    assert plan["takes_more"] is True
+    assert [entry["address"] for entry in plan["elements"]] == [
+        "cables/cbl-rtr-sw",
+        "cables/cbl-sw-ap",
+        "cables/cbl-sw-desk",
+        "cables/cbl-sw-dongle",
+        "cables/cbl-sw-nas",
+    ]
+    assert plan["message"] == "5 elements"
+    assert plan["revision"] == session.revision
+    assert _tree_bytes(session.root) == before, "asking must not change anything"
+
+
+def test_a_cascade_of_something_that_takes_nothing_says_so(session: EditingSession) -> None:
+    """What decides *not* to interrupt: a delete of exactly what you named."""
+    plan = session.cascade(["cbl-sw-nas"])
+    assert plan["takes_more"] is False
+    assert plan["elements"] == [] and plan["cleared"] == [] and plan["annotations"] == []
+
+
+def test_a_cascade_takes_the_canvas_suffix_off_a_link(session: EditingSession) -> None:
+    """``cbl-sw-nas#0`` is a drawn edge; what is deleted is the cable behind it."""
+    assert session.cascade(["cbl-sw-nas#0"])["asked"] == ["cables/cbl-sw-nas"]
+
+
+def test_a_cascade_of_a_name_nothing_carries_answers_rather_than_raises(
+    session: EditingSession,
+) -> None:
+    """A canvas holds a stale selection all the time; the write is where it is refused."""
+    plan = session.cascade(["sw-home", "no-such-thing"])
+    assert plan["unknown"] == ["no-such-thing"]
+    assert plan["asked"] == ["switches/sw-home"]
+
+
+def test_a_read_only_session_answers_a_cascade(tree: Path) -> None:
+    """It reads nothing but the tree, so the face without a write path gets it too."""
+    reader = EditingSession(root=tree, writable=False)
+    assert reader.cascade(["sw-home"])["takes_more"] is True
+
+
 def test_a_clipboard_write_decided_against_an_older_tree_is_refused(
     session: EditingSession,
 ) -> None:
@@ -763,6 +814,23 @@ def call(base: str, path: str, method: str = "GET", body: Any = None) -> tuple[i
             return response.status, json.loads(response.read())
     except urllib.error.HTTPError as exc:
         return exc.code, json.loads(exc.read())
+
+
+def test_the_cascade_route_is_a_get_and_writes_nothing(served: str) -> None:
+    """A question, spelled as one: no body, no revision, no undo entry."""
+    status, body = call(served, "/api/cascade?address=sw-home")
+    assert status == 200
+    assert body["takes_more"] is True
+    assert [entry["address"] for entry in body["elements"]] == [
+        "cables/cbl-rtr-sw",
+        "cables/cbl-sw-ap",
+        "cables/cbl-sw-desk",
+        "cables/cbl-sw-dongle",
+        "cables/cbl-sw-nas",
+    ]
+
+    status, again = call(served, "/api/cascade?address=sw-home")
+    assert (status, again["revision"]) == (200, body["revision"])
 
 
 def test_the_api_answers_the_tree_and_one_file(served: str) -> None:

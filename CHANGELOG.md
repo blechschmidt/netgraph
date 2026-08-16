@@ -18,6 +18,47 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **A delete now takes everything that cannot outlive it — and the editor stops asking for
+  a flag it was always going to be given.** "Cascade" used to mean the cables. It now means
+  the whole of what a deleted element leaves behind, in three layers:
+
+  * **Elements**, as before: a link dies with either end, a tunnel with the tunnel it runs
+    over, transitively.
+  * **Annotations (§21)**, by §21's own coherence rules rather than a table. A note anchored
+    to the deleted element *and* placed keeps its text and loses only its anchor; a note that
+    is only anchored cannot be drawn without it, so it is a dependent — named in the refusal,
+    removed by `--cascade`. An area drops the doomed members and goes only if that would leave
+    it with no members, no selector and no rectangle. In one line: **an annotation is removed
+    exactly when clearing its references would leave a document the loader refuses.**
+  * **Geometry (§18)**, which is never a dependency and is therefore never asked about.
+    Deleting one switch out of an arranged home lab used to hand back a tree carrying **eight
+    new `W138` warnings** — the switch's position in two views, the waypoints of each of its
+    five cables, and the box round the namespace it emptied — and told you to run `netgraph
+    layout --prune`. It now hands back the tree it found, minus the switch. This is
+    deliberately not `--prune`, which drops every key the current *drawing* lacks and would
+    throw away the position of a device merely filtered out of the view.
+
+  `netgraph edit disconnect` grows `--cascade` for the same reason a delete has one, and the
+  waypoints of a dropped cable go either way. Two bugs found on the way are under **Fixed**.
+
+- **The editor cascades, and says what that costs before it does it.** On the command line a
+  cabled switch is refused and you are told to pass `--cascade`. On a canvas that is theatre:
+  somebody who dragged a box to the bin has said what they want. So `Delete` always cascades,
+  and what it owes you instead is the truth — once, before the fact, and **not read off the
+  picture**.
+
+  The new read-only `GET /api/cascade` asks `netgraph.edit` for the set it will actually
+  remove, so the confirmation names what a diagram cannot show you: the tunnel three levels up
+  that runs over a cable that runs to the switch, the note anchored to it in a view you are not
+  looking at, the group that lists it as a member, and the layout entries that placed all of
+  it — each with the reason it goes. The multi-select confirmation used to guess this from the
+  drawn edges, which got the cables right and everything else wrong.
+
+  **A delete that takes nothing but what you named does not ask at all**, because a
+  confirmation that always appears is one that stops being read. And the whole of it is one
+  entry in the undo stack: elements, annotations and geometry come back together, byte for
+  byte, on one `Ctrl-Z`.
+
 - **`netgraph review`, and a pull-request bot built on it.** A green check answers "does this
   branch validate?" A reviewer wants "what does this change do, and what did it break that was
   not already broken?" — and neither half of that is in a check mark. `netgraph review --from
@@ -927,6 +968,18 @@ publish a version whose section is missing or empty — see
   needs to say where its cache goes on the machines it is used on.
 
 ### Fixed
+
+- **Deleting one of a server's two PDUs took the server with it.** Clearing a power input is
+  right; leaving `redundant: true` behind on the one feed that is left is not, because that
+  flag claims the device survives losing a feed and one feed does not. `E042` / `NG-E015` is
+  a *load* error, so the server stopped loading altogether and every cable that ended on it
+  started reporting a dangling endpoint. The flag now goes with the feed it was about.
+
+- **`netgraph import drawio` put back the coordinates of the node it had just deleted.** The
+  geometry write is built from the arrangement the tree held *before* the import, which still
+  places everything the import removes, and it runs last — so a diagram with one node deleted
+  and one dragged came back with a stale `W138` per node removed. The deleted keys are taken
+  out of it, using the same closure the delete itself runs.
 
 - **The editor said "saved" and "unsaved changes" at the same time.** Typing into a file
   and then putting the text back the way it was left the badge up, the Save button enabled

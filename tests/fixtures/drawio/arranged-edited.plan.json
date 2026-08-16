@@ -115,6 +115,15 @@
           "path": "spec.views.l1.nodes.hosts/pc-1.position.x",
           "before": 577.0,
           "after": 697.0
+        },
+        {
+          "path": "spec.views.l1.nodes.hosts/pc-2",
+          "before": {
+            "position": {
+              "x": 733.0,
+              "y": 232.0
+            }
+          }
         }
       ],
       "document": {
@@ -142,12 +151,6 @@
                 "hosts/pc-1": {
                   "position": {
                     "x": 697.0,
-                    "y": 232.0
-                  }
-                },
-                "hosts/pc-2": {
-                  "position": {
-                    "x": 733.0,
                     "y": 232.0
                   }
                 },

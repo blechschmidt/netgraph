@@ -200,28 +200,14 @@ window.netgraphSelect = (function () {
     return picked.length + " selected";
   }
 
-  /** Every cable and tunnel that would dangle if the selection went.
-   *
-   * A link dies with either of its ends — that is the mutation layer's rule
-   * (``netgraph edit delete`` refuses without ``--cascade`` and names them) —
-   * so the confirmation has to say so *before* the deletion, not after. Read off
-   * the records the drawing came with, which already carry each node's links.
-   */
-  function dangling() {
-    var doomed = {};
-    picked.forEach(function (address) { doomed[address] = true; });
-    var found = [];
-    nodes().forEach(function (address) {
-      var record = recordFor(address);
-      ((record && record.links) || []).forEach(function (link) {
-        var peer = records[link.element];
-        var id = peer && String(peer.id || "");
-        if (!id || doomed[id] || found.indexOf(id) !== -1) { return; }
-        found.push(id);
-      });
-    });
-    return found;
-  }
+  /* There used to be a `dangling()` here: the cables that would be left with an
+   * end missing if the selection went, read off the records the drawing came
+   * with. It was right about cables and blind to everything else a delete takes
+   * — a tunnel over one of them, a note anchored to one, a group listing one,
+   * the layout entries that placed all of it — because none of that is drawn.
+   * `GET /api/cascade` answers with netgraph.edit's own closure instead, so the
+   * confirmation cannot disagree with what the write then does. See
+   * session.js's `cascading`. */
 
   /** Note that the set moved: repaint it, mirror it, and tell app.js. */
   function settled(options) {
@@ -581,7 +567,6 @@ window.netgraphSelect = (function () {
     nodes: nodes,
     links: links,
     targets: targets,
-    dangling: dangling,
     summary: summary,
     set: set,
     add: add,
