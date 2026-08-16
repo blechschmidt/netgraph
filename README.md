@@ -95,11 +95,13 @@ CLI, the live preview and the browser editor:
 
 <!-- norun: needs a Docker daemon -->
 ```bash
-docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:latest validate
+docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:main validate
 ```
 
-See [`docs/docker.md`](docs/docker.md), which also covers
-[`docker-compose.yml`](docker-compose.yml) for the two servers.
+`main` is the tip of the default branch, rebuilt on every push. No version has been
+released yet, so there is no `latest` to pull — see [`docs/docker.md`](docs/docker.md) for
+the full tag list, which also covers [`docker-compose.yml`](docker-compose.yml) for the two
+servers.
 
 ## Quickstart
 

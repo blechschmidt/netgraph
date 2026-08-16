@@ -1223,6 +1223,19 @@ publish a version whose section is missing or empty — see
 
 ### Fixed
 
+- **The documented way to pull the container did not work.** `README.md` and
+  `docs/docker.md` both opened with `docker run … ghcr.io/blechschmidt/netgraph:latest`, and
+  that tag has never existed: `latest` is set only by `release.yml`, only for a
+  non-pre-release, and no version has been released — so the first command a reader typed
+  came back `manifest unknown`. Every pull instruction now names **`main`**, the tip of the
+  default branch, which `container.yml` publishes on every push and which resolves today,
+  multi-architecture, with provenance and an SBOM. The examples that pinned a version
+  (`:0.1.0`) had the same problem and now pin a commit (`sha-…`), which is the immutable tag
+  that exists before there is a release to pin. The docs still describe `latest`, `X.Y.Z` and
+  `X.Y` as what a release adds — a table row and prose, not an instruction — and
+  `tests/test_docker.py` now enforces that split: an image reference inside a fenced code
+  block in either page must use a tag some workflow actually publishes today.
+
 - **`netgraph edit rename` lost the arrangement of the element it renamed.** A rename
   rewrote every *reference* to the element — a cable end, a tunnel's `over`, an adapter's
   `attached_to` — and nothing else. But two more places write a name down, and both are

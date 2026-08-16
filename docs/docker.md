@@ -6,51 +6,59 @@ neither a Python environment nor a system package is welcome — a shared CI run
 jump host, a colleague's laptop — a container is the shortest route from a folder of
 YAML to a diagram.
 
-Every release publishes one, so there is nothing to build:
+Every push to the default branch publishes one, so there is nothing to build:
 
 <!-- norun: needs a Docker daemon -->
 ```bash
-docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:latest validate
+docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:main validate
 ```
 
-## The released image
+**`main` is the tag to pull, not `latest`.** No version has been released yet, so the
+registry holds no `latest` and no `X.Y.Z`: the tags that exist today are `main`, `edge` and
+one `sha-…` per commit, all described under [the development
+image](#the-development-image). `latest` is reserved for releases and cannot be reached by
+a branch build, so an unqualified `docker pull ghcr.io/blechschmidt/netgraph` finds nothing
+at all rather than finding unreleased work.
+
+## The image
 
 `ghcr.io/blechschmidt/netgraph`, built from the [`Dockerfile`](../Dockerfile) in this
-repository by [`.github/workflows/container.yml`](../.github/workflows/container.yml) when
-[`release.yml`](../.github/workflows/release.yml) calls it — after the guard, the CI gate
-and the cross-platform verification have passed. The same repository in the registry also
-holds a [development image](#the-development-image) under different tags; these three are
-the ones a release sets, and the only ones that stand for a version.
+repository by [`.github/workflows/container.yml`](../.github/workflows/container.yml) —
+on every push to every branch, and again from [`release.yml`](../.github/workflows/release.yml)
+when a version is tagged, after the guard, the CI gate and the cross-platform verification
+have passed.
 
 | | |
 |---|---|
 | Registry | `ghcr.io/blechschmidt/netgraph` — no login needed to pull |
-| Tags | `X.Y.Z` (exact), `X.Y` (follows patch releases), `latest` (the newest non-pre-release) |
+| Tags today | `main`, `edge`, `sha-…` — see [the development image](#the-development-image) |
+| Tags a release adds | `X.Y.Z` (exact), `X.Y` (follows patch releases), `latest` (the newest non-pre-release) |
 | Platforms | `linux/amd64`, `linux/arm64` |
 | Provenance | a build provenance attestation and an SBOM, both attached to the manifest |
 
-Pin a tag in anything that matters. `latest` is convenient on a laptop and is the wrong
-choice in a pipeline, where a release you did not ask for should not change what your build
-does:
+Pin a tag in anything that matters. A moving tag — `main`, `edge`, and `latest` once it
+exists — is convenient on a laptop and is the wrong choice in a pipeline, where a commit
+you did not ask for should not change what your build does. Until there is a version to
+pin, the immutable tag is the commit:
 
-<!-- norun: needs a Docker daemon -->
+<!-- norun: needs a Docker daemon, and names a commit that may have been pruned -->
 ```bash
-docker pull ghcr.io/blechschmidt/netgraph:0.1.0
+docker pull ghcr.io/blechschmidt/netgraph:sha-1a2b3c4
 ```
 
 The image is signed with GitHub's build provenance, so you can check that the thing you
-pulled came from this repository's release workflow and not from somewhere else. The digest
-is in each release's notes:
+pulled came from this repository's workflow and not from somewhere else. Branch builds
+carry it too, so there is nothing to wait for:
 
-<!-- norun: needs the gh CLI, a Docker daemon and a real digest -->
+<!-- norun: needs the gh CLI and a Docker daemon -->
 ```bash
-gh attestation verify oci://ghcr.io/blechschmidt/netgraph:0.1.0 \
+gh attestation verify oci://ghcr.io/blechschmidt/netgraph:main \
   --repo blechschmidt/netgraph
 ```
 
 ## The development image
 
-The same repository in the registry also carries unreleased work, built and pushed by
+Everything in the registry today is unreleased work, built and pushed by
 [`.github/workflows/container.yml`](../.github/workflows/container.yml) on **every push to
 every branch**, and rebuilt weekly against a fresh base image:
 
@@ -78,11 +86,13 @@ most recently, not something anyone decided to release. It is the tag to reach f
 fix has landed and you would rather not wait for the version that carries it; a branch tag
 is how to run a colleague's work without a Python environment.
 
-**`latest` is never a development build.** It follows releases and nothing else, so an
-unqualified `docker pull ghcr.io/blechschmidt/netgraph` cannot land on unreleased work.
-A branch build has no way to reach it: `latest` is set only when `release.yml` asks for it,
-and it only asks once its guard confirms the version is not a pre-release. That split is
-enforced in `tests/test_docker.py`, not just intended.
+**`latest` is never a development build**, which is why there is none to pull yet. It
+follows releases and nothing else, so an unqualified `docker pull
+ghcr.io/blechschmidt/netgraph` cannot land on unreleased work — today it resolves to
+nothing at all. A branch build has no way to reach it: `latest` is set only when
+`release.yml` asks for it, and it only asks once its guard confirms the version is not a
+pre-release. That split is enforced in `tests/test_docker.py`, not just intended, along
+with the rule that no example on this page tells you to pull a tag that does not exist.
 
 The weekly rebuild exists because the image is `python:3.12-slim` plus Debian's Graphviz,
 and neither takes its security updates from this repository. Without it, `edge` would age
@@ -258,7 +268,7 @@ image:
 
 <!-- norun: needs a Docker daemon, and the last starts a server that never exits -->
 ```bash
-image=ghcr.io/blechschmidt/netgraph:latest
+image=ghcr.io/blechschmidt/netgraph:main
 
 docker run --rm -v "$PWD:/inventory:ro" "$image" validate
 docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/inventory" \
@@ -281,13 +291,14 @@ The image is a way to run `netgraph validate` on a runner with no Python:
 
 <!-- norun: needs a Docker daemon, and is a fragment of somebody else's pipeline -->
 ```bash
-docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:0.1.0 \
+docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:sha-1a2b3c4 \
   validate --strict --output-format github
 ```
 
-An exact version rather than `latest`, for the reason above: a pipeline whose behaviour
-changes because somebody else cut a release is a pipeline that will fail on a day nobody
-touched it.
+One exact commit rather than a moving tag, for the reason above: a pipeline whose behaviour
+changes because somebody else pushed to `main` is a pipeline that will fail on a day nobody
+touched it. Substitute the short SHA you want; once versions are released, `X.Y.Z` is the
+same promise with a friendlier name.
 
 Exit codes and output formats are unchanged by the container — `0` clean, `1` findings,
 and `--output-format json|sarif|github` as documented in [ci.md](ci.md). If your runner
@@ -300,7 +311,7 @@ The image's entrypoint is netgraph itself, so:
 
 <!-- norun: needs a Docker daemon; the versions are properties of the image -->
 ```bash
-docker run --rm ghcr.io/blechschmidt/netgraph:latest version --json
+docker run --rm ghcr.io/blechschmidt/netgraph:main version --json
 ```
 
 That prints the netgraph, Python and Graphviz versions inside the container, which is the
@@ -311,7 +322,7 @@ first thing worth pasting into a bug report about a render — see
 <!-- norun: needs a Docker daemon -->
 ```bash
 docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' \
-  ghcr.io/blechschmidt/netgraph:latest
+  ghcr.io/blechschmidt/netgraph:main
 ```
 
 ## How this is kept honest

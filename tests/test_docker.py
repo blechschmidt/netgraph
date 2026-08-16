@@ -34,6 +34,7 @@ DOCKERFILE = REPO_ROOT / "Dockerfile"
 DOCKERIGNORE = REPO_ROOT / ".dockerignore"
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 DOC = REPO_ROOT / "docs" / "docker.md"
+README = REPO_ROOT / "README.md"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 CONTAINER_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "container.yml"
 RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
@@ -43,7 +44,14 @@ RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
 IMAGE = "ghcr.io/blechschmidt/netgraph"
 
 #: What ``container.yml`` publishes from the default branch. ``latest`` is
-#: pointedly absent -- see :func:`test_the_development_build_never_takes_latest`.
+#: pointedly absent -- see :func:`test_a_branch_build_can_never_take_latest`.
+#:
+#: These are also the only tags that exist in the registry at all, because no
+#: version has been released yet: ``latest``, ``X.Y.Z`` and ``X.Y`` are set by
+#: ``release.yml`` and it has never run. So they double as the set the docs are
+#: allowed to tell a reader to pull -- see
+#: :func:`test_no_documented_command_pulls_a_tag_that_does_not_exist`, and add
+#: the version tags here when the first release is cut.
 DEVELOPMENT_TAGS = ["edge", "main", "sha-"]
 
 #: The tree the smoke test in ``container.yml`` renders. Also the compose file's
@@ -790,6 +798,36 @@ def test_the_docs_page_documents_the_published_development_tags() -> None:
     for tag in ("edge", "sha-"):
         assert f"`{tag}" in page, f"docs/docker.md does not document the {tag!r} tag"
     assert f"{IMAGE}:edge" in page
+
+
+#: A fenced code block, fence included. What a reader copies.
+_FENCED_BLOCK = re.compile(r"^```.*?^```", re.DOTALL | re.MULTILINE)
+
+#: ``ghcr.io/blechschmidt/netgraph:<tag>``, capturing the tag.
+_IMAGE_REFERENCE = re.compile(re.escape(IMAGE) + r":([A-Za-z0-9][\w.-]*)")
+
+
+@pytest.mark.parametrize("page", [DOC, README], ids=lambda p: p.name)
+def test_no_documented_command_pulls_a_tag_that_does_not_exist(page: Path) -> None:
+    """A command in the docs has to work when it is pasted into a terminal.
+
+    Both pages told the reader to ``docker run ghcr.io/…/netgraph:latest``, and
+    ``latest`` has never been pushed: it is set only by ``release.yml``, and no
+    version has been released. So the first thing anybody following the README
+    typed came back ``manifest unknown``.
+
+    The tags that do exist are the ones ``container.yml`` produces on every
+    push, which is what ``DEVELOPMENT_TAGS`` lists -- ``main`` being the one to
+    reach for, since it is the tip of the default branch. Prose may still
+    describe ``latest`` and ``X.Y.Z``, because what a release *will* publish is
+    worth documenting; a code block may not, because it is an instruction.
+    """
+    for block in _FENCED_BLOCK.findall(page.read_text(encoding="utf-8")):
+        for tag in _IMAGE_REFERENCE.findall(block):
+            assert any(tag.startswith(known) for known in DEVELOPMENT_TAGS), (
+                f"{page.name} tells the reader to pull {IMAGE}:{tag}, "
+                f"which no workflow has published; the pullable tags are {DEVELOPMENT_TAGS}"
+            )
 
 
 # --------------------------------------------------------------------------- #

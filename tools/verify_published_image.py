@@ -11,7 +11,7 @@ check is everything that makes the image usable *by someone else*:
   failure mode is silent: green pipeline, and ``docker pull`` on any other
   machine says ``denied``. That is the one this script exists for.
 * the **tag** resolves. The workflow verifies ``@sha256:…``; a reader follows
-  ``docs/docker.md`` and types ``:edge`` or ``:latest``.
+  ``docs/docker.md`` and types ``:main`` or ``:edge``.
 * the **entrypoint** is netgraph with no arguments needed, the way
   ``ENTRYPOINT ["netgraph"]`` promises, and bare ``docker run IMAGE`` prints
   help rather than doing something nobody asked for.
@@ -24,7 +24,7 @@ credentials; that is the point, since a credential would defeat the test. The
 runtime checks need a daemon and are skipped, loudly, without one.
 
     tools/verify_published_image.py
-    tools/verify_published_image.py --image ghcr.io/blechschmidt/netgraph:0.1.0
+    tools/verify_published_image.py --image ghcr.io/blechschmidt/netgraph:main
     tools/verify_published_image.py --registry-only --json
 
 Exit status is 0 when every check that ran passed, 1 when one failed, and 2 for
