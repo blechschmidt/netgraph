@@ -64,9 +64,32 @@ The three Linux libyaml jobs agree within 0.04; Windows is 0.16 above them and
 macOS 0.13 below, which puts both *inside* the 1.60-to-1.79 band this row exists
 to discriminate within. So the Linux copy stays sharp, and the other two get the
 blunter 1.95: an entry-5-sized regression is invisible to them, a catastrophic
-one is not. The ``validate`` column needs no such split — both of its halves run
-over an inventory already in memory, and it spans 7.04 to 8.48 across six jobs
-against a threshold of 9.5.
+one is not.
+
+The ``validate`` column was read for a long time as needing no such split — both
+of its halves run over an inventory already in memory, so the parser does not
+enter either one — and one number, 9.5, covered all six jobs. **It does not, and
+the column above is one commit's worth of evidence for a claim that needed
+several.** Forty-eight samples off the four CI runs of 2026-08-15 and -16, which
+is what the ``[perf]`` line was added to make readable:
+
+=============================  ===========  ==========
+Job                            validate     samples
+=============================  ===========  ==========
+ubuntu-24.04 (all four jobs)   7.19-8.64    32
+macos-14 3.12                  6.87-8.33    8
+windows-latest 3.12            8.54-9.85    8
+=============================  ===========  ==========
+
+Windows is not noisier around the same centre; it sits about 0.8 above it, and
+the one sample that broke 9.5 -- 9.85, which failed the run on ``10f9284c`` --
+was 12 % above its own median rather than an outlier from the pooled spread. A
+threshold set on the Linux figure was therefore always going to fail there
+eventually, and did. Both halves being memory-resident is what makes the *parser*
+cancel out of this ratio; it does not make the interpreter cancel out, and the
+numerator is a hundred small rule functions where the floor is one tight loop.
+
+So this guard is split the same way, and for a reason of the same shape.
 
 The "headroom" column is the load guard's, and the Linux rows are the thin ones.
 Each guard prints its own figures on every run — ``[perf] validate: 8.48x
@@ -91,11 +114,12 @@ millisecond on the guard's tree, which is small enough that the timer's own
 noise moves the ratio by several per cent; eight of them cost enough to measure
 cleanly, and the ratio only has to be compared with itself.
 
-==============  ===============  ==========  =========
-Measured        Before entry 7   Today       Threshold
-==============  ===============  ==========  =========
-validate/floor  21.5-22.0        8.2-8.6     9.5
-==============  ===============  ==========  =========
+==============  ===============  ============  ==============
+Measured        Before entry 7   Today         Threshold
+==============  ===============  ============  ==============
+validate/floor  21.5-22.0        6.9-8.6       9.5 (not Windows)
+validate/floor  --               8.5-9.9       11.0 (Windows)
+==============  ===============  ============  ==============
 
 The "today" range widened when the routing rules of §16 landed — not because
 those rules cost anything (0.0 ms each by ``tools/profile_validate.py``, and
@@ -204,13 +228,32 @@ MAX_LOAD_RATIO_PURE_PYTHON = 1.25
 #: catastrophic one still is. The sharp copy runs on all four Linux jobs.
 MAX_LOAD_RATIO_LIBYAML_ELSEWHERE = 1.95
 
-#: ``validate / address-walk floor`` ceiling. Parser-independent: both halves
-#: run over an inventory that is already in memory. See the module docstring, and
-#: entry 12 of ``docs/follow-ups.md`` for the history: 8.5, then 9.0 when the
-#: routing model's context building landed, and now 9.5 over a measured 8.2-8.6.
-#: A revert of any piece of entry 7's work lands at 9.1 against a *6.9* baseline,
-#: which is 11.0 against this one, so the guard keeps what it is for.
+#: ``validate / address-walk floor`` ceiling. Parser-independent — both halves
+#: run over an inventory that is already in memory — but *not* platform
+#: independent; see the module docstring. History, in entry 12 of
+#: ``docs/follow-ups.md``: 8.5, then 9.0 when the routing model's context
+#: building landed, then 9.5, over a measured 6.9-8.6 on Linux and macOS.
+#: A revert of any piece of entry 7's work lands at 9.1 against a *6.9*
+#: baseline, which is 11.0 against this one, so the guard keeps what it is for.
 MAX_VALIDATE_RATIO = 9.5
+
+#: What that ceiling becomes on Windows, where the same ratio reads 8.5-9.9.
+#:
+#: 9.85 on ``10f9284c`` failed a run that had regressed nothing, and the eight
+#: Windows samples either side of it have a median of 8.8 — so the ceiling that
+#: held on the other five jobs left this one 7 % of headroom, and 7 % is inside
+#: what a shared runner moves in a bad minute. 11.0 is 12 % above the worst
+#: sample yet seen and 25 % above the median, which is the same trade the load
+#: guard makes off Linux: blunter, deliberately, on the platform whose spread the
+#: number was not measured on.
+#:
+#: Still sharp enough to be worth running. The catch table below is written
+#: against a 6.9 baseline; scaled to the 8.8 one this platform has, a revert of
+#: ``validate.py`` reads 11.6 and one of ``models/interface.py`` reads 17.5, so
+#: the two pieces of entry 7 the Linux copy catches are both still caught here —
+#: the first of them only just, which is the price of the platform and is why
+#: 9.5 stays everywhere else rather than everyone moving up to this.
+MAX_VALIDATE_RATIO_WINDOWS = 11.0
 
 #: Ceilings on a *warm* load as a fraction of a cold one, for the two tiers of
 #: the parse cache. Measured 0.30-0.34 (disk) and 0.084-0.090 (memory) through
@@ -451,12 +494,15 @@ def test_validating_costs_no_more_than_its_budget_above_an_address_walk(
 
     floor, full = min(floors), min(fulls)
     ratio = full / floor
-    report(capsys, "validate", ratio=ratio, budget=MAX_VALIDATE_RATIO)
+    # ``sys.platform`` rather than ``platform_marks.ON_WINDOWS``, to read the
+    # same way as the load guard's three-way split thirty lines above.
+    budget = MAX_VALIDATE_RATIO_WINDOWS if sys.platform == "win32" else MAX_VALIDATE_RATIO
+    report(capsys, "validate", ratio=ratio, budget=budget)
 
-    assert ratio <= MAX_VALIDATE_RATIO, (
+    assert ratio <= budget, (
         f"validate is {ratio:.2f}x the address-walk floor "
         f"({full:.1f} ms against {floor:.1f} ms), over the budget of "
-        f"{MAX_VALIDATE_RATIO:.1f}x. Either an optimisation from entry 7 of "
+        f"{budget:.1f}x. Either an optimisation from entry 7 of "
         f"docs/follow-ups.md was undone, or a rule grew per-address work. Profile with "
         f"'python tools/profile_validate.py' before changing this threshold."
     )

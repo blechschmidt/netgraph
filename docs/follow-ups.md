@@ -1412,6 +1412,40 @@ either number can read the spread off six jobs instead of guessing from the one
 that failed. If the Linux row starts flaking, that log is the input, and this
 entry is where the new number gets written down.
 
+**2026-08-16: the `validate` guard did not survive leaving Linux either, and
+"unaffected" above was one commit's worth of evidence.** CI read **9.85** on
+`10f9284c`, windows-latest, against the 9.5 set here — a commit that had
+regressed nothing. This is what the `[perf]` line was added for, so the
+replacement number was read off the runners rather than guessed. Forty-eight
+samples, the four CI runs of 2026-08-15 and -16:
+
+| job | validate/floor | samples |
+|---|---|---|
+| ubuntu-24.04, all four jobs | 7.19–8.64 | 32 |
+| macos-14 3.12 | 6.87–8.33 | 8 |
+| windows-latest 3.12 | 8.54–9.85 | 8 |
+
+Windows is not noisier around the same centre — it sits about 0.8 above it, with
+a median of 8.8 — so 9.5 left that one job 7 % of headroom while leaving the
+other five 10–28 %, and 7 % is inside what a shared runner moves in a bad
+minute. The 9.85 was 12 % above its own median, not an outlier from the pooled
+spread.
+
+Both halves being memory-resident makes the *parser* cancel out of this ratio,
+which is what the paragraph above got right; it does not make the interpreter
+cancel out, and the numerator is a hundred small rule functions where the floor
+is one tight loop. That is the same shape of premise failure as the load guard's,
+and it gets the same shape of fix: `MAX_VALIDATE_RATIO_WINDOWS = 11.0`, 12 %
+above the worst sample seen and 25 % above the median, with 9.5 unchanged
+everywhere else.
+
+Blunter, and still worth running. Scaled from the 6.9 baseline entry 7's catch
+table is written against to the 8.8 this platform has, a revert of `validate.py`
+reads 11.6 there and one of `models/interface.py` reads 17.5 — so both pieces the
+sharp copy catches are still caught, the first of them only just. That last
+margin is the reason 9.5 stays on the other five jobs instead of everyone moving
+up to 11.0.
+
 ---
 
 ## 13. `netgraph --version --json` is not the spelling that works

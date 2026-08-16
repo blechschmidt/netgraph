@@ -129,8 +129,14 @@ jobs:
       # tests/platform_marks.py measures whether nft can parse here and skips if
       # it cannot, so the suite is honest either way. This step is what keeps the
       # gate *running* rather than skipping: it grants the binary the capability
-      # and then checks an empty ruleset, so a grant that did not take fails the
-      # job here rather than quietly turning the check off.
+      # and then re-runs the very probe the suite will run, so a grant that did
+      # not take fails the job here rather than quietly turning the check off.
+      #
+      # The probe has to declare something. An empty file makes nft exit 0
+      # without ever touching the cache, so it would pass in a process that
+      # cannot check anything -- which is exactly the silence this step exists to
+      # break. tests/fixtures/nft-probe.nft is therefore the one copy, read from
+      # the checkout by both readers.
       #
       # It relies on the ``apt-get update`` above, which is Linux-only too and
       # runs immediately before it.
@@ -140,11 +146,7 @@ jobs:
           set -euo pipefail
           sudo apt-get install --no-install-recommends --yes nftables libcap2-bin
           sudo setcap cap_net_admin+ep "$(command -v nft)"
-          # An empty ruleset, in a real file: nft refuses /dev/null as "not a
-          # regular file", and the point here is the netlink socket it opens
-          # before reading, not what is in the file.
-          : > "${RUNNER_TEMP:-/tmp}/probe.nft"
-          nft --check -f "${RUNNER_TEMP:-/tmp}/probe.nft"
+          nft --check -f tests/fixtures/nft-probe.nft
 
       - name: Install Graphviz (macOS)
         if: runner.os == 'macOS'

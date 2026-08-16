@@ -1,0 +1,25 @@
+# The smallest ruleset that proves 'nft --check' can run here.
+#
+# '--check' parses a file without committing it, but before it reads a byte it
+# opens a netlink socket and populates its cache, and that needs CAP_NET_ADMIN.
+# An *empty* file does not: nft has nothing to resolve, never initialises the
+# cache, and exits 0 in a process that could not have checked anything. So an
+# empty file is not a probe. This one declares a table, which is enough to make
+# nft consult the cache and therefore enough to fail with "cache initialization
+# failed: Operation not permitted" when the capability is missing.
+#
+# Two readers, deliberately the same bytes:
+#
+#   * tests/platform_marks.py runs it to decide whether the nft gate in
+#     tests/test_firewall.py can run at all, and skips those tests if it cannot.
+#   * .github/workflows/ci.yml runs it after granting the capability, so a grant
+#     that did not take fails the job loudly instead of quietly turning the gate
+#     off for the rest of the run.
+#
+# Nothing here is committed and no table of this name is created: --check stops
+# before the transaction. Keep it to constructs every nft since 0.9 accepts.
+table inet netgraph_probe {
+	chain c {
+		type filter hook input priority 0;
+	}
+}

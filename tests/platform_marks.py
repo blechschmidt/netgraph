@@ -43,6 +43,7 @@ from netgraph.render.dot import find_dot
 __all__ = [
     "HAVE_BASH_COMPLETION",
     "NFT",
+    "NFT_PROBE",
     "ON_WINDOWS",
     "PWSH",
     "requires_dot",
@@ -192,6 +193,11 @@ requires_node = pytest.mark.skipif(
 )
 
 
+#: The ruleset :func:`_nft_that_can_check` hands nft, shared with CI so that the
+#: job and the suite ask the same question. See the comment inside the file.
+NFT_PROBE: Final = Path(__file__).parent / "fixtures" / "nft-probe.nft"
+
+
 def _nft_that_can_check() -> str | None:
     """The ``nft`` binary that can syntax-check a ruleset here, or ``None``.
 
@@ -205,27 +211,26 @@ def _nft_that_can_check() -> str | None:
     as though the generated ruleset were malformed.
 
     The capability is therefore measured, by handing nft the smallest ruleset
-    every version of it accepts. If that comes back clean, nft can parse here and
-    a later failure is netgraph's; if it does not, nothing about the ruleset has
-    been established either way, and the tests that need it say so rather than
-    failing. CI grants the capability (see ``.github/workflows/ci.yml``) so the
-    gate runs there rather than skipping.
+    every version of it accepts -- ``tests/fixtures/nft-probe.nft``, which
+    ``.github/workflows/ci.yml`` runs too, so the two cannot disagree about what
+    "nft works here" means. It has to declare a table: an empty file never makes
+    nft touch the cache, so it exits 0 in a process that could not have checked
+    anything.
+
+    If the probe comes back clean, nft can parse here and a later failure is
+    netgraph's; if it does not, nothing about the ruleset has been established
+    either way, and the tests that need it say so rather than failing. CI grants
+    the capability so the gate runs there rather than skipping.
     """
     nft = shutil.which("nft")
     if nft is None:
         return None
-    with tempfile.TemporaryDirectory() as directory:
-        probe = Path(directory) / "probe.nft"
-        probe.write_text(
-            "table inet netgraph_probe {\n\tchain c {\n\t\ttype filter hook input priority 0;\n\t}\n}\n",
-            encoding="utf-8",
+    try:
+        completed = subprocess.run(
+            [nft, "--check", "-f", str(NFT_PROBE)], capture_output=True, text=True, timeout=30
         )
-        try:
-            completed = subprocess.run(
-                [nft, "--check", "-f", str(probe)], capture_output=True, text=True, timeout=30
-            )
-        except (OSError, subprocess.SubprocessError):  # pragma: no cover - nft is on PATH
-            return None
+    except (OSError, subprocess.SubprocessError):  # pragma: no cover - nft is on PATH
+        return None
     return nft if completed.returncode == 0 else None
 
 

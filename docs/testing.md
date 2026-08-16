@@ -166,15 +166,20 @@ GitHub Linux runners `nft` is on `PATH` and the job is unprivileged, so every
 `--check` failed with `cache initialization failed: Operation not permitted` —
 a verdict about the runner, reported as though the ruleset were malformed.
 `platform_marks.NFT` therefore **measures** it, by handing `nft` the smallest
-ruleset every version accepts, and `requires_nft` skips when that does not come
-back clean.
+ruleset every version accepts — `tests/fixtures/nft-probe.nft` — and
+`requires_nft` skips when that does not come back clean.
+
+The probe has to *declare* something. An empty file gives `nft` nothing to
+resolve, so it never touches the cache and exits 0 in a process that could not
+have checked anything; a file with a table in it is what turns the missing
+capability into the error above.
 
 A skip would mean the gate never runs where it is most wanted, so CI does not
-rely on it: the Linux test job installs `nftables` and grants the binary the
-capability (`sudo setcap cap_net_admin+ep`), then checks an empty ruleset in the
-workflow so a failure to grant it fails the job loudly instead of quietly
-turning the gate off. The skip is what a developer's unprivileged shell, macOS
-and Windows get.
+rely on it: the Linux test job installs `nftables`, grants the binary the
+capability (`sudo setcap cap_net_admin+ep`), and then runs that same probe file,
+so a grant that did not take fails the job loudly instead of quietly turning the
+gate off for the rest of the run. The skip is what a developer's unprivileged
+shell, macOS and Windows get.
 
 ## The browser layer
 
