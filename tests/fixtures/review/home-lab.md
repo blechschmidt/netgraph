@@ -49,4 +49,4 @@ flowchart LR
 
 📎 [Download the full diagram (SVG, PNG)](https://github.com/o/r/actions/runs/42#artifacts) from `netviz-review`.
 
-<sub>netviz 0.0.1 · this comment is edited in place on every push · reproduce it with <code>netviz review --from origin/main</code></sub>
+<sub>netviz 0.1.0 · this comment is edited in place on every push · reproduce it with <code>netviz review --from origin/main</code></sub>
