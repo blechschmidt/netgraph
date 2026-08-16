@@ -525,7 +525,9 @@ spec:
     ipv6: false
   netns: []
   vrfs: []
+  route_tables: []
   routes: []
+  routing_policy: []
 ```
 
 `192.168.10.20/24` came back as `{ip: ..., prefix_length: 24}`, and

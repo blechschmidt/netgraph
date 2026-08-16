@@ -1858,9 +1858,23 @@
           "xe-0/0/1",
           "xe-0/0/2"
         ],
+        "tables": [
+          {
+            "name": "lab-egress",
+            "id": 100
+          }
+        ],
         "routes": [
           "10.3.0.0/16 blackhole metric 250",
-          "10.1.99.0/24 via 198.51.100.10 dev xe-0/0/1 metric 200"
+          "10.1.99.0/24 via 198.51.100.10 dev xe-0/0/1 metric 200",
+          "0.0.0.0/0 via 198.51.100.5 dev xe-0/0/2 table lab-egress",
+          "::/0 via 2001:db8:ff:2::1 dev xe-0/0/2 table lab-egress"
+        ],
+        "policy": [
+          "90: from 10.3.20.0/24 to 10.3.99.0/24 prohibit",
+          "100: from 10.3.20.0/24 lookup lab-egress",
+          "110: fwmark 0x1 lookup lab-egress",
+          "32766: all lookup main"
         ]
       },
       "vlans": [],

@@ -54,6 +54,7 @@ import re
 from collections.abc import Iterator, Sequence
 from typing import Final
 
+from netgraph.errors import count_text
 from netgraph.export.config import netplan
 from netgraph.export.config.header import config_header
 from netgraph.export.config.model import ConfigFile, Unsupported
@@ -258,6 +259,16 @@ def _record_out_of_remit(plan: DevicePlan, recorder: Recorder) -> None:
             "'spec.routing' is a routing protocol; ifupdown brings interfaces up. Generate "
             "it with 'netgraph export frr'",
         )
+    if plan.device.spec.routing_policy:
+        recorder.skip(
+            plan.fqn,
+            Reason.NOT_REPRESENTABLE,
+            f"{plan.field('routing_policy')}: a policy rule is a property of the whole stack "
+            f"and ifupdown runs a command only from an interface coming up, so there is no "
+            f"stanza these belong to; the "
+            + count_text(len(plan.device.spec.routing_policy), "rule")
+            + " of the policy database is written by 'netgraph export routes' instead",
+        )
     for interface in plan.interfaces:
         if interface.poe is not None:
             recorder.skip(
@@ -344,7 +355,7 @@ def _interface(
             body.extend(_link(interface))
             body.extend(_stacking(plan, interface, recorder))
             body.extend(_wireless(interface))
-        body.extend(_route_commands(routes, families, position))
+        body.extend(_route_commands(plan, routes, families, position))
         for line in body:
             yield f"    {line}"
 
@@ -437,7 +448,7 @@ def _wireless(interface: Interface) -> Iterator[str]:
 
 
 def _route_commands(
-    routes: Sequence[StaticRoute], families: Sequence[str], position: int
+    plan: DevicePlan, routes: Sequence[StaticRoute], families: Sequence[str], position: int
 ) -> Iterator[str]:
     """The ``up``/``down`` hooks the stanza at ``position`` is responsible for.
 
@@ -452,12 +463,12 @@ def _route_commands(
         if home != position:
             continue
         version = "-4" if route.prefix.version == 4 else "-6"
-        arguments = _route_arguments(route)
+        arguments = _route_arguments(plan, route)
         yield f"up ip {version} route replace {arguments}"
         yield f"down ip {version} route del {arguments}"
 
 
-def _route_arguments(route: StaticRoute) -> str:
+def _route_arguments(plan: DevicePlan, route: StaticRoute) -> str:
     """The words after ``ip -4 route replace``.
 
     The same words, in the same order, as
@@ -477,6 +488,13 @@ def _route_arguments(route: StaticRoute) -> str:
         words.extend(["via", str(route.via)])
     if route.dev is not None:
         words.extend(["dev", route.dev])
+    if route.table is not None:
+        # By number wherever the inventory knows one, exactly as
+        # :mod:`netgraph.export.routes` writes it: a name resolves only through
+        # /etc/iproute2/rt_tables, and an ifupdown hook is in no position to
+        # have edited that file first.
+        number = plan.device.spec.table_id(route.table)
+        words.extend(["table", route.table if number is None else str(number)])
     if route.metric is not None:
         words.extend(["metric", str(route.metric)])
     return " ".join(words)

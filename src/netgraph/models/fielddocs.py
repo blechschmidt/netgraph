@@ -67,6 +67,8 @@ from netgraph.models.routing import (
     BgpConfig,
     BgpNeighbor,
     OspfConfig,
+    PolicyRule,
+    RouteTable,
     RoutingConfig,
     StaticRoute,
     VrfDefinition,
@@ -119,7 +121,9 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     Bss,
     NetnsDefinition,
     VrfDefinition,
+    RouteTable,
     StaticRoute,
+    PolicyRule,
     RoutingConfig,
     OspfConfig,
     BgpConfig,
@@ -292,9 +296,20 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "`vrf`, and that binding is what partitions the address namespace.",
         "/ni:network-instances/ni:network-instance",
     ),
+    ("DeviceSpec", "route_tables"): Doc(
+        "The routing tables this device holds beyond `main`, `local` and `default`. A table on "
+        "its own changes nothing; what reaches it is a rule in `routing_policy` (§16.6).",
+        NONE,
+    ),
     ("DeviceSpec", "routes"): Doc(
         "Configured static routes, in the order the device holds them.",
         "…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes",
+    ),
+    ("DeviceSpec", "routing_policy"): Doc(
+        "The routing policy database: the ordered rules deciding which *table* a packet is "
+        "routed by, from its source, its firewall mark, its ingress interface or its DSCP. "
+        "This is policy-based routing (§16.6).",
+        NONE,
     ),
     ("DeviceSpec", "power"): Doc(
         "What the device draws, which PDU outlets feed it, and how much PoE it hands out "
@@ -357,6 +372,17 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "Free text: what the instance is for.",
         "/ni:network-instances/ni:network-instance/ni:description",
     ),
+    ("RouteTable", "name"): Doc(
+        "Name of the routing table. Unique within the device, and not one of the reserved "
+        "`main`, `local` or `default`, which exist without being declared (`NG-F015`).",
+        NONE,
+    ),
+    ("RouteTable", "id"): Doc(
+        "The number the table is known by, 1-4294967295. Unique within the device, and not "
+        "253, 254 or 255 — those are the reserved three under another name (`NG-F015`).",
+        NONE,
+    ),
+    ("RouteTable", "description"): Doc("Free text: what the table is for."),
     ("StaticRoute", "prefix"): Doc(
         "Destination prefix, either family, in canonical CIDR form. Host bits are rejected: a "
         "destination with them set is a typo or a host route, and netgraph will not guess which.",
@@ -377,6 +403,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "unset means the global instance.",
         "/ni:network-instances/ni:network-instance/ni:name",
     ),
+    ("StaticRoute", "table"): Doc(
+        "The routing table holding the route; `main` when unset. Names an entry of "
+        "`spec.route_tables` or a reserved table (`NG-F019`). A VRF is a table of its own, so "
+        "`vrf` and `table` are alternatives, not a pair (`NG-F018`).",
+        NONE,
+    ),
     ("StaticRoute", "metric"): Doc(
         "Administrative distance or cost, as this device counts it. Documentation only: netgraph "
         "does not compute a best path.",
@@ -386,6 +418,66 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "Discard matching packets. Excludes `via` and `dev` (`NG-F004`).",
         "…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop",
     ),
+    ("PolicyRule", "priority"): Doc(
+        "Where the rule sits in the policy database, 0-4294967295. The database is walked "
+        "from the lowest priority upwards and the first match decides, so this is the rule's "
+        "position and its identity: unique within the device per family (`NG-F020`).",
+        NONE,
+    ),
+    ("PolicyRule", "family"): Doc(
+        "`ipv4` or `ipv6` — which family's database the rule is installed in. Derived from "
+        "`src`/`dst` when they say, and both families when nothing does.",
+        NONE,
+    ),
+    ("PolicyRule", "src"): Doc(
+        "Match packets from this prefix. The selector policy-based routing exists for: it is "
+        "what makes a source route a source route.",
+        NONE,
+    ),
+    ("PolicyRule", "dst"): Doc("Match packets to this prefix.", NONE),
+    ("PolicyRule", "fwmark"): Doc(
+        "Match the mark a firewall put on the packet, optionally masked: `0x1`, `0x1/0xff`, or "
+        "a plain number. This is how a port, a user or an application reaches the policy "
+        "database — something marks, and this matches.",
+        NONE,
+    ),
+    ("PolicyRule", "iif"): Doc(
+        "Match packets that arrived on this interface. Names an interface of this device "
+        "(`NG-F021`).",
+        NONE,
+    ),
+    ("PolicyRule", "oif"): Doc(
+        "Match packets that would leave by this interface — locally originated traffic from a "
+        "socket bound to it. Names an interface of this device (`NG-F021`).",
+        NONE,
+    ),
+    ("PolicyRule", "dscp"): Doc(
+        "Match this DSCP code point, 0-63 (RFC 2474 §3) — the six bits, not the whole octet.",
+        NONE,
+    ),
+    ("PolicyRule", "invert"): Doc(
+        "Match everything the selectors do *not*. Needs a selector to invert (`NG-F017`).",
+        NONE,
+    ),
+    ("PolicyRule", "action"): Doc(
+        "What happens to a matching packet: `lookup` routes it by `table`, `blackhole`, "
+        "`unreachable` and `prohibit` discard it, `goto` jumps to another priority. Default "
+        "`lookup`.",
+        NONE,
+    ),
+    ("PolicyRule", "table"): Doc(
+        "The table to route by. Required by `lookup` and refused by every other action "
+        "(`NG-F016`); names an entry of `spec.route_tables`, a VRF, or a reserved table "
+        "(`NG-F019`).",
+        NONE,
+    ),
+    ("PolicyRule", "goto"): Doc(
+        "The priority to jump to. Required by `goto` and refused by every other action "
+        "(`NG-F016`), and strictly greater than this rule's own — the database is walked "
+        "upwards, so a backwards jump is a loop.",
+        NONE,
+    ),
+    ("PolicyRule", "description"): Doc("Free text: what the rule is for."),
     ("RoutingConfig", "ospf"): Doc(
         "The OSPF area this device runs, and on which interfaces.",
         "…/rt:control-plane-protocol[type='ospf']",

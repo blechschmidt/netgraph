@@ -55,6 +55,13 @@ spec:
   forwarding:
     ipv4: true
     ipv6: true
+  route_tables:
+    # The lab VLAN is not allowed to share the campus default. It gets a table
+    # of its own, and the policy database below is what sends it there; the
+    # table on its own changes nothing.
+    - name: lab-egress
+      id: 100
+      description: Everything the lab VLAN and marked traffic leave by
   routes:
     # A discard route for the site summary: every connected /24 is more specific
     # and still wins, so this catches only the parts of 10.3.0.0/16 that are
@@ -69,6 +76,36 @@ spec:
       via: 198.51.100.10
       dev: xe-0/0/1
       metric: 200
+    # The lab table's own default: anticlockwise round the ring, towards South,
+    # rather than whichever way the IGP happens to prefer today.
+    - prefix: 0.0.0.0/0
+      via: 198.51.100.5
+      dev: xe-0/0/2
+      table: lab-egress
+    - prefix: ::/0
+      via: 2001:db8:ff:2::1
+      dev: xe-0/0/2
+      table: lab-egress
+  routing_policy:
+    # Which table each packet is routed by, walked lowest priority first --
+    # so the refusal is numbered *below* the diversion it would otherwise
+    # never be reached past.
+    - priority: 90
+      src: 10.3.20.0/24
+      dst: 10.3.99.0/24
+      action: prohibit
+      description: The lab reaches no management address, and is told so
+    - priority: 100
+      src: 10.3.20.0/24
+      table: lab-egress
+      description: Lab VLAN 20 egresses towards South, whatever the IGP says
+    - priority: 110
+      fwmark: '0x1'
+      table: lab-egress
+      description: And so does anything the edge firewall marked as lab traffic
+    - priority: 32766
+      table: main
+      description: Everything else, routed the ordinary way
   routing:
     ospf:
       area: 0.0.0.0

@@ -437,7 +437,27 @@ _ICON_NAME_SCHEMA: Final[dict[str, Any]] = {
     "description": "A picture in the icon theme, or 'none' for a plain shape.",
 }
 
+#: A firewall mark (§16.4). A string in either base, with an optional mask, or
+#: a bare number — which is what an operator writes and what the loader accepts,
+#: so an editor must not underline it. Stored hexadecimal either way.
+_FWMARK_SCHEMA: Final[dict[str, Any]] = {
+    "anyOf": [
+        {
+            "type": "string",
+            "pattern": r"^(0[xX][0-9a-fA-F]{1,8}|\d{1,10})(?:/(0[xX][0-9a-fA-F]{1,8}|\d{1,10}))?$",
+            "description": "A mark, with an optional mask: `0x1`, `0x1/0xff`, `1/255`.",
+        },
+        {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295,
+            "description": "The same mark as a plain number, normalised to hexadecimal.",
+        },
+    ]
+}
+
 _SCALAR_PROPERTIES: Final[dict[tuple[str, str], dict[str, Any]]] = {
+    ("PolicyRule", "fwmark"): _FWMARK_SCHEMA,
     ("Interface", "mac"): _MAC_SCHEMA,
     ("BridgeConfig", "address"): _MAC_SCHEMA,
     ("CableSpec", "speed"): _BITRATE_SCHEMA,

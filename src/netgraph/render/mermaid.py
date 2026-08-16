@@ -279,7 +279,7 @@ def _clustered_nodes(
     *,
     skip: Container[str] = frozenset(),
 ) -> Iterator[str]:
-    """One ``subgraph`` per box the layer asked for: a VRF (§16.6) or a machine (§23.3)."""
+    """One ``subgraph`` per box the layer asked for: a VRF (§16.8) or a machine (§23.3)."""
     loose = [node for node in graph.nodes.values() if not node.cluster and node.fqn not in skip]
     yield from (f"{_INDENT}{line}" for line in _nodes(loose, ids, options, graph.layer))
     noun = CLUSTER_NOUN.get(graph.layer, "group")

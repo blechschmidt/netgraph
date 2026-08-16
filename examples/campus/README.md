@@ -124,7 +124,7 @@ One IGP, one AS, and one VRF (§16):
   the core-to-distribution uplinks; on the distribution switches it runs on the
   uplink and the two user SVIs. Nobody declares an adjacency — netgraph derives
   them the way the protocol does, from two OSPF interfaces addressed in one
-  subnet (§16.4), which is what produces the nine edges of the routing view.
+  subnet (§16.6), which is what produces the nine edges of the routing view.
 * **BGP** is a three-router iBGP mesh in AS 65001, peering on the loopbacks. The
   peer is written as an *address*, so the session resolves against
   `192.0.2.<i>/32` and the AS numbers of both ends are checked against each
@@ -135,6 +135,15 @@ One IGP, one AS, and one VRF (§16):
   site's management prefix to the clockwise fibre. Each distribution switch has a
   default route into its core, and a discard default *inside* the `mgmt`
   instance — management is deliberately not routed off-site.
+* **Policy-based routing** on `rtr-west-core-01` alone (§16.4), because one
+  example of it is worth more than three copies. The West lab VLAN is not
+  allowed to share the campus default: `spec.route_tables` declares
+  `lab-egress` (table 100), two default routes of the two families are placed in
+  it, and `spec.routing_policy` is what sends anything from `10.3.20.0/24` —
+  and anything the edge firewall marked `0x1` — to that table instead of to
+  `main`. The refusal above it, `prohibit` from the lab to the management
+  prefix, is numbered *below* the diversion for the reason the walk demands: the
+  first matching rule decides, so a rule after a `lookup` never runs.
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```bash

@@ -143,6 +143,9 @@ W143  warning   NG-G004           An area's selector matches no element of the i
 W144  warning   NG-Z003           A style fades an element to nothing, so it is drawn invisibly.
 W145  warning   NG-Z005           A style draws an element's label in the colour of the box behind it.
 W146  warning   NG-N026           A declared network namespace holds no interface.
+W147  warning   NG-F022           A policy rule looks up a declared routing table that holds no route.
+W148  warning   NG-F023           A declared routing table that no policy rule ever looks up.
+W149  warning   NG-F024           A policy rule is shadowed by an earlier rule that matches every packet.
 I001  info      NG-I010           A MAC address is locally administered rather than vendor-assigned.
 I002  info      NG-C015           An interface is enabled but terminates no cable.
 I003  info      NG-T015           A tunnel listens on a port other than the registered one for its type.

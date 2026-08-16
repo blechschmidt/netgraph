@@ -34,13 +34,13 @@ to the end of the line, and a repeated attribute is a list::
         ipv4-address 192.168.10.20/24
         ipv4-gateway 192.168.10.1
 
-Six stanza kinds — ``device``, ``vlan``, ``netns``, ``vrf``, ``interface``,
-``route`` and ``tunnel`` — in that order, which is the order they depend on each
-other in. A
-value is present exactly when the inventory states it: there is no default to
-read into an absent line, which is what makes the file a faithful projection and
-what lets :mod:`netgraph.importer.neutral` read it back without inventing the
-difference between "off" and "not said".
+Nine stanza kinds — ``device``, ``vlan``, ``netns``, ``vrf``, ``route-table``,
+``interface``, ``route``, ``policy`` and ``tunnel`` — in that order, which is the
+order they depend on each other in: a route is placed in a table, and a policy
+rule selects one. A value is present exactly when the inventory states it: there
+is no default to read into an absent line, which is what makes the file a
+faithful projection and what lets :mod:`netgraph.importer.config.neutral` read it
+back without inventing the difference between "off" and "not said".
 """
 
 from __future__ import annotations
@@ -55,6 +55,8 @@ from netgraph.export.manifest import Recorder
 from netgraph.models import (
     Interface,
     NetnsDefinition,
+    PolicyRule,
+    RouteTable,
     StaticRoute,
     VlanDefinition,
     VrfDefinition,
@@ -97,10 +99,14 @@ def files(plan: DevicePlan, recorder: Recorder) -> tuple[ConfigFile, ...]:
         lines.extend(["", *_netns(entry)])
     for vrf in plan.device.spec.vrfs:
         lines.extend(["", *_vrf(vrf)])
+    for table in plan.device.spec.route_tables:
+        lines.extend(["", *_route_table(table)])
     for interface in plan.interfaces:
         lines.extend(["", *_interface(plan, interface)])
     for route in plan.routes:
         lines.extend(["", *_route(route)])
+    for rule in plan.device.spec.routing_policy:
+        lines.extend(["", *_policy(rule)])
     for tunnel in plan.tunnels:
         lines.extend(["", *_tunnel(tunnel)])
 
@@ -274,6 +280,19 @@ def _poe(poe: PoeConfig) -> Iterator[str]:
         yield f"    poe-budget-watts {poe.budget_watts}"
 
 
+def _route_table(table: RouteTable) -> Iterator[str]:
+    """A ``route-table`` stanza — one routing table of the device (§16.3).
+
+    Before the routes, because they are placed in it, and before the policy,
+    because that selects it: the same dependency order every other stanza kind
+    here is written in.
+    """
+    yield f"route-table {table.name}"
+    yield f"    id {table.id}"
+    if table.description:
+        yield f"    description {_inline(table.description)}"
+
+
 def _route(route: StaticRoute) -> Iterator[str]:
     words = [f"route {route.prefix}"]
     if route.blackhole:
@@ -284,9 +303,44 @@ def _route(route: StaticRoute) -> Iterator[str]:
         words.extend(["dev", route.dev])
     if route.vrf is not None:
         words.extend(["vrf", route.vrf])
+    if route.table is not None:
+        words.extend(["table", route.table])
     if route.metric is not None:
         words.extend(["metric", str(route.metric)])
     yield " ".join(words)
+
+
+def _policy(rule: PolicyRule) -> Iterator[str]:
+    """A ``policy`` stanza — one rule of the policy database (§16.6).
+
+    Opened by the priority, because that is the rule's identity: it is where the
+    rule sits in the walk, and two rules of one family cannot share it
+    (``NG-F020``). ``family`` is written only when the document states it, since
+    a rule that states none is installed in both — and reading that back as
+    ``ipv4`` would silently halve it.
+    """
+    yield f"policy {rule.priority}"
+    if rule.family is not None:
+        yield f"    family {rule.family.value}"
+    for name, value in (
+        ("from", rule.src),
+        ("to", rule.dst),
+        ("iif", rule.iif),
+        ("oif", rule.oif),
+        ("fwmark", rule.fwmark),
+        ("dscp", rule.dscp),
+    ):
+        if value is not None:
+            yield f"    {name} {value}"
+    if rule.invert:
+        yield "    invert true"
+    yield f"    action {rule.action.value}"
+    if rule.table is not None:
+        yield f"    table {rule.table}"
+    if rule.goto is not None:
+        yield f"    goto {rule.goto}"
+    if rule.description:
+        yield f"    description {_inline(rule.description)}"
 
 
 def _tunnel(plan: TunnelPlan) -> Iterator[str]:

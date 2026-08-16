@@ -18,6 +18,52 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **Policy-based routing: `spec.route_tables`, `spec.routes[].table` and `spec.routing_policy`
+  (§16.2, §16.4).** Everywhere else in §16 a device answers one question about a packet —
+  which route in *the* table matches its destination. That is right for most boxes and wrong
+  for every edge router anyone has actually built: a guest VLAN out the cheap uplink, a
+  marked flow down the tunnel, a lab prefix that must not reach management. Each of those is
+  a decision about which *table* to route by, made before the destination is looked at, and
+  the schema had nowhere to put it.
+
+  `spec.route_tables[]` declares a table — a name and a number — and `spec.routes[].table`
+  places a route in one. The three tables every stack is born with (`main`, `local`,
+  `default`) are nameable without being declared and cannot be declared, by either name or
+  number (`NG-F015`). A VRF is a routing table too, so `table:` resolves against `spec.vrfs`
+  as readily (`NG-F019`) — but `vrf` and `table` on one route are a contradiction rather than
+  a refinement (`NG-F018`).
+
+  `spec.routing_policy[]` is the database itself: an ordered list of rules, walked from the
+  lowest `priority` upwards, first match deciding — the shape RFC 1812 §5.2.4.3 describes and
+  every implementation implements. A rule selects on `src`, `dst`, `fwmark`, `iif`, `oif` and
+  `dscp`, optionally inverted, and does one of five things: `lookup` a table, `blackhole`,
+  `unreachable`, `prohibit`, or `goto` another priority. `priority` is the rule's identity as
+  well as its position, so it is unique per device per family (`NG-F020`); a rule that states
+  no `family` and no prefix is installed in both, which is what typing `ip rule` and
+  `ip -6 rule` does by hand.
+
+  **Layer 4 is deliberately not a selector.** No `sport`, no `dport`, no protocol: `ip rule`
+  grew them late and nothing else agrees on them. The portable way to route by port, by user
+  or by application is to mark the packet where marking belongs and match `fwmark` here.
+
+  Three rules report the ways a database goes wrong without going invalid. `W147` — a rule
+  looks up a declared table no route is placed in, so the diverted traffic falls through and
+  goes exactly where it would have gone anyway. `W148` — a declared table no rule looks up,
+  so its routes are never consulted. `W149` — a rule numbered above the catch-all that
+  terminates its family's database, so it can never run.
+
+- **The routing view, the routes script and networkd carry it.** `--layer routing` labels a
+  router with its rule count and lists its tables, its routes and its database — in *priority*
+  order, which is the order the device walks it — on the tooltip and in `-f json`.
+  `netgraph export routes` writes the rules beside the routes they select, routes first so no
+  rule ever diverts traffic into a table that is still empty; each rule is a `del` of its
+  priority followed by an `add`, which is how `ip rule` is made idempotent. A table is written
+  by **number** with its name in a trailing comment, since a name resolves only through
+  `/etc/iproute2/rt_tables` and this script does not edit that file. `netgraph export networkd`
+  writes the database as `[RoutingPolicyRule]` sections; `netgraph export interfaces` projects
+  it as `route-table` and `policy` stanzas; frr, netplan and ifupdown name it in their
+  manifests with the emitter that does write it.
+
 - **A machine is no longer one network stack: `spec.netns`, `interfaces[].netns` and veth
   pairs (§23).** Everywhere else in the schema a host has one set of interface names, one
   address space and one routing table, and one box on a diagram holds all of it. That is

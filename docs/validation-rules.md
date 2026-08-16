@@ -861,7 +861,7 @@ reader of the routing view counts on a path that does not exist.
 
 A `neighbors[].remote_asn` contradicts the `asn` the peer declares for itself.
 The peer is found by resolving the neighbour address against every address the
-inventory configures (schema §16.4), so the check only applies to a session
+inventory configures (schema §16.6), so the check only applies to a session
 whose far end is an element here; a peer that declares no `routing.bgp` at all is
 silent, because an inventory may model the box without modelling its control
 plane.
@@ -2313,6 +2313,71 @@ end of a veth pair and forgotten on the other — which is
 inventory that declares namespaces before their contents should say
 `ignore = ["W146"]` in `netgraph.toml` once.
 
+#### `W147` — policy rule looks up an empty table
+
+*Alias: `NG-F022`. Severity: warning.*
+
+A rule in `spec.routing_policy` says *route this by table X*, and no route in
+`spec.routes` is placed in X (§16.4). The rule matches, the lookup finds nothing,
+and the packet falls through to the next rule — so the traffic somebody diverted
+goes exactly where it would have gone without the rule.
+
+Only tables the device *declares* are checked. `main` holds every connected route
+the machine has without anybody writing one down, and a VRF's table is fed by the
+interfaces bound to it, so neither is empty for going unmentioned; an empty VRF is
+[`W136`](#w136--vrf-with-no-interface-bound-to-it) instead.
+
+**Why it matters.** This is the failure that looks like it works. Every command
+applies, `ip rule show` lists the rule, and traffic goes out the default uplink
+anyway — the half that is missing is in a different file from the half that is
+there. The other direction is [`W148`](#w148--routing-table-nothing-selects).
+
+**Suppress with** `W147` / `NG-F022`, or an annotation on the device. Worth
+suppressing when the table is filled by a routing daemon rather than by
+`spec.routes` — that is exactly what a table fed by BGP looks like from here.
+
+#### `W148` — routing table nothing selects
+
+*Alias: `NG-F023`. Severity: warning.*
+
+A table is declared in `spec.route_tables` and no rule in `spec.routing_policy`
+looks it up (§16.2). A routing table is consulted only when something selects it,
+so a table nothing selects is not a fallback — it is inert, and any route placed
+in it is a statement about the device that the device does not act on. The
+finding counts those routes.
+
+**Why it matters.** The common shape of a half-finished change: the table is
+added, the routes are written, and the rule that reaches them is the line that
+never got typed. It is the mirror of
+[`W147`](#w147--policy-rule-looks-up-an-empty-table), and the two cannot both
+fire for one table.
+
+**Suppress with** `W148` / `NG-F023`, or an annotation on the device. A table
+selected by something outside the inventory — a VPN client's own rule, a
+container runtime — is the case worth suppressing, and worth a `description` on
+the table saying which.
+
+#### `W149` — unreachable policy rule
+
+*Alias: `NG-F024`. Severity: warning.*
+
+A rule sits below one that matches every packet of the same family (§16.4). The
+policy database is walked from the lowest priority upwards and the first match
+decides, so a rule with no selector at all ends the walk: everything after it is
+unreachable, whatever it says.
+
+That is also how a database is *meant* to be terminated — the last rule is
+normally `lookup main` — so the finding names both rules, the shadowed one and
+the one shadowing it. Per family, because the two databases are separate lists:
+an IPv4 catch-all shadows nothing in IPv6. A `goto` catch-all shadows nothing
+either; it jumps forward, and what it jumps to is still reached.
+
+**Why it matters.** Numbering. A new rule is written with a priority above the
+terminator instead of below it, and it never runs — with no error anywhere,
+because the rule is perfectly valid and simply never consulted.
+
+**Suppress with** `W149` / `NG-F024`, or an annotation on the device.
+
 #### `I001` — locally administered MAC address
 
 *Alias: `NG-I010`. Severity: info.*
@@ -2498,7 +2563,7 @@ schema rule is a usage error:
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

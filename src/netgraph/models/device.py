@@ -18,7 +18,15 @@ from netgraph.models.element import ElementBase
 from netgraph.models.interface import Interface, InterfaceList, InterfaceType
 from netgraph.models.netns import ROOT_NETNS, NetnsDefinition, resolve_netns_tree
 from netgraph.models.power import PowerConfig
-from netgraph.models.routing import RoutingConfig, StaticRoute, VrfDefinition
+from netgraph.models.routing import (
+    RESERVED_TABLES,
+    AddressFamily,
+    PolicyRule,
+    RouteTable,
+    RoutingConfig,
+    StaticRoute,
+    VrfDefinition,
+)
 from netgraph.models.scalars import Boolean, ElementName, MacAddress, VlanId
 from netgraph.models.style import Style
 
@@ -104,9 +112,13 @@ class DeviceSpec(NetgraphModel):
     netns: list[NetnsDefinition] = Field(default_factory=list)
     #: The routing instances this device implements (§16.1).
     vrfs: list[VrfDefinition] = Field(default_factory=list)
-    #: Configured static routes (§16.2).
+    #: The routing tables this device holds beyond the reserved three (§16.3).
+    route_tables: list[RouteTable] = Field(default_factory=list)
+    #: Configured static routes (§16.5).
     routes: list[StaticRoute] = Field(default_factory=list)
-    #: The dynamic routing protocols the device takes part in (§16.3).
+    #: The routing policy database: which table each packet is routed by (§16.6).
+    routing_policy: list[PolicyRule] = Field(default_factory=list)
+    #: The dynamic routing protocols the device takes part in (§16.7).
     routing: RoutingConfig | None = None
     #: What the device draws, which outlets feed it, and how much PoE it hands
     #: out (§17.2). Absent means the inventory records nothing about its power.
@@ -160,6 +172,104 @@ class DeviceSpec(NetgraphModel):
                     path=("routes", index, "vrf"),
                 )
         return self
+
+    @model_validator(mode="after")
+    def _check_routing_policy(self) -> DeviceSpec:
+        """``NG-F015``/``NG-F019``/``NG-F020``/``NG-F021``: tables and the policy over them.
+
+        The same shape as :meth:`_check_vrf_table` and for the same reason: a
+        table is named from two places in one ``spec`` — a route is placed in
+        one, a policy rule looks one up — and both references, along with the
+        interfaces a rule selects on, are resolvable from inside this document.
+        What is *not* here is whether the table anybody looks up holds a route:
+        that is a judgement about the whole device rather than a broken
+        reference, so it is ``W147``'s and ``W148``'s business.
+        """
+        declared = self._check_route_tables()
+        resolvable = declared | set(RESERVED_TABLES) | {vrf.name for vrf in self.vrfs}
+
+        for index, route in enumerate(self.routes):
+            if route.table is not None and route.table not in resolvable:
+                raise field_error(
+                    f"route {route.prefix} is placed in table {route.table!r}, which "
+                    f"{_table_list(resolvable)}",
+                    rule="NG-F019",
+                    path=("routes", index, "table"),
+                )
+
+        names = {interface.name for interface in self.interfaces}
+        seen: dict[tuple[AddressFamily, int], int] = {}
+        for index, rule in enumerate(self.routing_policy):
+            if rule.table is not None and rule.table not in resolvable:
+                raise field_error(
+                    f"policy rule {rule.priority} looks up table {rule.table!r}, which "
+                    f"{_table_list(resolvable)}",
+                    rule="NG-F019",
+                    path=("routing_policy", index, "table"),
+                )
+            for family in rule.families:
+                if (first := seen.get((family, rule.priority))) is not None:
+                    raise field_error(
+                        f"two {family.value} policy rules share priority {rule.priority} "
+                        f"(this one and entry {first}); the database is walked in priority "
+                        f"order, so which of them decides is not something the document says",
+                        rule="NG-F020",
+                        path=("routing_policy", index, "priority"),
+                    )
+                seen[(family, rule.priority)] = index
+            for key in ("iif", "oif"):
+                port: str | None = getattr(rule, key)
+                if port is not None and port not in names:
+                    raise field_error(
+                        f"policy rule {rule.priority} selects on {key} {port!r}, which the "
+                        f"device does not have; it has {_name_list(names)}",
+                        rule="NG-F021",
+                        path=("routing_policy", index, key),
+                    )
+        return self
+
+    def _check_route_tables(self) -> set[str]:
+        """``NG-F015``: the declared tables, checked; their names, returned.
+
+        A reserved name or number is refused rather than merged, because the
+        three tables of :data:`~netgraph.models.routing.RESERVED_TABLES` exist
+        whether or not anybody writes them down — so a second declaration of one
+        is not additional information, it is a document describing a device that
+        cannot exist.
+        """
+        declared: set[str] = set()
+        ids: dict[int, str] = {}
+        for index, table in enumerate(self.route_tables):
+            if table.name in RESERVED_TABLES:
+                raise field_error(
+                    f"{table.name!r} is one of the tables every routing stack already has "
+                    f"({_reserved_tables()}); it is nameable without being declared",
+                    rule="NG-F015",
+                    path=("route_tables", index, "name"),
+                )
+            if table.name in declared:
+                raise field_error(
+                    f"routing table {table.name!r} is declared twice",
+                    rule="NG-F015",
+                    path=("route_tables", index, "name"),
+                )
+            if (reserved := _reserved_by_id(table.id)) is not None:
+                raise field_error(
+                    f"table {table.name!r} is numbered {table.id}, which is reserved for "
+                    f"{reserved!r}; a table declared there is that table under another name",
+                    rule="NG-F015",
+                    path=("route_tables", index, "id"),
+                )
+            if (other := ids.get(table.id)) is not None:
+                raise field_error(
+                    f"tables {other!r} and {table.name!r} are both numbered {table.id}; a "
+                    f"table is its number, so these are one table with two names",
+                    rule="NG-F015",
+                    path=("route_tables", index, "id"),
+                )
+            declared.add(table.name)
+            ids[table.id] = table.name
+        return declared
 
     @model_validator(mode="after")
     def _check_netns_table(self) -> DeviceSpec:
@@ -239,6 +349,63 @@ class DeviceSpec(NetgraphModel):
         """Look a routing instance up by name (§16.1)."""
         return next((vrf for vrf in self.vrfs if vrf.name == name), None)
 
+    def route_table(self, name: str) -> RouteTable | None:
+        """Look a declared routing table up by name (§16.3).
+
+        Declared only: ``main`` is a table this device has and is not an entry
+        of ``spec.route_tables``, so it answers ``None`` here. Callers that mean
+        "is this a table at all" want :meth:`has_table`.
+        """
+        return next((table for table in self.route_tables if table.name == name), None)
+
+    def table_id(self, name: str) -> int | None:
+        """The number ``name`` is known by, when the inventory knows it (§16.3).
+
+        ``None`` for a VRF: a VRF has a table, but which number the
+        implementation gave it is not something a route distinguisher says, and
+        every emitter that needs a number has to refuse rather than invent one.
+        """
+        if (reserved := RESERVED_TABLES.get(name)) is not None:
+            return reserved
+        table = self.route_table(name)
+        return None if table is None else table.id
+
+    def has_table(self, name: str) -> bool:
+        """Is ``name`` a table this device routes by — declared, reserved or a VRF?"""
+        return (
+            name in RESERVED_TABLES
+            or self.route_table(name) is not None
+            or self.vrf(name) is not None
+        )
+
+    def routes_in(self, table: str) -> tuple[StaticRoute, ...]:
+        """Every static route placed in ``table``, in declaration order (§16.5).
+
+        Through :attr:`~netgraph.models.routing.StaticRoute.table_name`, so a
+        route that names neither a table nor a VRF is found under ``main`` — the
+        table it is actually in, rather than the one it declines to mention.
+        """
+        return tuple(route for route in self.routes if route.table_name == table)
+
+    def policy_for(self, table: str) -> tuple[PolicyRule, ...]:
+        """Every policy rule that looks ``table`` up, in declaration order (§16.6)."""
+        return tuple(rule for rule in self.routing_policy if rule.table == table)
+
+    def policy_in(self, family: AddressFamily) -> tuple[PolicyRule, ...]:
+        """The policy database of one family, in the order it is walked (§16.6).
+
+        Sorted by priority rather than by declaration, because that *is* the
+        database: two rules in the document are a set, and the order they are
+        consulted in is the number on them. Ties cannot happen (``NG-F020``), so
+        the sort is total and the result is what the device would do.
+        """
+        return tuple(
+            sorted(
+                (rule for rule in self.routing_policy if rule.matches_family(family)),
+                key=lambda rule: rule.priority,
+            )
+        )
+
     def netns_entry(self, name: str) -> NetnsDefinition | None:
         """Look a network namespace up by name (§23.1).
 
@@ -306,6 +473,34 @@ def _vrf_table(declared: Iterable[str]) -> str:
     if not names:
         return "is not declared: the device declares no 'spec.vrfs' at all"
     return f"is not declared in 'spec.vrfs'; it holds {', '.join(repr(name) for name in names)}"
+
+
+def _table_list(resolvable: Iterable[str]) -> str:
+    """``is no table of this device; it routes by …`` — the tail of ``NG-F019``.
+
+    The reserved three are named alongside the declared ones because they are
+    equally valid answers: somebody who wrote ``table: mian`` needs to see that
+    ``main`` was available without being declared.
+    """
+    return "is no table of this device; it routes by " + ", ".join(
+        repr(name) for name in sorted(resolvable)
+    )
+
+
+def _name_list(names: Iterable[str]) -> str:
+    """``'eth0', 'eth1'``, or a phrase for a device with no interface at all."""
+    listed = sorted(names)
+    return ", ".join(repr(name) for name in listed) if listed else "no interfaces at all"
+
+
+def _reserved_tables() -> str:
+    """``'local', 'main', 'default'`` — the reserved three, highest number first."""
+    return ", ".join(repr(name) for name in RESERVED_TABLES)
+
+
+def _reserved_by_id(number: int) -> str | None:
+    """The reserved table numbered ``number``, if one is."""
+    return next((name for name, value in RESERVED_TABLES.items() if value == number), None)
 
 
 def _netns_table(declared: Iterable[str]) -> str:

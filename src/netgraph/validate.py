@@ -91,6 +91,9 @@ from netgraph.models import (
     Note,
     PanelSide,
     PatchPanel,
+    PolicyAction,
+    PolicyRule,
+    RouteTable,
     RoutingConfig,
     Server,
     StaticRoute,
@@ -107,6 +110,7 @@ from netgraph.models import (
 )
 from netgraph.models.metadata import Location
 from netgraph.models.power import format_watts
+from netgraph.models.routing import AddressFamily
 from netgraph.models.scalars import MAX_VLAN_ID, MIN_VLAN_ID, format_bitrate
 from netgraph.models.style import hex_colour
 from netgraph.power import FeedKind, PowerPlan, UnresolvedReason, Uplink, power_plan
@@ -477,7 +481,7 @@ class _Placement:
 
 @dataclass(frozen=True, slots=True)
 class _RouteEntry:
-    """One static route, tied to the device that configures it (§16.2)."""
+    """One static route, tied to the device that configures it (§16.3)."""
 
     owner_fqn: str
     owner: Device
@@ -501,7 +505,7 @@ class _RouteEntry:
 
 @dataclass(frozen=True, slots=True)
 class _Session:
-    """One configured BGP session, with its far end resolved by address (§16.4).
+    """One configured BGP session, with its far end resolved by address (§16.6).
 
     Resolution is by *address*, which is what the device is configured with. A
     session whose address matches nothing in the inventory is not an error — an
@@ -558,6 +562,39 @@ class _Vrf:
 
 
 @dataclass(frozen=True, slots=True)
+class _PolicyDatabase:
+    """One device's policy-based routing: its tables and the rules over them (§16.6).
+
+    Held per device rather than flattened per rule, unlike :class:`_RouteEntry`,
+    because every question worth asking about a policy database is about the
+    database and not about one line of it: whether a table anything selects holds
+    a route, whether a table any route is placed in is ever selected, and whether
+    a rule is reachable at all. None of those can be answered from one rule.
+    """
+
+    owner_fqn: str
+    owner: Device
+    #: The declared tables, in declaration order. The reserved three are not
+    #: here: nobody declared them, so no finding can be anchored at them.
+    tables: tuple[RouteTable, ...]
+    #: The policy database in declaration order — *not* priority order, since a
+    #: finding's field path is a position in the document.
+    rules: tuple[PolicyRule, ...]
+
+    def table_path(self, index: int, *suffix: str | int) -> tuple[str | int, ...]:
+        return ("spec", "route_tables", index, *suffix)
+
+    def rule_path(self, rule: PolicyRule, *suffix: str | int) -> tuple[str | int, ...]:
+        """The path of ``rule`` in the document it was written in.
+
+        By identity rather than by a stored index, because the checks walk the
+        database in *priority* order — which is the order the device walks it —
+        and the document order is what a field path has to name.
+        """
+        return ("spec", "routing_policy", self.rules.index(rule), *suffix)
+
+
+@dataclass(frozen=True, slots=True)
 class _Context:
     """Everything the checks need, computed once.
 
@@ -611,12 +648,14 @@ class _Context:
     #: order. This is the same grouping the layer-3 graph draws, so a finding
     #: about a subnet and the diagram of it can never disagree.
     subnets: tuple[Subnet, ...] = ()
-    #: Every static route of every device, in load then declaration order (§16.2).
+    #: Every static route of every device, in load then declaration order (§16.3).
     routes: tuple[_RouteEntry, ...] = ()
-    #: Every configured BGP session, with its far end resolved by address (§16.4).
+    #: Every configured BGP session, with its far end resolved by address (§16.6).
     sessions: tuple[_Session, ...] = ()
     #: Every VRF any device declares, with what is bound and placed in it (§16.1).
     vrfs: tuple[_Vrf, ...] = ()
+    #: Every device that declares a routing table or a policy rule (§16.6).
+    policies: tuple[_PolicyDatabase, ...] = ()
     #: Devices that declare ``spec.routing``, in load order.
     routing: Mapping[str, RoutingConfig] = field(default_factory=dict)
     #: Every address the inventory configures -> where it is, first declaration
@@ -685,7 +724,7 @@ class _Context:
     def on_link(
         self, owner_fqn: str, *, vrf: str, version: int, dev: str | None = None
     ) -> tuple[IPNetwork, ...]:
-        """The prefixes ``owner_fqn`` can reach without routing (§16.2).
+        """The prefixes ``owner_fqn`` can reach without routing (§16.3).
 
         A next hop is resolved by ARP or neighbour discovery, so it has to sit in
         a prefix the device holds *itself* — in the right family, and in the right
@@ -828,6 +867,7 @@ def _build_context(inventory: Inventory) -> _Context:
         routes=routing.routes,
         sessions=routing.sessions,
         vrfs=routing.vrfs,
+        policies=routing.policies,
         routing=routing.routing,
         address_owners=routing.address_owners,
         power=power_plan(inventory),
@@ -849,6 +889,7 @@ class _Routing:
     routes: tuple[_RouteEntry, ...] = ()
     sessions: tuple[_Session, ...] = ()
     vrfs: tuple[_Vrf, ...] = ()
+    policies: tuple[_PolicyDatabase, ...] = ()
     routing: Mapping[str, RoutingConfig] = field(default_factory=dict)
     address_owners: Mapping[_IPAddress, tuple[str, str]] = field(default_factory=dict)
 
@@ -870,6 +911,7 @@ def _collect_routing(owners: Mapping[str, InterfaceOwner]) -> _Routing:
 
     routes: list[_RouteEntry] = []
     vrfs: list[_Vrf] = []
+    policies: list[_PolicyDatabase] = []
     routing: dict[str, RoutingConfig] = {}
     peers: list[tuple[str, Device, BgpConfig]] = []
 
@@ -898,6 +940,15 @@ def _collect_routing(owners: Mapping[str, InterfaceOwner]) -> _Routing:
                     ),
                 )
             )
+        if spec.route_tables or spec.routing_policy:
+            policies.append(
+                _PolicyDatabase(
+                    owner_fqn=fqn,
+                    owner=owner,
+                    tables=tuple(spec.route_tables),
+                    rules=tuple(spec.routing_policy),
+                )
+            )
         if spec.routing is not None:
             routing[fqn] = spec.routing
             if spec.routing.bgp is not None and spec.routing.bgp.neighbors:
@@ -920,6 +971,7 @@ def _collect_routing(owners: Mapping[str, InterfaceOwner]) -> _Routing:
         routes=tuple(routes),
         sessions=tuple(sessions),
         vrfs=tuple(vrfs),
+        policies=tuple(policies),
         routing=routing,
         address_owners=addresses,
     )
@@ -929,7 +981,13 @@ def _routes_anything(owners: Mapping[str, InterfaceOwner]) -> bool:
     """Does any device declare routing state at all (§16)?"""
     return any(
         isinstance(owner, Device)
-        and (owner.spec.routes or owner.spec.vrfs or owner.spec.routing is not None)
+        and (
+            owner.spec.routes
+            or owner.spec.vrfs
+            or owner.spec.route_tables
+            or owner.spec.routing_policy
+            or owner.spec.routing is not None
+        )
         for owner in owners.values()
     )
 
@@ -1597,6 +1655,110 @@ def _check_empty_vrf(ctx: _Context) -> Iterator[_Draft]:
             (entry.owner_fqn,),
             entry.path("name"),
         )
+
+
+def _check_policy_empty_table(ctx: _Context) -> Iterator[_Draft]:
+    """W147 — a policy rule selects a table nothing is in (``NG-F022``).
+
+    Policy-based routing is two halves that have to meet: a rule that says
+    *route this by table X*, and a route placed in X. With the second half
+    missing, the rule matches, the lookup finds nothing, and the packet falls
+    through to the next rule — so the traffic the operator diverted goes exactly
+    where it would have gone anyway, silently.
+
+    Only *declared* tables are checked. ``main`` holds every connected route the
+    device has without anybody writing one down, and a VRF's table is fed by the
+    interfaces bound to it, so neither is empty for being unmentioned; an empty
+    VRF is ``W136``'s business instead.
+    """
+    for database in ctx.policies:
+        for index, table in enumerate(database.tables):
+            selecting = database.owner.spec.policy_for(table.name)
+            if not selecting or database.owner.spec.routes_in(table.name):
+                continue
+            priorities = _join_plain([str(rule.priority) for rule in selecting])
+            yield _Draft(
+                f"element {_q(database.owner_fqn)} routes by {table.describe()} at "
+                f"{'priorities' if len(selecting) > 1 else 'priority'} {priorities}, but no "
+                f"route is placed in that table; the lookup finds nothing and the packet "
+                f"falls through to the next rule",
+                (database.owner_fqn,),
+                database.table_path(index, "name"),
+            )
+
+
+def _check_unselected_route_table(ctx: _Context) -> Iterator[_Draft]:
+    """W148 — a declared table no rule ever looks up (``NG-F023``).
+
+    The other half of ``W147``, and the more common mistake: the routes are
+    written, the table is declared, and the rule that would reach it was never
+    added. A table nothing selects is consulted by nothing — it is not a
+    fallback, it is dead weight — so any route in it is a statement about the
+    device that the device does not act on.
+    """
+    for database in ctx.policies:
+        for index, table in enumerate(database.tables):
+            if database.owner.spec.policy_for(table.name):
+                continue
+            routes = database.owner.spec.routes_in(table.name)
+            placed = (
+                f"; {count_text(len(routes), 'route')} placed in it is never consulted"
+                if routes
+                else ""
+            )
+            yield _Draft(
+                f"element {_q(database.owner_fqn)} declares {table.describe()}, but no rule "
+                f"in 'spec.routing_policy' looks it up, so nothing is ever routed by it"
+                f"{placed}",
+                (database.owner_fqn,),
+                database.table_path(index, "name"),
+            )
+
+
+def _check_shadowed_policy(ctx: _Context) -> Iterator[_Draft]:
+    """W149 — a rule below one that matches everything (``NG-F024``).
+
+    The policy database is walked from the lowest priority upwards and the first
+    match decides, so a rule with no selector at all ends the walk: everything
+    after it in the same family is unreachable, whatever it says. That is how a
+    database is *meant* to be terminated — the last rule is normally
+    ``lookup main`` — and it is also the most common way to break one, by
+    numbering a new rule above the terminator instead of below it.
+
+    Per family, because the two databases are separate lists: an IPv4 catch-all
+    shadows nothing in IPv6. A ``goto`` catch-all is not a terminator either — it
+    jumps forward, and what it jumps to is still reached.
+    """
+    for database in ctx.policies:
+        for family in AddressFamily:
+            walk = database.owner.spec.policy_in(family)
+            blocker = next(
+                (
+                    rule
+                    for rule in walk
+                    if rule.is_catch_all and rule.action is not PolicyAction.GOTO
+                ),
+                None,
+            )
+            if blocker is None:
+                continue
+            shadowed = [rule for rule in walk if rule.priority > blocker.priority]
+            if not shadowed:
+                continue
+            first = shadowed[0]
+            others = (
+                f", and {count_text(len(shadowed) - 1, 'rule')} after it"
+                if len(shadowed) > 1
+                else ""
+            )
+            yield _Draft(
+                f"element {_q(database.owner_fqn)} has {family.value} policy rule "
+                f"{_q(first.describe())} below {_q(blocker.describe())}, which matches every "
+                f"packet; the database is walked in priority order and the first match "
+                f"decides, so this rule{others} can never run",
+                (database.owner_fqn,),
+                database.rule_path(first, "priority"),
+            )
 
 
 def _check_vlan_mismatch(ctx: _Context) -> Iterator[_Draft]:
@@ -5276,6 +5438,9 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W144", _check_invisible_style),
     ("W145", _check_unreadable_label),
     ("W146", _check_empty_netns),
+    ("W147", _check_policy_empty_table),
+    ("W148", _check_unselected_route_table),
+    ("W149", _check_shadowed_policy),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),

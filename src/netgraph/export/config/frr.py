@@ -54,11 +54,13 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Final
 
+from netgraph.errors import count_text
 from netgraph.export.config.header import config_header
 from netgraph.export.config.model import ConfigFile, Unsupported
 from netgraph.export.config.plan import DevicePlan, addresses_of, netns_limits
 from netgraph.export.manifest import Reason, Recorder
 from netgraph.models import (
+    RESERVED_TABLES,
     BgpConfig,
     Interface,
     InterfaceType,
@@ -185,7 +187,9 @@ def _blocks(plan: DevicePlan) -> Iterator[list[str]]:
             yield block
     # A route with no 'vrf' is in the global instance, and FRR writes that one
     # at the top level rather than in any block.
-    global_routes = [_route(route) for route in plan.routes if route.vrf is None]
+    global_routes = [
+        _route(plan, route) for route in plan.routes if route.vrf is None and _writable(plan, route)
+    ]
     if global_routes:
         yield global_routes
     routing = spec.routing
@@ -205,7 +209,7 @@ def _vrf_block(plan: DevicePlan, vrf: VrfDefinition) -> list[str]:
         # FRR's vrf node has no 'description' command, so the operator's words
         # are kept as a comment rather than turned into a line vtysh rejects.
         lines.append(f" ! {_inline(vrf.description)}")
-    lines.extend(f" {_route(route)}" for route in plan.routes if route.vrf == vrf.name)
+    lines.extend(f" {_route(plan, route)}" for route in plan.routes if route.vrf == vrf.name)
     lines.append(" exit-vrf")
     return lines
 
@@ -289,12 +293,17 @@ def _bgp_block(bgp: BgpConfig) -> list[str]:
     return lines
 
 
-def _route(route: StaticRoute) -> str:
+def _route(plan: DevicePlan, route: StaticRoute) -> str:
     """One static route, in the order FRR's grammar takes the words.
 
     ``ip`` or ``ipv6`` comes from the destination's own family rather than from
     the next hop: the two are the same by ``NG-F003``, and the destination is
     the one a route always has.
+
+    A route placed in a table (§16.3) is written with ``table``, which FRR takes
+    as a *number* — so the name is resolved through the device's own declarations
+    rather than passed through, and a route in a table nothing numbered does not
+    reach here at all (:func:`_record_out_of_remit` says so).
 
     ``metric`` is not written; see the comment in the body for why substituting
     FRR's administrative distance for it would be the one thing this package
@@ -307,6 +316,8 @@ def _route(route: StaticRoute) -> str:
         words.append(str(route.via))
     if route.dev is not None:
         words.append(route.dev)
+    if (number := _table_number(plan, route)) is not None:
+        words.extend(["table", str(number)])
     # ``metric`` is deliberately absent. The number FRR takes in this position is
     # an *administrative distance* -- which protocol's answer wins for a prefix,
     # 1 to 255 -- and a metric ranks routes within one protocol over the whole
@@ -314,6 +325,31 @@ def _route(route: StaticRoute) -> str:
     # 200 into a distance of 200 and a metric of 1000 into a syntax error, so it
     # is reported (:func:`_record_out_of_remit`) rather than substituted.
     return " ".join(words)
+
+
+def _writable(plan: DevicePlan, route: StaticRoute) -> bool:
+    """Can FRR state which table this route is in?
+
+    Only if the number is known. A route placed in a table FRR cannot name would
+    otherwise be written without the ``table`` word, which is not the same route
+    — it is that route in ``main`` — and writing it there is the one substitution
+    this package refuses to make. :func:`_record_out_of_remit` names each one it
+    leaves out.
+    """
+    return route.table is None or plan.device.spec.table_id(route.table) is not None
+
+
+def _table_number(plan: DevicePlan, route: StaticRoute) -> int | None:
+    """The table number this route is written into, or ``None`` for ``main``.
+
+    ``main`` is what FRR writes into when no table is named, so naming it would
+    add a word that changes nothing. A VRF is not a table here either: FRR puts
+    a VRF's routes inside its ``vrf`` block, which :func:`emit` already does.
+    """
+    if route.table is None:
+        return None
+    number = plan.device.spec.table_id(route.table)
+    return None if number == RESERVED_TABLES["main"] else number
 
 
 # --------------------------------------------------------------------------- #
@@ -342,6 +378,26 @@ def _record_out_of_remit(plan: DevicePlan, recorder: Recorder) -> None:
             f"1 to 255 -- and not a metric, which ranks routes within one protocol. The "
             f"route to {route.prefix} is written without its metric of {route.metric} rather "
             f"than with one number standing in for the other",
+        )
+    for index, route in enumerate(plan.routes):
+        if route.table is not None and plan.device.spec.table_id(route.table) is None:
+            recorder.skip(
+                plan.fqn,
+                Reason.NOT_REPRESENTABLE,
+                f"{plan.field('routes', index, 'table')}: FRR's 'ip route ... table' takes a "
+                f"number and {route.table!r} is a VRF, whose table number a route "
+                f"distinguisher does not state; the route to {route.prefix} is left out "
+                f"rather than written into whichever table FRR would pick",
+            )
+    if plan.device.spec.routing_policy:
+        recorder.skip(
+            plan.fqn,
+            Reason.NOT_REPRESENTABLE,
+            f"{plan.field('routing_policy')}: FRR's own policy routing is 'pbr-map', which "
+            f"needs the PBR daemon and a per-interface binding this inventory does not "
+            f"describe; the "
+            + count_text(len(plan.device.spec.routing_policy), "rule")
+            + " of the policy database is written by 'netgraph export routes' instead",
         )
     for interface in plan.interfaces:
         _record_interface(plan, interface, recorder)

@@ -596,13 +596,15 @@ def _netns(view: NetnsView) -> dict[str, Any]:
 
 
 def _routing(view: RoutingView) -> dict[str, Any]:
-    """What one element contributes to the control plane (§16.6).
+    """What one element contributes to the control plane (§16.8).
 
     Only what the inventory states is emitted, so a consumer can tell "runs no
     OSPF" from "runs OSPF in area 0.0.0.0" — which a defaulted area would not
-    allow. ``routes`` is the rendered form (``0.0.0.0/0 via 203.0.113.1``), the
-    same string the diagram prints; a consumer that wants the fields reads the
-    inventory, which is where they are declared.
+    allow. ``routes`` and ``policy`` are the rendered forms (``0.0.0.0/0 via
+    203.0.113.1``, ``100: from 10.20.0.0/16 lookup uplink-b``), the same strings
+    the diagram prints; a consumer that wants the fields reads the inventory,
+    which is where they are declared. ``policy`` is in priority order, which is
+    the order the device walks it.
     """
     payload: dict[str, Any] = {}
     if view.asn is not None:
@@ -614,8 +616,12 @@ def _routing(view: RoutingView) -> dict[str, Any]:
         payload["ospfInterfaces"] = list(view.ospf_interfaces)
     if view.vrfs:
         payload["vrfs"] = [{"name": name, "rd": rd} for name, rd in view.vrfs]
+    if view.tables:
+        payload["tables"] = [{"name": name, "id": number} for name, number in view.tables]
     if view.routes:
         payload["routes"] = list(view.routes)
+    if view.policy:
+        payload["policy"] = list(view.policy)
     return payload
 
 

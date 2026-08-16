@@ -4321,8 +4321,9 @@ def _empty_graph_reason(layer: Layer, spec: FilterSpec) -> str:
     if layer is Layer.ROUTING:
         return (
             "nothing to draw in the routing view: no element declares 'spec.routing', "
-            "'spec.routes' or 'spec.vrfs'. Render '--layer l3' for the addressing the "
-            "inventory does declare, or add a 'routing' block to a router"
+            "'spec.routes', 'spec.vrfs', 'spec.route_tables' or 'spec.routing_policy'. "
+            "Render '--layer l3' for the addressing the inventory does declare, or add a "
+            "'routing' block to a router"
         )
     if layer is Layer.RACK:
         return (

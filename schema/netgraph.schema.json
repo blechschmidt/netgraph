@@ -264,6 +264,15 @@
       "title": "AdapterSpec",
       "type": "object"
     },
+    "AddressFamily": {
+      "description": "Which of the two protocol families a policy rule is installed in.\n\nThe policy database is per family — an IPv4 rule and an IPv6 rule with the\nsame priority are two rules, in two lists, that never see each other's\npackets. Most rules say which family they are in by carrying a prefix; the\nfield is for the ones that do not, and the one place it is *not* optional is\na reader's understanding.",
+      "enum": [
+        "ipv4",
+        "ipv6"
+      ],
+      "title": "AddressFamily",
+      "type": "string"
+    },
     "AnnotationGeometry": {
       "additionalProperties": false,
       "description": "Where an annotation is drawn, and how big it is.\n\nFlat rather than the nested ``position``/``size`` of §18, because these four\nnumbers are what a drag and a resize produce and what an editor writes back;\na note is one box, not a node with an optional extent.\n\nCoordinates are the §18 system: points, ``y`` upwards, and ``x``/``y`` is\nthe **centre** of the box. Both or neither: half a position places nothing.",
@@ -802,7 +811,7 @@
     },
     "BgpNeighbor": {
       "additionalProperties": false,
-      "description": "One entry of `spec.routing.bgp.neighbors` — a configured session.\n\nThe peer is an **address**, not a name. That is what the device is\nconfigured with, and it is what lets the graph layer find the peer among the\naddresses the inventory already declares without a second reference grammar\nthat could point somewhere else (§16.4).",
+      "description": "One entry of `spec.routing.bgp.neighbors` — a configured session.\n\nThe peer is an **address**, not a name. That is what the device is\nconfigured with, and it is what lets the graph layer find the peer among the\naddresses the inventory already declares without a second reference grammar\nthat could point somewhere else (§16.6).",
       "properties": {
         "address": {
           "anyOf": [
@@ -1277,6 +1286,14 @@
           "type": "array",
           "description": "The routing instances (VRFs) this device implements. An interface binds to one with `vrf`, and that binding is what partitions the address namespace.\n\nYANG: `/ni:network-instances/ni:network-instance`"
         },
+        "route_tables": {
+          "items": {
+            "$ref": "#/$defs/RouteTable"
+          },
+          "title": "route_tables",
+          "type": "array",
+          "description": "The routing tables this device holds beyond `main`, `local` and `default`. A table on its own changes nothing; what reaches it is a rule in `routing_policy` (§16.6)."
+        },
         "routes": {
           "items": {
             "$ref": "#/$defs/StaticRoute"
@@ -1284,6 +1301,14 @@
           "title": "routes",
           "type": "array",
           "description": "Configured static routes, in the order the device holds them.\n\nYANG: `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes`"
+        },
+        "routing_policy": {
+          "items": {
+            "$ref": "#/$defs/PolicyRule"
+          },
+          "title": "routing_policy",
+          "type": "array",
+          "description": "The routing policy database: the ordered rules deciding which *table* a packet is routed by, from its source, its firewall mark, its ingress interface or its DSCP. This is policy-based routing (§16.6)."
         },
         "routing": {
           "anyOf": [
@@ -2563,7 +2588,7 @@
     },
     "OspfConfig": {
       "additionalProperties": false,
-      "description": "`spec.routing.ospf` — one OSPF area and the interfaces that run it.\n\nOne area per device, deliberately: an area border router is a real thing,\nbut modelling it needs per-interface areas, and a single area covers the\ninventories this revision is for. See §16.5.",
+      "description": "`spec.routing.ospf` — one OSPF area and the interfaces that run it.\n\nOne area per device, deliberately: an area border router is a real thing,\nbut modelling it needs per-interface areas, and a single area covers the\ninventories this revision is for. See §16.7.",
       "properties": {
         "area": {
           "default": "0.0.0.0",
@@ -3240,6 +3265,213 @@
       "title": "Point",
       "type": "object"
     },
+    "PolicyAction": {
+      "description": "What happens to a packet a policy rule matches.\n\n`lookup` is the rule that does the routing; the other four are the ones\nthat stop it, and they exist because a policy database without them can only\never *add* reachability. A rule that discards traffic from a guest prefix is\none line here and a firewall in its absence.",
+      "enum": [
+        "lookup",
+        "blackhole",
+        "unreachable",
+        "prohibit",
+        "goto"
+      ],
+      "title": "PolicyAction",
+      "type": "string"
+    },
+    "PolicyRule": {
+      "additionalProperties": false,
+      "description": "One entry of `spec.routing_policy` — a rule of the policy database (§16.6).\n\nRead it as a sentence, which is how every implementation writes it: *at\npriority 100, a packet from 10.20.0.0/16 is routed by the table called\nuplink-b*. The selectors are the subject, the action is the verb, and the\n`priority` is where in the queue the sentence is read — lowest first, first\nmatch wins, and nothing after a matching `lookup` is consulted.\n\nThe selectors are all layer 3 or below on purpose (see the module docstring):\nwhere the packet came from, where it is going, which interface it arrived on\nor would leave by, what the firewall marked it with, and what it asked for in\nits DSCP. A rule that names none of them matches everything, which is not a\nmistake — it is how the database is terminated.",
+      "properties": {
+        "priority": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "title": "priority",
+          "type": "integer",
+          "description": "Where the rule sits in the policy database, 0-4294967295. The database is walked from the lowest priority upwards and the first match decides, so this is the rule's position and its identity: unique within the device per family (`NG-F020`)."
+        },
+        "family": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AddressFamily"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "family",
+          "description": "`ipv4` or `ipv6` — which family's database the rule is installed in. Derived from `src`/`dst` when they say, and both families when nothing does."
+        },
+        "src": {
+          "anyOf": [
+            {
+              "format": "ipv4network",
+              "type": "string"
+            },
+            {
+              "format": "ipv6network",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "src",
+          "description": "Match packets from this prefix. The selector policy-based routing exists for: it is what makes a source route a source route."
+        },
+        "dst": {
+          "anyOf": [
+            {
+              "format": "ipv4network",
+              "type": "string"
+            },
+            {
+              "format": "ipv6network",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "dst",
+          "description": "Match packets to this prefix."
+        },
+        "fwmark": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(0[xX][0-9a-fA-F]{1,8}|\\d{1,10})(?:/(0[xX][0-9a-fA-F]{1,8}|\\d{1,10}))?$",
+                  "description": "A mark, with an optional mask: `0x1`, `0x1/0xff`, `1/255`."
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295,
+                  "description": "The same mark as a plain number, normalised to hexadecimal."
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "fwmark",
+          "description": "Match the mark a firewall put on the packet, optionally masked: `0x1`, `0x1/0xff`, or a plain number. This is how a port, a user or an application reaches the policy database — something marks, and this matches."
+        },
+        "iif": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._/-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "iif",
+          "description": "Match packets that arrived on this interface. Names an interface of this device (`NG-F021`)."
+        },
+        "oif": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._/-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "oif",
+          "description": "Match packets that would leave by this interface — locally originated traffic from a socket bound to it. Names an interface of this device (`NG-F021`)."
+        },
+        "dscp": {
+          "anyOf": [
+            {
+              "maximum": 63,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "dscp",
+          "description": "Match this DSCP code point, 0-63 (RFC 2474 §3) — the six bits, not the whole octet."
+        },
+        "invert": {
+          "default": false,
+          "title": "invert",
+          "type": "boolean",
+          "description": "Match everything the selectors do *not*. Needs a selector to invert (`NG-F017`)."
+        },
+        "action": {
+          "$ref": "#/$defs/PolicyAction",
+          "default": "lookup",
+          "title": "action",
+          "description": "What happens to a matching packet: `lookup` routes it by `table`, `blackhole`, `unreachable` and `prohibit` discard it, `goto` jumps to another priority. Default `lookup`."
+        },
+        "table": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "table",
+          "description": "The table to route by. Required by `lookup` and refused by every other action (`NG-F016`); names an entry of `spec.route_tables`, a VRF, or a reserved table (`NG-F019`)."
+        },
+        "goto": {
+          "anyOf": [
+            {
+              "maximum": 4294967295,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "goto",
+          "description": "The priority to jump to. Required by `goto` and refused by every other action (`NG-F016`), and strictly greater than this rule's own — the database is walked upwards, so a backwards jump is a loop."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text: what the rule is for."
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "title": "PolicyRule",
+      "type": "object"
+    },
     "PowerConfig": {
       "additionalProperties": false,
       "description": "`spec.power` — a device's power, both directions (§17.2).\n\n\"Both directions\" is the whole shape of it. A switch *takes* power through\n`inputs` and *gives* it through `poe_budget_watts` and the `poe` blocks\non its ports; an access point takes power over its uplink and gives none. One\nblock covers all three because they are one question — where does the power\nin this box come from and go to — and splitting it would put two halves of\none answer in two places.",
@@ -3396,6 +3628,46 @@
       ],
       "title": "RadioRole",
       "type": "string"
+    },
+    "RouteTable": {
+      "additionalProperties": false,
+      "description": "One entry of `spec.route_tables` — a routing table of its own (§16.3).\n\nA table is a name and a number and nothing else, because that is all a table\nis: a container routes are placed in. What makes it *do* anything is a policy\nrule that looks it up (§16.6) — a table nothing selects holds routes nothing\nconsults, which is `NG-F023`.\n\nThe three tables every stack already has — `main`, `local` and\n`default` — are never declared here and always nameable anyway; declaring\neither their name or their number is `NG-F015`, because a second `main`\nis not a second table, it is a document that has stopped describing the\ndevice.",
+      "properties": {
+        "name": {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+          "title": "name",
+          "type": "string",
+          "description": "Name of the routing table. Unique within the device, and not one of the reserved `main`, `local` or `default`, which exist without being declared (`NG-F015`)."
+        },
+        "id": {
+          "maximum": 4294967295,
+          "minimum": 1,
+          "title": "id",
+          "type": "integer",
+          "description": "The number the table is known by, 1-4294967295. Unique within the device, and not 253, 254 or 255 — those are the reserved three under another name (`NG-F015`)."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text: what the table is for."
+        }
+      },
+      "required": [
+        "name",
+        "id"
+      ],
+      "title": "RouteTable",
+      "type": "object"
     },
     "Router": {
       "additionalProperties": false,
@@ -3604,6 +3876,22 @@
           "default": null,
           "title": "vrf",
           "description": "The routing instance holding the route. Names an entry of `spec.vrfs` (`NG-F005`); unset means the global instance.\n\nYANG: `/ni:network-instances/ni:network-instance/ni:name`"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "table",
+          "description": "The routing table holding the route; `main` when unset. Names an entry of `spec.route_tables` or a reserved table (`NG-F019`). A VRF is a table of its own, so `vrf` and `table` are alternatives, not a pair (`NG-F018`)."
         },
         "metric": {
           "anyOf": [
@@ -4089,6 +4377,14 @@
           "type": "array",
           "description": "The routing instances (VRFs) this device implements. An interface binds to one with `vrf`, and that binding is what partitions the address namespace.\n\nYANG: `/ni:network-instances/ni:network-instance`"
         },
+        "route_tables": {
+          "items": {
+            "$ref": "#/$defs/RouteTable"
+          },
+          "title": "route_tables",
+          "type": "array",
+          "description": "The routing tables this device holds beyond `main`, `local` and `default`. A table on its own changes nothing; what reaches it is a rule in `routing_policy` (§16.6)."
+        },
         "routes": {
           "items": {
             "$ref": "#/$defs/StaticRoute"
@@ -4096,6 +4392,14 @@
           "title": "routes",
           "type": "array",
           "description": "Configured static routes, in the order the device holds them.\n\nYANG: `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes`"
+        },
+        "routing_policy": {
+          "items": {
+            "$ref": "#/$defs/PolicyRule"
+          },
+          "title": "routing_policy",
+          "type": "array",
+          "description": "The routing policy database: the ordered rules deciding which *table* a packet is routed by, from its source, its firewall mark, its ingress interface or its DSCP. This is policy-based routing (§16.6)."
         },
         "routing": {
           "anyOf": [

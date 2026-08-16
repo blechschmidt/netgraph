@@ -100,7 +100,9 @@ The five device kinds share one spec shape. They differ in which fields they per
 | `forwarding` | [Forwarding](#specforwarding) | no | *unset* | Device-wide default for per-interface IP forwarding. Defaults to true/true on a `router` and false/false on every other kind; a `hub` must not declare it. | — |
 | `netns` | [NetnsDefinition](#specnetns) list | no | `[]` | The network namespaces this machine runs (§23.1). Each is a whole second network stack — its own interfaces, addresses and routing table — and `parent` nests one inside another, arbitrarily deep. Not a VRF: a VRF partitions one stack's routing table, a namespace *is* a second stack. | — |
 | `vrfs` | [VrfDefinition](#specvrfs) list | no | `[]` | The routing instances (VRFs) this device implements. An interface binds to one with `vrf`, and that binding is what partitions the address namespace. | `/ni:network-instances/ni:network-instance` |
+| `route_tables` | [RouteTable](#specroute_tables) list | no | `[]` | The routing tables this device holds beyond `main`, `local` and `default`. A table on its own changes nothing; what reaches it is a rule in `routing_policy` (§16.6). | — |
 | `routes` | [StaticRoute](#specroutes) list | no | `[]` | Configured static routes, in the order the device holds them. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes` |
+| `routing_policy` | [PolicyRule](#specrouting_policy) list | no | `[]` | The routing policy database: the ordered rules deciding which *table* a packet is routed by, from its source, its firewall mark, its ingress interface or its DSCP. This is policy-based routing (§16.6). | — |
 | `routing` | [RoutingConfig](#specrouting) | no | *unset* | The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol` |
 | `power` | [PowerConfig](#specpower) | no | *unset* | What the device draws, which PDU outlets feed it, and how much PoE it hands out (§17.2). Absent means the inventory records nothing about its power. | `/eo-mib:eoPowerTable/eoPowerEntry` |
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
@@ -290,9 +292,22 @@ One routing instance — a VRF (§16.1). An interface joins it with `vrf`, and t
 * Two devices that use the same `name` are taken to mean the same VRF; the route distinguisher is recorded because MPLS needs it, not to identify the instance.
 * A VRF no interface binds to holds nothing, which is `NG-F014`.
 
+## `spec.route_tables[]`
+
+One routing table beyond the three every stack has (§16.2). A table is a container routes are placed in; what reaches it is a rule in `routing_policy`.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `name` | element name | **yes** | — | Name of the routing table. Unique within the device, and not one of the reserved `main`, `local` or `default`, which exist without being declared (`NG-F015`). | — |
+| `id` | integer, 1–4294967295 | **yes** | — | The number the table is known by, 1-4294967295. Unique within the device, and not 253, 254 or 255 — those are the reserved three under another name (`NG-F015`). | — |
+| `description` | string | no | *unset* | Free text: what the table is for. | — |
+
+* `main`, `local` and `default` exist without being declared and may not be declared, by either name or number (`NG-F015`).
+* A table nothing looks up is consulted by nothing (`NG-F023`); a rule looking up a table nothing is placed in falls through (`NG-F022`).
+
 ## `spec.routes[]`
 
-One configured static route (§16.2).
+One configured static route (§16.3).
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
@@ -300,15 +315,41 @@ One configured static route (§16.2).
 | `via` | IPv4 address \| IPv6 address | no | *unset* | Next-hop address. Same family as `prefix` (`NG-F003`), and on a prefix the device configures (`NG-F008`). | `…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address` |
 | `dev` | interface name | no | *unset* | Egress interface, for an unnumbered next hop or a route pointed at an interface. Names an interface of this device (`NG-F009`). | `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface` |
 | `vrf` | element name | no | *unset* | The routing instance holding the route. Names an entry of `spec.vrfs` (`NG-F005`); unset means the global instance. | `/ni:network-instances/ni:network-instance/ni:name` |
+| `table` | element name | no | *unset* | The routing table holding the route; `main` when unset. Names an entry of `spec.route_tables` or a reserved table (`NG-F019`). A VRF is a table of its own, so `vrf` and `table` are alternatives, not a pair (`NG-F018`). | — |
 | `metric` | integer, 0–4294967295 | no | *unset* | Administrative distance or cost, as this device counts it. Documentation only: netgraph does not compute a best path. | — |
 | `blackhole` | boolean | no | `false` | Discard matching packets. Excludes `via` and `dev` (`NG-F004`). | `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop` |
 
 * At least one of `via`, `dev` and `blackhole` is required, and `blackhole` excludes the other two (`NG-F004`).
 * `via` is of the same family as `prefix` (`NG-F003`) and must be on-link: inside a prefix the device configures, in the same VRF (`NG-F008`).
+* `vrf` and `table` are alternatives, not a pair: a VRF is a routing table of its own (`NG-F018`).
+
+## `spec.routing_policy[]`
+
+One rule of the routing policy database (§16.4): which *table* a packet is routed by, decided from where it came from, what marked it, where it arrived or its DSCP.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `priority` | integer, 0–4294967295 | **yes** | — | Where the rule sits in the policy database, 0-4294967295. The database is walked from the lowest priority upwards and the first match decides, so this is the rule's position and its identity: unique within the device per family (`NG-F020`). | — |
+| `family` | `ipv4` \| `ipv6` | no | *unset* | `ipv4` or `ipv6` — which family's database the rule is installed in. Derived from `src`/`dst` when they say, and both families when nothing does. | — |
+| `src` | IPv4 prefix \| IPv6 prefix | no | *unset* | Match packets from this prefix. The selector policy-based routing exists for: it is what makes a source route a source route. | — |
+| `dst` | IPv4 prefix \| IPv6 prefix | no | *unset* | Match packets to this prefix. | — |
+| `fwmark` | string | no | *unset* | Match the mark a firewall put on the packet, optionally masked: `0x1`, `0x1/0xff`, or a plain number. This is how a port, a user or an application reaches the policy database — something marks, and this matches. | — |
+| `iif` | interface name | no | *unset* | Match packets that arrived on this interface. Names an interface of this device (`NG-F021`). | — |
+| `oif` | interface name | no | *unset* | Match packets that would leave by this interface — locally originated traffic from a socket bound to it. Names an interface of this device (`NG-F021`). | — |
+| `dscp` | integer, 0–63 | no | *unset* | Match this DSCP code point, 0-63 (RFC 2474 §3) — the six bits, not the whole octet. | — |
+| `invert` | boolean | no | `false` | Match everything the selectors do *not*. Needs a selector to invert (`NG-F017`). | — |
+| `action` | `lookup` \| `blackhole` \| `unreachable` \| `prohibit` \| `goto` | no | `lookup` | What happens to a matching packet: `lookup` routes it by `table`, `blackhole`, `unreachable` and `prohibit` discard it, `goto` jumps to another priority. Default `lookup`. | — |
+| `table` | element name | no | *unset* | The table to route by. Required by `lookup` and refused by every other action (`NG-F016`); names an entry of `spec.route_tables`, a VRF, or a reserved table (`NG-F019`). | — |
+| `goto` | integer, 0–4294967295 | no | *unset* | The priority to jump to. Required by `goto` and refused by every other action (`NG-F016`), and strictly greater than this rule's own — the database is walked upwards, so a backwards jump is a loop. | — |
+| `description` | string | no | *unset* | Free text: what the rule is for. | — |
+
+* The database is walked from the lowest `priority` upwards and the first match decides, so `priority` is the rule's position and its identity: unique within the device, per family (`NG-F020`).
+* A rule with no selector matches every packet, which terminates the database — and makes every rule after it in that family unreachable (`NG-F024`).
+* There is no layer-4 selector. Mark the packet in the firewall and match `fwmark` here; see §16.7.
 
 ## `spec.routing`
 
-The dynamic routing protocols the device takes part in (§16.3). Both blocks are optional and neither implies the other.
+The dynamic routing protocols the device takes part in (§16.5). Both blocks are optional and neither implies the other.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
@@ -326,7 +367,7 @@ One OSPF area, and the interfaces that run it.
 | `interfaces` | interface name list, ≥ 1 entry | **yes** | — | The interfaces OSPF runs on. Non-empty, free of duplicates (`NG-F006`), and each one an interface of this device (`NG-F010`). | `/if:interfaces/if:interface/if:name` |
 
 * `area` accepts `0` and `0.0.0.0` for the backbone and stores the dotted quad, so two documents that spell one area differently still compare equal.
-* One area per device: per-interface areas, and therefore area border routers, are deferred (§16.5).
+* One area per device: per-interface areas, and therefore area border routers, are deferred (§16.7).
 
 ## `spec.routing.bgp`
 
@@ -340,7 +381,7 @@ The autonomous system this device is in, and the sessions it configures.
 
 ## `spec.routing.bgp.neighbors[]`
 
-One BGP session. The peer is an **address**, which is what the device is configured with — never an element name (§16.4).
+One BGP session. The peer is an **address**, which is what the device is configured with — never an element name (§16.6).
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|

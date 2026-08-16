@@ -203,6 +203,12 @@ def declared_addresses(inventory: Inventory) -> set[str]:
             found.add(str(route.prefix.network_address))
             if route.via is not None:
                 found.add(str(route.via))
+        # A policy rule selects on prefixes of its own (§16.4), and a dialect
+        # that writes the database writes them out.
+        for entry in getattr(spec, "routing_policy", ()) or ():
+            for prefix in (entry.src, entry.dst):
+                if prefix is not None:
+                    found.add(str(prefix.network_address))
         routing = getattr(spec, "routing", None)
         if routing is not None:
             for neighbor in getattr(routing.bgp, "neighbors", ()) if routing.bgp else ():

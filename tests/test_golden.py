@@ -138,7 +138,7 @@ CASES = (
     Case(
         # The control plane: an iBGP mesh, six OSPF adjacencies nobody declared,
         # and the management VRF as a cluster. ``group_by_namespace`` is on to
-        # pin down that the layer's own grouping wins over it (§16.6).
+        # pin down that the layer's own grouping wins over it (§16.8).
         name="campus-routing",
         example="campus",
         layer=Layer.ROUTING,
@@ -706,7 +706,7 @@ def test_the_mermaid_golden_declares_a_flowchart(case: Case) -> None:
     # not a legal Mermaid id. They must be dense and start at zero, or the
     # ``class nN kind`` lines at the foot would style the wrong nodes. They are
     # *numbered* in graph order rather than in emission order, so a layer that
-    # groups its nodes — a VRF cluster at ``--layer routing``, §16.6 — declares
+    # groups its nodes — a VRF cluster at ``--layer routing``, §16.8 — declares
     # them out of sequence; what has to hold is that the set is exactly n0..nN.
     declared = re.findall(r"^ +(n\d+)[(\[>{]", text, re.MULTILINE)
     assert sorted(declared, key=lambda name: int(name[1:])) == [

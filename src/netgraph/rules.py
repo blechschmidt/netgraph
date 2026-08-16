@@ -848,6 +848,27 @@ RULES: Final[tuple[Rule, ...]] = (
         title="network namespace with no interface",
     ),
     Rule(
+        "W147",
+        Severity.WARNING,
+        "A policy rule looks up a declared routing table that holds no route.",
+        ("NG-F022",),
+        title="policy rule looks up an empty table",
+    ),
+    Rule(
+        "W148",
+        Severity.WARNING,
+        "A declared routing table that no policy rule ever looks up.",
+        ("NG-F023",),
+        title="routing table nothing selects",
+    ),
+    Rule(
+        "W149",
+        Severity.WARNING,
+        "A policy rule is shadowed by an earlier rule that matches every packet.",
+        ("NG-F024",),
+        title="unreachable policy rule",
+    ),
+    Rule(
         "I001",
         Severity.INFO,
         "A MAC address is locally administered rather than vendor-assigned.",

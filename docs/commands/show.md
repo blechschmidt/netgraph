@@ -166,7 +166,9 @@ spec:
   - name: mgmt
     rd: 65001:99
     description: In-band management
+  route_tables: []
   routes: []
+  routing_policy: []
 ```
 
 The `description: Access port 1 - staff` is worth pausing on: the template wrote
@@ -236,7 +238,9 @@ spec:
     ipv6: false
   netns: []
   vrfs: []
+  route_tables: []
   routes: []
+  routing_policy: []
 ```
 
 `192.168.10.20/24` is one string in the file and two fields in the model, and it

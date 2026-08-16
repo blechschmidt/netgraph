@@ -218,7 +218,7 @@ def namespace_text(
 
     ``records`` are the node records inside it — what the box is a box *of*,
     which is the one thing its label does not say. ``kind`` names what sort of box
-    it is: a namespace, or the ``vrf`` of the routing view (§16.6).
+    it is: a namespace, or the ``vrf`` of the routing view (§16.8).
     """
     members = list(records)
     kinds: dict[str, int] = {}
@@ -368,9 +368,18 @@ def _routing_lines(routing: Mapping[str, Any]) -> Iterator[str]:
             f"{plain_text(str(entry.get('name', '')))} (rd {plain_text(str(entry.get('rd', '')))})"
             for entry in vrfs
         )
+    tables = [entry for entry in routing.get("tables", ()) if isinstance(entry, Mapping)]
+    if tables:
+        yield "tables: " + _listed(
+            f"{plain_text(str(entry.get('name', '')))} ({plain_text(str(entry.get('id', '')))})"
+            for entry in tables
+        )
     yield from _rows(
         "routes", [{"route": route} for route in routing.get("routes", ())], _route_row
     )
+    # In priority order, as the graph flattened it: a policy database read in
+    # any other order says something the device does not do.
+    yield from _rows("policy", [{"route": rule} for rule in routing.get("policy", ())], _route_row)
 
 
 def _route_row(entry: Mapping[str, Any]) -> str:

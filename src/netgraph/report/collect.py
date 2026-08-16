@@ -169,7 +169,11 @@ def layers_for(inventory: Inventory, requested: Sequence[Layer] = ()) -> tuple[L
     if inventory.tunnels:
         chosen.append(Layer.OVERLAY)
     if any(
-        device.spec.routing is not None or device.spec.vrfs or device.spec.routes
+        device.spec.routing is not None
+        or device.spec.vrfs
+        or device.spec.routes
+        or device.spec.route_tables
+        or device.spec.routing_policy
         for device in devices
     ):
         chosen.append(Layer.ROUTING)

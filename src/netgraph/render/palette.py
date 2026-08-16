@@ -167,7 +167,7 @@ ENCAPSULATION_STYLE: Final[tuple[str, str]] = ("#8b5cf6", "dotted")
 #: everything else by being the only line on the page.
 MEMBERSHIP_STYLE: Final[tuple[str, str]] = ("#be185d", "solid")
 
-#: The two adjacencies of the routing view (§16.6). A BGP session is a
+#: The two adjacencies of the routing view (§16.8). A BGP session is a
 #: configured, point-to-point relationship, so it is drawn *solid*; an OSPF
 #: adjacency is discovered and belongs to an area rather than to a pair, so it is
 #: dotted. Both are blue-green — the colour of the routed layers here — and the

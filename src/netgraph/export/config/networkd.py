@@ -77,7 +77,7 @@ from netgraph.export.config.plan import (
     route_interface,
 )
 from netgraph.export.manifest import Reason, Recorder
-from netgraph.models import Interface, InterfaceType, StaticRoute
+from netgraph.models import Interface, InterfaceType, PolicyAction, PolicyRule, StaticRoute
 from netgraph.models.interface import VlanMode
 from netgraph.models.tunnel import TunnelType
 
@@ -232,6 +232,18 @@ def _is_writable(
 
 def _record_out_of_remit(plan: DevicePlan, configured: set[str], recorder: Recorder) -> None:
     """Everything networkd is simply not the tool for, named with the tool that is."""
+    for index, rule in enumerate(plan.device.spec.routing_policy):
+        if not rule.invert:
+            continue
+        recorder.skip(
+            plan.fqn,
+            Reason.NOT_REPRESENTABLE,
+            f"{plan.field('routing_policy', index, 'invert')}: policy rule {rule.priority} "
+            f"matches everything its selectors do not, and '[RoutingPolicyRule]' has no key "
+            f"that inverts a selector set; the rule is written without the inversion, so it "
+            f"matches the opposite of what the inventory states. "
+            f"'netgraph export routes' writes it correctly, as 'ip rule add not ...'",
+        )
     if plan.device.spec.routing is not None:
         recorder.skip(
             plan.fqn,
@@ -315,6 +327,8 @@ def _network_file(
         _bridge_vlan(interface),
     ]
     sections.extend(_routes(plan, interface, unbound=unbound))
+    if unbound:
+        sections.extend(_policy_rules(plan))
     return ConfigFile(path=f"{DIRECTORY}/{stem}.network", content=_render(plan, sections))
 
 
@@ -429,12 +443,12 @@ def _routes(plan: DevicePlan, interface: Interface, *, unbound: bool) -> Iterato
     for route in plan.routes:
         if route.blackhole:
             if unbound:
-                yield _route(route)
+                yield _route(plan, route)
         elif route_interface(plan, route) == interface.name:
-            yield _route(route)
+            yield _route(plan, route)
 
 
-def _route(route: StaticRoute) -> list[str]:
+def _route(plan: DevicePlan, route: StaticRoute) -> list[str]:
     lines = ["[Route]", f"Destination={route.prefix}"]
     if route.blackhole:
         lines.append("Type=blackhole")
@@ -442,7 +456,86 @@ def _route(route: StaticRoute) -> list[str]:
         lines.append(f"Gateway={route.via}")
     if route.metric is not None:
         lines.append(f"Metric={route.metric}")
+    if route.table is not None:
+        lines.append(f"Table={_table(plan, route.table)}")
     return lines
+
+
+def _table(plan: DevicePlan, name: str) -> str:
+    """How ``Table=`` names a routing table: its number, or failing that its name.
+
+    ``Table=`` takes a name or a number, and networkd resolves a name against its
+    own ``RouteTable=`` definitions rather than against
+    ``/etc/iproute2/rt_tables`` — so the number is what both ends agree on, and
+    the number is written wherever the inventory knows one.
+
+    It does not know one for a VRF (§16.2), and the name is written then. That
+    line is one networkd will refuse unless something defined the name, which is
+    the point: a *loud* failure. Leaving the key out instead would install the
+    route in ``main``, which is a different route from the one the inventory
+    states and no message anywhere would say so. In practice neither happens —
+    :func:`limits` refuses a device declaring a VRF at all — but the fallback
+    has to be the safe one rather than rely on that staying true.
+    """
+    number = plan.device.spec.table_id(name)
+    return name if number is None else str(number)
+
+
+def _policy_rules(plan: DevicePlan) -> Iterator[list[str]]:
+    """``[RoutingPolicyRule]`` per rule of the policy database (§16.6).
+
+    The one section here that is not about the link the file matches: a policy
+    rule is a property of the *stack*, and networkd installs one from whichever
+    ``.network`` states it. So they go in the first file this device gets, for
+    the same reason a blackhole route does — an arbitrary file, but not a guess,
+    because which one it sits in does not change what it does.
+
+    A rule installed in both families is written twice, once per ``Family=``,
+    since the key takes one. ``ipv4-and-ipv6`` exists but only for a rule with no
+    family-specific selector, and deciding which rules qualify is a judgement the
+    two explicit sections do not need.
+    """
+    for rule in plan.device.spec.routing_policy:
+        for family in rule.families:
+            lines = ["[RoutingPolicyRule]", f"Priority={rule.priority}", f"Family={family.value}"]
+            lines.extend(_rule_selectors(plan, rule))
+            lines.extend(_rule_action(plan, rule))
+            yield lines
+
+
+def _rule_selectors(plan: DevicePlan, rule: PolicyRule) -> Iterator[str]:
+    """Which packets the rule matches, in networkd's spelling of each selector.
+
+    ``invert`` has no key: networkd inverts one selector at a time
+    (``InvertRule=`` does not exist; ``IPProtocol=`` and friends have no negation)
+    and the inventory inverts the whole set. It is recorded as a skip rather than
+    dropped silently, in :func:`_record_out_of_remit`.
+    """
+    if rule.src is not None:
+        yield f"From={rule.src}"
+    if rule.dst is not None:
+        yield f"To={rule.dst}"
+    if rule.iif is not None:
+        yield f"IncomingInterface={rule.iif}"
+    if rule.oif is not None:
+        yield f"OutgoingInterface={rule.oif}"
+    if rule.fwmark is not None:
+        yield f"FirewallMark={rule.fwmark}"
+    if rule.dscp is not None:
+        # ``TypeOfService=`` is the whole octet; a DSCP is its top six bits.
+        yield f"TypeOfService={rule.dscp << 2}"
+
+
+def _rule_action(plan: DevicePlan, rule: PolicyRule) -> Iterator[str]:
+    """What the rule does: a table to route by, or the way it refuses to."""
+    if rule.action is PolicyAction.LOOKUP:
+        assert rule.table is not None  # NG-F016: a lookup always names one
+        yield f"Table={_table(plan, rule.table)}"
+        return
+    if rule.action is PolicyAction.GOTO:
+        yield f"GoTo={rule.goto}"
+        return
+    yield f"Type={rule.action.value}"
 
 
 # --------------------------------------------------------------------------- #

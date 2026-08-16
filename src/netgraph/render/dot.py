@@ -1450,7 +1450,7 @@ def _groups(
     the diagram helps nobody.
 
     A layer that groups its own nodes wins over ``--group-by-namespace``: the
-    routing view boxes each VRF (§16.6), and that is the grouping the reader asked
+    routing view boxes each VRF (§16.8), and that is the grouping the reader asked
     for by choosing the layer.
 
     Args:
@@ -2025,7 +2025,7 @@ def _area_groups(
     2. among two areas that both name it, the one declared **first**. Declaration
        order is the only tie-break that does not depend on the graph, so the
        same inventory always draws the same picture;
-    3. whatever is left: the layer's own clustering (the VRFs of §16.6) and then
+    3. whatever is left: the layer's own clustering (the VRFs of §16.8) and then
        ``--group-by-namespace``, each of which loses the nodes an area took and
        is omitted entirely when it has none left.
 

@@ -188,7 +188,7 @@ without a box in the middle of each one.
 ### `routing`: sessions, adjacencies and VRFs
 
 The `routing` layer draws the control plane
-([`docs/schema.md` §16.6](schema.md#166-the-routing-view)). Nodes are the
+([`docs/schema.md` §16.8](schema.md#168-the-routing-view)). Nodes are the
 elements that take part in routing at all, labelled with the AS number and router
 id their peers know them by; edges are the sessions and adjacencies between them:
 
@@ -222,6 +222,14 @@ grouping the reader asked for by choosing the layer wins over the one a flag
 asks for. A router with interfaces in exactly one instance is drawn inside that
 instance's box; one that straddles several belongs to no box — the same choice a
 cross-site prefix gets at layer 3 — and names its instances on its label instead.
+
+**Policy-based routing is on the node, not on an edge**
+([§16.4](schema.md#164-routing_policy--policy-based-routing)). A rule decides
+which *table* a packet is routed by, which is a fact about one router and not a
+relationship between two, so there is nothing to draw a line between: the label
+carries the rule count, and the tooltip and `-f json` carry the tables and the
+rules themselves — **in priority order**, which is the order the device walks
+them and the only order in which the list means anything.
 
 Nothing physical appears. Two routers are adjacent here because they exchange
 routes, which a cable neither guarantees nor is needed for.

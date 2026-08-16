@@ -4,7 +4,7 @@ title: "Campus, routing"
 flowchart TB
     n3(["rtr-north-core-01<br/>[router]<br/>AS 65001<br/>id 192.0.2.1<br/>ospf area 0.0.0.0<br/>10.1.0.0/16 blackhole metric 250<br/>10.2.99.0/24 via 198.51.100.2 dev xe-0/0/1 metric 200"])
     n7(["rtr-south-core-01<br/>[router]<br/>AS 65001<br/>id 192.0.2.2<br/>ospf area 0.0.0.0<br/>10.2.0.0/16 blackhole metric 250<br/>10.3.99.0/24 via 198.51.100.6 dev xe-0/0/1 metric 200"])
-    n11(["rtr-west-core-01<br/>[router]<br/>AS 65001<br/>id 192.0.2.3<br/>ospf area 0.0.0.0<br/>10.3.0.0/16 blackhole metric 250<br/>10.1.99.0/24 via 198.51.100.10 dev xe-0/0/1 metric 200"])
+    n11(["rtr-west-core-01<br/>[router]<br/>AS 65001<br/>id 192.0.2.3<br/>ospf area 0.0.0.0<br/>4 policy rules<br/>10.3.0.0/16 blackhole metric 250<br/>10.1.99.0/24 via 198.51.100.10 dev xe-0/0/1 metric 200<br/>0.0.0.0/0 via 198.51.100.5 dev xe-0/0/2 table lab-egress<br/>::/0 via 2001:db8:ff:2::1 dev xe-0/0/2 table lab-egress"])
     subgraph vrf0["vrf mgmt"]
         direction TB
         n0["sw-north-acc-01<br/>[switch]<br/>vrf mgmt (65001:99)"]

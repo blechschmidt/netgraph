@@ -19,7 +19,7 @@ Format             What it is
 ``cable-list``     The pull list: one row per physical run, both ends
                    located by rack, unit and panel port.
 ``routes``         An iproute2 script, one function per device, holding the
-                   static routes that device declares (§16.2).
+                   static routes that device declares (§16.3).
 ``power``          The load schedule: one row per power feed, both ends
                    located, with the per-PDU and per-PSE totals (§17.7).
 ``drawio``         An mxGraph diagram draw.io opens already arranged, carrying

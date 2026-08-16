@@ -7,11 +7,11 @@ everything a :class:`~netgraph.importer.draft.Draft` can hold. Which is the
 interesting part, because a draft holds rather less than a device document does,
 and the difference is the whole subject of this module.
 
-The grammar is six stanza kinds — ``device``, ``vlan``, ``vrf``, ``interface``,
-``route`` and ``tunnel`` — opening in column 0, with ``lower-case-with-hyphens``
-attributes indented under them, a value running to the end of the line, and a
-repeated attribute meaning a list (``member``, ``ipv4-address``). A ``route`` is
-one line with no body. Splitting is
+The grammar is nine stanza kinds — ``device``, ``vlan``, ``netns``, ``vrf``,
+``route-table``, ``interface``, ``route``, ``policy`` and ``tunnel`` — opening in
+column 0, with ``lower-case-with-hyphens`` attributes indented under them, a
+value running to the end of the line, and a repeated attribute meaning a list
+(``member``, ``ipv4-address``). A ``route`` is one line with no body. Splitting is
 :func:`~netgraph.importer.config.common.stanzas`, which also strips comments;
 free text that held a ``#`` therefore loses its tail, which is exactly why the
 emitter never writes an inline comment of its own.
@@ -48,11 +48,12 @@ guessing that a token it did not write means the whole range is a guess about
 **Everything with no home is named once.** A draft describes what a capture
 observed, in the vocabulary
 :mod:`netgraph.importer.emit` can write; it has no field for a gateway, a
-per-family MTU, a forwarding switch, a VRF, a radio, a PSE, a static route or a
-tunnel. Each of those is reported once per attribute — not once per interface,
-because a 48-port switch would otherwise fill the run report with one identical
-line per port — and the three whole-stanza kinds (``route``, ``vrf``,
-``tunnel``) are reported with their contents named. That last part matters: a
+per-family MTU, a forwarding switch, a VRF, a radio, a PSE, a static route, a
+routing table, a policy rule or a tunnel. Each of those is reported once per
+attribute — not once per interface, because a 48-port switch would otherwise fill
+the run report with one identical line per port — and the five whole-stanza kinds
+(``route``, ``vrf``, ``route-table``, ``policy``, ``tunnel``) are reported with
+their contents named. That last part matters: a
 drift check that silently ignored a device's entire routing table would tell an
 operator that nothing had changed, which is a different statement from "netgraph
 did not look".
@@ -135,6 +136,8 @@ class _Pass:
     host: str
     routes: list[str] = field(default_factory=list)
     vrfs: list[str] = field(default_factory=list)
+    tables: list[str] = field(default_factory=list)
+    policy: list[str] = field(default_factory=list)
     tunnels: list[str] = field(default_factory=list)
 
     def note(self, message: str) -> None:
@@ -196,13 +199,17 @@ def _read_stanza(state: _Pass, header: str, body: list[str]) -> None:
         _read_netns_stanza(state, words, body)
     elif kind == "vrf":
         state.vrfs.append(_vrf_text(words, body))
+    elif kind == "route-table":
+        state.tables.append(_table_text(words, body))
+    elif kind == "policy":
+        state.policy.append(_policy_text(words, body))
     elif kind == "tunnel":
         state.tunnels.append(_tunnel_text(words))
     else:
         state.note(
-            f"{kind!r} is not one of the seven stanza kinds this grammar has ('device', "
-            "'vlan', 'netns', 'vrf', 'interface', 'route', 'tunnel'), so the stanza was not "
-            "imported"
+            f"{kind!r} is not one of the nine stanza kinds this grammar has ('device', "
+            "'vlan', 'netns', 'vrf', 'route-table', 'interface', 'route', 'policy', "
+            "'tunnel'), so the stanza was not imported"
         )
 
 
@@ -438,6 +445,37 @@ def _vlan_block(state: _Pass, vlan: _VlanLines) -> DraftVlan | None:
 # --------------------------------------------------------------------------- #
 
 
+def _table_text(words: list[str], body: list[str]) -> str:
+    """``uplink-b (table 100)`` — enough of a ``route-table`` stanza to name it by."""
+    name = words[1] if len(words) > 1 else "an unnamed table"
+    for line in body:
+        attribute, value = _attribute(line)
+        if attribute == "id" and value:
+            return f"{name} (table {value})"
+    return name
+
+
+def _policy_text(words: list[str], body: list[str]) -> str:
+    """``100 from 10.20.0.0/16 lookup uplink-b`` — one policy stanza, in one phrase.
+
+    The selectors and the action are rebuilt from the body rather than summarised
+    by priority alone: this text lands in a note saying the rules were *not*
+    imported, and a note that named only the priorities would leave a reader with
+    no way to tell which policy the capture had.
+    """
+    parts = [words[1] if len(words) > 1 else "an unnumbered rule"]
+    action, target = "lookup", ""
+    for line in body:
+        attribute, value = _attribute(line)
+        if attribute in ("from", "to", "iif", "oif", "fwmark", "dscp") and value:
+            parts.append(f"{attribute} {value}")
+        elif attribute == "action" and value:
+            action = value
+        elif attribute in ("table", "goto") and value:
+            target = value
+    return " ".join([*parts, action, target]).strip()
+
+
 def _vrf_text(words: list[str], body: list[str]) -> str:
     """``blue (rd 65000:1)`` — enough of a VRF stanza to recognise it by."""
     name = words[1] if len(words) > 1 else "an unnamed VRF"
@@ -468,6 +506,19 @@ def _note_stated(state: _Pass) -> None:
             f"the file states {len(state.vrfs)} routing instance(s) "
             f"[{comment_text('; '.join(state.vrfs))}]; a draft has no VRF, so they were not "
             "imported and the interfaces bound to them read as though they were global"
+        )
+    if state.tables:
+        state.note(
+            f"the file states {len(state.tables)} routing table(s) "
+            f"[{comment_text('; '.join(state.tables))}]; a draft has no routing table, so "
+            "they were not imported"
+        )
+    if state.policy:
+        state.note(
+            f"the file states {len(state.policy)} policy rule(s) "
+            f"[{comment_text('; '.join(state.policy))}]; a draft has no policy database, so "
+            "they were not imported — a drift check cannot compare which table this device "
+            "routes a packet by"
         )
     if state.tunnels:
         state.note(

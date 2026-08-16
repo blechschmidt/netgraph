@@ -43,6 +43,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from typing import Final
 
+from netgraph.errors import count_text
 from netgraph.export.config.header import config_header
 from netgraph.export.config.model import ConfigFile, Unsupported
 from netgraph.export.config.plan import (
@@ -208,6 +209,7 @@ def files(plan: DevicePlan, recorder: Recorder) -> tuple[ConfigFile, ...]:
             bodies.append((interface, body))
 
     routes = _route_map(plan, recorder, [interface for interface, _ in bodies])
+    _record_policy(plan, recorder)
     sections: dict[str, list[str]] = {name: [] for name in _SECTIONS.values()}
     for interface, body in bodies:
         block = [*body, *_render_routes(routes.get(interface.name, ()))]
@@ -475,6 +477,31 @@ def _mtu(plan: DevicePlan, interface: Interface, recorder: Recorder) -> int | No
     return interface.mtu
 
 
+def _record_policy(plan: DevicePlan, recorder: Recorder) -> None:
+    """``spec.routing_policy``, which netplan hangs off an interface it is not about.
+
+    netplan has ``routing-policy:``, and it takes ``from``/``to``/``table``/
+    ``mark``/``priority`` — but it takes them *under one interface*, and a policy
+    rule is a property of the whole stack. Writing the database under whichever
+    interface happened to come first would be an arbitrary attribution in a file
+    an operator edits by hand, and every rule with an ``iif``, an ``oif``, an
+    inversion or an action other than ``lookup`` has no spelling there at all.
+    So the database is named, once, with the emitter that writes all of it.
+    """
+    rules = plan.device.spec.routing_policy
+    if not rules:
+        return
+    recorder.skip(
+        plan.fqn,
+        Reason.NOT_REPRESENTABLE,
+        f"{plan.field('routing_policy')}: netplan's 'routing-policy:' sits under one "
+        f"interface and a policy rule is a property of the whole stack, with no spelling "
+        f"there for an 'iif', an 'oif', an inversion or a discarding action; the "
+        + count_text(len(rules), "rule")
+        + " of the policy database is written by 'netgraph export routes' instead",
+    )
+
+
 def _route_map(
     plan: DevicePlan, recorder: Recorder, written: Sequence[Interface]
 ) -> dict[str, list[list[str]]]:
@@ -513,12 +540,22 @@ def _route_map(
                 )
 
     for index, route in enumerate(plan.routes):
+        if route.table is not None and plan.device.spec.table_id(route.table) is None:
+            recorder.skip(
+                plan.fqn,
+                Reason.NOT_REPRESENTABLE,
+                f"{plan.field('routes', index, 'table')}: netplan's 'table:' is a number and "
+                f"{route.table!r} is a VRF, whose table number a route distinguisher does not "
+                f"state; the route to {route.prefix} is left out rather than written into "
+                f"whichever table netplan would pick",
+            )
+            continue
         target = route_interface(plan, route)
         if target in names:
-            placed.setdefault(target, []).append(_route(route))
+            placed.setdefault(target, []).append(_route(plan, route))
             continue
         if route.blackhole and anchor:
-            placed.setdefault(anchor, []).append(_route(route))
+            placed.setdefault(anchor, []).append(_route(plan, route))
             continue
         recorder.skip(
             plan.fqn,
@@ -552,7 +589,7 @@ def _render_routes(entries: Sequence[Sequence[str]]) -> Iterator[str]:
             yield f"          {line}"
 
 
-def _route(route: StaticRoute) -> list[str]:
+def _route(plan: DevicePlan, route: StaticRoute) -> list[str]:
     entry = [f"to: {route.prefix}"]
     if route.blackhole:
         entry.append("type: blackhole")
@@ -560,6 +597,12 @@ def _route(route: StaticRoute) -> list[str]:
         entry.append(f"via: {route.via}")
     if route.metric is not None:
         entry.append(f"metric: {route.metric}")
+    # netplan's ``table:`` is a number, for the same reason its ``vrfs`` section
+    # is: it renders to a netplan-managed table rather than to one named in
+    # /etc/iproute2/rt_tables. A route whose table has no number never reaches
+    # here -- :func:`_route_map` leaves it out and records why.
+    if (number := plan.device.spec.table_id(route.table or "")) is not None:
+        entry.append(f"table: {number}")
     return entry
 
 

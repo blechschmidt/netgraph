@@ -63,7 +63,7 @@ share one topology; ``l3``, ``overlay`` and ``rack`` each build a different one:
     encapsulated in. That edge is what makes ``VXLAN over IPsec`` drawable:
     nesting is a relation between two links, and a link cannot end on a link.
 ``routing``
-    The control plane (§16.6). Nodes are the elements that take part in routing,
+    The control plane (§16.8). Nodes are the elements that take part in routing,
     labelled with the AS and router id their peers know them by; edges are the
     BGP sessions they declare and the OSPF adjacencies their addressing implies,
     and nodes are grouped into one cluster per VRF. Nothing physical appears: two
@@ -99,6 +99,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final, TypeAlias
 
 from netgraph.annotations import AnnotationSet, annotations_for_view, area_members, note_anchor
+from netgraph.errors import count_text
 from netgraph.identity import identities, identity_plan
 from netgraph.layout.geometry import Geometry
 from netgraph.layout.resolve import resolve_geometry
@@ -200,7 +201,7 @@ class Layer(str, Enum):
     #: tunnels they run inside (§14).
     OVERLAY = "overlay"
     #: Control plane: the routers, joined by the BGP sessions and OSPF
-    #: adjacencies they declare, clustered by VRF (§16.6).
+    #: adjacencies they declare, clustered by VRF (§16.8).
     ROUTING = "routing"
     #: Placement: one node per rack, holding its front elevation (§3.2).
     RACK = "rack"
@@ -329,7 +330,7 @@ class EdgeKind(str, Enum):
     TUNNEL = "tunnel"
     #: A tunnel's ``over``: this tunnel is carried inside that one (§14.3).
     ENCAPSULATION = "encapsulation"
-    #: A BGP session one of the two ends declares (§16.4).
+    #: A BGP session one of the two ends declares (§16.6).
     BGP = "bgp"
     #: An OSPF adjacency: two routers in one area, on one link.
     OSPF = "ospf"
@@ -609,11 +610,13 @@ class NetnsView:
 
 @dataclass(frozen=True, slots=True)
 class RoutingView:
-    """What one element contributes to the routing layer (§16.6).
+    """What one element contributes to the routing layer (§16.8).
 
-    Flattened out of ``spec.routing``, ``spec.vrfs`` and ``spec.routes`` once,
-    here, so that the DOT, Mermaid, JSON and HTML renderings of one inventory
-    cannot disagree about which AS a router is in or which area a link is in.
+    Flattened out of ``spec.routing``, ``spec.vrfs``, ``spec.route_tables``,
+    ``spec.routes`` and ``spec.routing_policy`` once, here, so that the DOT,
+    Mermaid, JSON and HTML renderings of one inventory cannot disagree about
+    which AS a router is in, which area a link is in, or which table a packet
+    from a given prefix is routed by.
     """
 
     #: Fully-qualified name of the element.
@@ -635,6 +638,12 @@ class RoutingView:
     #: Every static route the device holds, already rendered (``0.0.0.0/0 via
     #: 203.0.113.1 dev wan0``), in declaration order.
     routes: tuple[str, ...] = ()
+    #: ``(name, id)`` per declared routing table, in declaration order (§16.3).
+    tables: tuple[tuple[str, int], ...] = ()
+    #: The policy database, already rendered (``100: from 10.20.0.0/16 lookup
+    #: uplink-b``), **in priority order** — which is the order the device walks
+    #: it, and therefore the only order in which the list means anything.
+    policy: tuple[str, ...] = ()
 
     @property
     def speaks_bgp(self) -> bool:
@@ -645,9 +654,21 @@ class RoutingView:
         return self.area is not None
 
     @property
+    def routes_by_policy(self) -> bool:
+        """Does the element route by anything other than the destination (§16.6)?"""
+        return bool(self.policy)
+
+    @property
     def is_empty(self) -> bool:
         """Does the element take part in no routing at all?"""
-        return not (self.speaks_bgp or self.speaks_ospf or self.routes or self.vrfs)
+        return not (
+            self.speaks_bgp
+            or self.speaks_ospf
+            or self.routes
+            or self.vrfs
+            or self.tables
+            or self.policy
+        )
 
     @property
     def asn_text(self) -> str | None:
@@ -661,12 +682,18 @@ class RoutingView:
             lines.append(f"id {self.router_id}")
         if self.area is not None:
             lines.append(f"ospf area {self.area}")
+        if self.policy:
+            # Counted rather than listed: a policy database is as long as it
+            # needs to be, and a node label is not. The rules themselves are on
+            # the tooltip and in the JSON, which is where a reader who wants
+            # them is looking.
+            lines.append(count_text(len(self.policy), "policy rule"))
         return tuple(lines)
 
 
 @dataclass(frozen=True, slots=True)
 class AdjacencyView:
-    """One protocol adjacency between two elements (§16.6).
+    """One protocol adjacency between two elements (§16.8).
 
     A BGP session and an OSPF adjacency are both "these two routers talk", but
     they are different facts about a network and are drawn differently, so the
@@ -1169,7 +1196,7 @@ class Edge:
     #: on a radio link whose ends model no radio detail.
     wireless: WirelessView | None = None
     #: The protocol adjacency this edge is; set on ``bgp`` and ``ospf`` edges,
-    #: which exist only at :attr:`Layer.ROUTING` (§16.6).
+    #: which exist only at :attr:`Layer.ROUTING` (§16.8).
     adjacency: AdjacencyView | None = None
     #: The power feed this edge is; set on ``outlet`` and ``poe`` edges, which
     #: exist only at :attr:`Layer.POWER` (§17.5).
@@ -2155,7 +2182,7 @@ def _nesting_edge(fqn: str, view: NetnsView) -> Edge:
 def _routing_view(
     nodes: Mapping[str, Node], inventory: Inventory, subnets: Sequence[Subnet]
 ) -> tuple[dict[str, Node], tuple[Edge, ...], tuple[str, ...]]:
-    """Turn the physical graph into the control-plane one (§16.6).
+    """Turn the physical graph into the control-plane one (§16.8).
 
     Nodes are the elements that take part in routing at all — anything declaring
     ``routing``, ``routes`` or ``vrfs`` — labelled with the AS and router id that
@@ -2213,12 +2240,28 @@ def _routing_of(fqn: str, device: Device) -> RoutingView:
         area=ospf.area if ospf is not None else None,
         ospf_interfaces=tuple(ospf.interfaces) if ospf is not None else (),
         vrfs=tuple((vrf.name, vrf.rd) for vrf in device.spec.vrfs),
+        tables=tuple((table.name, table.id) for table in device.spec.route_tables),
         bound_vrfs=tuple(
             dict.fromkeys(
                 interface.vrf for interface in device.interfaces if interface.vrf is not None
             )
         ),
         routes=tuple(route.describe() for route in device.spec.routes),
+        policy=_policy_of(device),
+    )
+
+
+def _policy_of(device: Device) -> tuple[str, ...]:
+    """The policy database, rendered, in the order the device walks it (§16.6).
+
+    Sorted by priority rather than kept in declaration order, because the
+    diagram's job here is to answer "what happens to this packet", and that is
+    the walk. A rule installed in both families appears once: it is one rule, and
+    listing it twice would say the device has more policy than it has.
+    """
+    return tuple(
+        rule.describe()
+        for rule in sorted(device.spec.routing_policy, key=lambda rule: rule.priority)
     )
 
 

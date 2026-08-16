@@ -87,10 +87,12 @@ from netgraph.models import (  # noqa: E402
     PoeConfig,
     PoeStandard,
     Point,
+    PolicyRule,
     PowerConfig,
     PowerDraw,
     PowerInput,
     PowerSource,
+    RouteTable,
     RoutingConfig,
     Size,
     StaticRoute,
@@ -345,20 +347,49 @@ SECTIONS: Final[tuple[Section, ...]] = (
         ),
     ),
     Section(
+        RouteTable,
+        "`spec.route_tables[]`",
+        "One routing table beyond the three every stack has (§16.2). A table is a container "
+        "routes are placed in; what reaches it is a rule in `routing_policy`.",
+        notes=(
+            "`main`, `local` and `default` exist without being declared and may not be "
+            "declared, by either name or number (`NG-F015`).",
+            "A table nothing looks up is consulted by nothing (`NG-F023`); a rule looking up "
+            "a table nothing is placed in falls through (`NG-F022`).",
+        ),
+    ),
+    Section(
         StaticRoute,
         "`spec.routes[]`",
-        "One configured static route (§16.2).",
+        "One configured static route (§16.3).",
         notes=(
             "At least one of `via`, `dev` and `blackhole` is required, and `blackhole` excludes "
             "the other two (`NG-F004`).",
             "`via` is of the same family as `prefix` (`NG-F003`) and must be on-link: inside a "
             "prefix the device configures, in the same VRF (`NG-F008`).",
+            "`vrf` and `table` are alternatives, not a pair: a VRF is a routing table of its "
+            "own (`NG-F018`).",
+        ),
+    ),
+    Section(
+        PolicyRule,
+        "`spec.routing_policy[]`",
+        "One rule of the routing policy database (§16.4): which *table* a packet is routed by, "
+        "decided from where it came from, what marked it, where it arrived or its DSCP.",
+        notes=(
+            "The database is walked from the lowest `priority` upwards and the first match "
+            "decides, so `priority` is the rule's position and its identity: unique within the "
+            "device, per family (`NG-F020`).",
+            "A rule with no selector matches every packet, which terminates the database — and "
+            "makes every rule after it in that family unreachable (`NG-F024`).",
+            "There is no layer-4 selector. Mark the packet in the firewall and match `fwmark` "
+            "here; see §16.7.",
         ),
     ),
     Section(
         RoutingConfig,
         "`spec.routing`",
-        "The dynamic routing protocols the device takes part in (§16.3). Both blocks are "
+        "The dynamic routing protocols the device takes part in (§16.5). Both blocks are "
         "optional and neither implies the other.",
     ),
     Section(
@@ -369,7 +400,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "`area` accepts `0` and `0.0.0.0` for the backbone and stores the dotted quad, so "
             "two documents that spell one area differently still compare equal.",
             "One area per device: per-interface areas, and therefore area border routers, are "
-            "deferred (§16.5).",
+            "deferred (§16.7).",
         ),
     ),
     Section(
@@ -381,7 +412,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         BgpNeighbor,
         "`spec.routing.bgp.neighbors[]`",
         "One BGP session. The peer is an **address**, which is what the device is configured "
-        "with — never an element name (§16.4).",
+        "with — never an element name (§16.6).",
         notes=(
             "The address is resolved against every address the inventory configures. A peer "
             "that resolves to nothing is a warning (`NG-F013`), because an eBGP peer may be a "

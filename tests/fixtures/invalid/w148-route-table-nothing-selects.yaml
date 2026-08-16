@@ -1,0 +1,47 @@
+# W148 (NG-F023) - a routing table no policy rule ever looks up.
+#
+# A table is consulted only when something selects it, so this one is inert and
+# the route placed in it is a statement about the device that the device does
+# not act on. The other half of W147, and the more common mistake.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-a
+spec:
+  route_tables:
+    - name: lab-egress
+      id: 100
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+  routes:
+    - prefix: 0.0.0.0/0
+      via: 10.0.0.2
+      dev: eth0
+      table: lab-egress
+  # ... and no 'routing_policy' at all, so nothing reaches the table.
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - rtr-a:eth0
+    - rtr-b:eth0
+  medium: copper

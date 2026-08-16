@@ -1,0 +1,49 @@
+# W149 (NG-F024) - a policy rule numbered above the rule that terminates the
+# database.
+#
+# The walk goes from the lowest priority upwards and the first match decides,
+# so the catch-all at 32766 ends it: the rule at 32800 is perfectly valid and
+# is never consulted.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+  routes:
+    - prefix: 0.0.0.0/0
+      via: 10.0.0.2
+      dev: eth0
+  routing_policy:
+    - priority: 32766
+      table: main
+    - priority: 32800
+      src: 10.20.0.0/16
+      table: main
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - rtr-a:eth0
+    - rtr-b:eth0
+  medium: copper

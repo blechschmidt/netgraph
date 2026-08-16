@@ -44,11 +44,18 @@ from netgraph.models import (
     GLOBAL_VRF,
     BgpConfig,
     OspfConfig,
+    PolicyAction,
+    PolicyRule,
     StaticRoute,
     VrfDefinition,
     parse_document,
 )
-from netgraph.models.routing import normalise_area, normalise_rd
+from netgraph.models.routing import (
+    AddressFamily,
+    normalise_area,
+    normalise_fwmark,
+    normalise_rd,
+)
 from netgraph.render.details import build_details, detail_text
 from netgraph.render.dot import to_dot
 from netgraph.render.graph import EdgeKind, Layer, build_graph
@@ -1218,7 +1225,7 @@ def test_the_route_script_refuses_a_device_it_does_not_know(tmp_path: Path) -> N
     )
     ran = subprocess.run(["sh", str(script), "nobody"], capture_output=True, text=True)
     assert ran.returncode == 1
-    assert "no static routes declared for 'nobody'" in ran.stderr
+    assert "no routing declared for 'nobody'" in ran.stderr
 
 
 def test_the_route_script_records_what_it_left_out(tmp_path: Path) -> None:
@@ -1288,3 +1295,507 @@ def test_the_campus_management_prefixes_are_in_their_own_instance() -> None:
     # Every element addressed in one is bound to the instance, so the prefix is
     # not split between the global table and the VRF.
     assert all(len(subnet.elements) >= 3 for subnet in mgmt)
+
+
+# --------------------------------------------------------------------------- #
+# Policy-based routing: the model (§16.2, §16.4)
+# --------------------------------------------------------------------------- #
+
+
+def rule(priority: int, **fields: Any) -> dict[str, Any]:
+    """One ``spec.routing_policy`` entry, ``lookup main`` unless told otherwise."""
+    return {"priority": priority, **({"table": "main"} if "action" not in fields else {}), **fields}
+
+
+def policy_device(*rules: dict[str, Any], **spec: Any) -> dict[str, Any]:
+    """A router with two ports and the given policy database."""
+    return device(
+        "rtr",
+        port("eth0", "10.0.0.1/24"),
+        port("eth1", "10.9.0.1/24"),
+        routing_policy=list(rules),
+        **spec,
+    )
+
+
+@pytest.mark.parametrize(
+    ("written", "stored"),
+    [
+        (1, "0x1"),
+        ("1", "0x1"),
+        ("0x1", "0x1"),
+        ("0XFF", "0xff"),
+        ("0x1/0xff", "0x1/0xff"),
+        ("1/255", "0x1/0xff"),
+        (0, "0x0"),
+    ],
+)
+def test_a_firewall_mark_normalises_to_hexadecimal(written: Any, stored: str) -> None:
+    """A mark is a bit field, so two spellings of one mark have to compare equal."""
+    assert normalise_fwmark(written) == stored
+
+
+@pytest.mark.parametrize(
+    "written",
+    [
+        "0x100/0xff",  # every compared bit is masked away: matches nothing
+        "0x1/",
+        "green",
+        True,
+        4_294_967_296,
+        ["0x1"],
+    ],
+)
+def test_a_value_that_is_no_firewall_mark_is_refused(written: Any) -> None:
+    with pytest.raises(ValueError):
+        normalise_fwmark(written)
+
+
+def test_a_policy_rule_records_what_it_was_given() -> None:
+    entry = PolicyRule.model_validate(
+        {"priority": 100, "src": "10.20.0.0/16", "table": "uplink-b", "dscp": 46}
+    )
+    assert entry.priority == 100
+    assert entry.action is PolicyAction.LOOKUP
+    assert entry.selectors == ("from 10.20.0.0/16", "dscp 46")
+    assert entry.describe() == "100: from 10.20.0.0/16 dscp 46 lookup uplink-b"
+    assert not entry.is_catch_all
+
+
+def test_a_rule_with_no_selector_matches_everything() -> None:
+    entry = PolicyRule.model_validate({"priority": 32766, "table": "main"})
+    assert entry.is_catch_all
+    assert entry.describe() == "32766: all lookup main"
+
+
+@pytest.mark.parametrize(
+    ("fields", "families"),
+    [
+        ({"src": "10.0.0.0/8"}, ("ipv4",)),
+        ({"dst": "fd00::/8"}, ("ipv6",)),
+        ({"fwmark": "0x1"}, ("ipv4", "ipv6")),
+        ({"family": "ipv6"}, ("ipv6",)),
+        # A stated family wins over a derived one only when the two agree, which
+        # NG-F017 is what enforces; here it is the *absence* of a prefix that
+        # leaves the field to decide.
+        ({"family": "ipv4", "fwmark": "0x1"}, ("ipv4",)),
+    ],
+)
+def test_a_rule_is_installed_in_the_families_it_selects(
+    fields: dict[str, Any], families: tuple[str, ...]
+) -> None:
+    entry = PolicyRule.model_validate({"priority": 1, "table": "main", **fields})
+    assert tuple(family.value for family in entry.families) == families
+
+
+def test_a_declared_reserved_table_is_ng_f015() -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(device("rtr", port("eth0"), route_tables=[{"name": "main", "id": 5}]))
+    assert issues(exc) == [("NG-F015", "name")]
+
+
+def test_a_table_numbered_at_a_reserved_id_is_ng_f015() -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(device("rtr", port("eth0"), route_tables=[{"name": "mine", "id": 254}]))
+    assert issues(exc) == [("NG-F015", "id")]
+    assert "reserved for 'main'" in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    ("tables", "key"),
+    [
+        ([{"name": "a", "id": 1}, {"name": "a", "id": 2}], "name"),
+        ([{"name": "a", "id": 1}, {"name": "b", "id": 1}], "id"),
+    ],
+)
+def test_a_table_declared_twice_is_ng_f015(tables: list[dict[str, Any]], key: str) -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(device("rtr", port("eth0"), route_tables=tables))
+    assert issues(exc) == [("NG-F015", key)]
+
+
+def test_a_lookup_with_no_table_is_ng_f016() -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(policy_device({"priority": 1}))
+    assert issues(exc) == [("NG-F016", "table")]
+
+
+@pytest.mark.parametrize(
+    ("fields", "key"),
+    [
+        ({"action": "blackhole", "table": "main"}, "table"),
+        ({"action": "goto"}, "goto"),
+        ({"action": "blackhole", "goto": 5}, "goto"),
+        ({"action": "goto", "goto": 1}, "goto"),  # a jump that does not go forwards
+    ],
+)
+def test_an_action_that_disagrees_with_its_argument_is_ng_f016(
+    fields: dict[str, Any], key: str
+) -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(policy_device({"priority": 1, **fields}))
+    assert issues(exc) == [("NG-F016", key)]
+
+
+def test_a_goto_that_jumps_forwards_is_accepted() -> None:
+    element = parse_document(policy_device({"priority": 1, "action": "goto", "goto": 200}))
+    assert element.spec.routing_policy[0].describe() == "1: all goto 200"
+
+
+@pytest.mark.parametrize(
+    ("fields", "key"),
+    [
+        ({"src": "10.0.0.0/8", "dst": "fd00::/8"}, "dst"),
+        ({"family": "ipv6", "src": "10.0.0.0/8"}, "src"),
+        ({"invert": True}, "invert"),
+    ],
+)
+def test_incoherent_selectors_are_ng_f017(fields: dict[str, Any], key: str) -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(policy_device(rule(1, **fields)))
+    assert issues(exc) == [("NG-F017", key)]
+
+
+def test_a_route_naming_both_a_vrf_and_a_table_is_ng_f018() -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(
+            device(
+                "rtr",
+                port("eth0", "10.0.0.1/24"),
+                vrfs=[{"name": "blue", "rd": "65000:1"}],
+                routes=[{"prefix": "0.0.0.0/0", "via": "10.0.0.2", "vrf": "blue", "table": "main"}],
+            )
+        )
+    assert issues(exc) == [("NG-F018", "table")]
+
+
+def test_a_rule_looking_up_an_undeclared_table_is_ng_f019() -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(policy_device(rule(1, table="nowhere")))
+    assert issues(exc) == [("NG-F019", "table")]
+    assert "'default', 'local', 'main'" in str(exc.value), "the reserved three are offered"
+
+
+def test_a_route_placed_in_an_undeclared_table_is_ng_f019() -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(
+            device(
+                "rtr",
+                port("eth0", "10.0.0.1/24"),
+                routes=[{"prefix": "0.0.0.0/0", "via": "10.0.0.2", "table": "nowhere"}],
+            )
+        )
+    assert issues(exc) == [("NG-F019", "table")]
+
+
+def test_a_vrf_is_a_table_a_rule_may_look_up() -> None:
+    """§16.2: a VRF *is* a routing table, so it resolves without being declared twice."""
+    element = parse_document(
+        device(
+            "rtr",
+            port("eth0", "10.0.0.1/24", vrf="blue"),
+            vrfs=[{"name": "blue", "rd": "65000:1"}],
+            routing_policy=[rule(1, table="blue")],
+        )
+    )
+    assert element.spec.has_table("blue")
+    # ...and netgraph has no *number* for it, which is what every emitter that
+    # needs one has to refuse over.
+    assert element.spec.table_id("blue") is None
+
+
+def test_two_rules_of_one_family_at_one_priority_are_ng_f020() -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(policy_device(rule(100, src="10.0.0.0/8"), rule(100, src="10.9.0.0/16")))
+    assert issues(exc) == [("NG-F020", "priority")]
+
+
+def test_one_priority_in_two_families_is_two_rules() -> None:
+    """The two databases are separate lists, so they do not collide."""
+    element = parse_document(policy_device(rule(100, src="10.0.0.0/8"), rule(100, src="fd00::/8")))
+    assert len(element.spec.routing_policy) == 2
+
+
+def test_a_rule_selecting_on_an_unknown_interface_is_ng_f021() -> None:
+    with pytest.raises(SchemaError) as exc:
+        parse_document(policy_device(rule(1, oif="eth9")))
+    assert issues(exc) == [("NG-F021", "oif")]
+
+
+def test_the_database_is_walked_in_priority_order() -> None:
+    element = parse_document(
+        policy_device(rule(300, src="10.0.0.0/8"), rule(100, src="10.9.0.0/16"), rule(200))
+    )
+    walk = element.spec.policy_in(AddressFamily.IPV4)
+    assert [entry.priority for entry in walk] == [100, 200, 300]
+    # The IPv6 database holds only the rule that selects on nothing v4-specific.
+    assert [entry.priority for entry in element.spec.policy_in(AddressFamily.IPV6)] == [200]
+
+
+def test_a_device_finds_the_routes_and_rules_of_a_table() -> None:
+    element = parse_document(
+        device(
+            "rtr",
+            port("eth0", "10.0.0.1/24"),
+            route_tables=[{"name": "alt", "id": 100}],
+            routes=[
+                {"prefix": "0.0.0.0/0", "via": "10.0.0.2"},
+                {"prefix": "10.9.0.0/16", "via": "10.0.0.3", "table": "alt"},
+            ],
+            routing_policy=[rule(1, table="alt", src="10.0.0.0/24")],
+        )
+    )
+    spec = element.spec
+    # A route naming no table is in 'main', which is the table it is actually in.
+    assert [route.prefix.compressed for route in spec.routes_in("main")] == ["0.0.0.0/0"]
+    assert [route.prefix.compressed for route in spec.routes_in("alt")] == ["10.9.0.0/16"]
+    assert [entry.priority for entry in spec.policy_for("alt")] == [1]
+    assert spec.route_table("alt") is not None and spec.route_table("main") is None
+    assert spec.table_id("alt") == 100 and spec.table_id("main") == 254
+
+
+# --------------------------------------------------------------------------- #
+# Policy-based routing: the validator
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def diverted(tmp_path: Path) -> dict[str, Any]:
+    """One router that diverts a prefix into a table of its own. Clean."""
+    return device(
+        "rtr",
+        port("eth0", "10.0.0.1/24"),
+        port("eth1", "10.9.0.1/24"),
+        route_tables=[{"name": "alt", "id": 100}],
+        routes=[{"prefix": "0.0.0.0/0", "via": "10.9.0.2", "dev": "eth1", "table": "alt"}],
+        routing_policy=[rule(100, src="10.0.0.0/24", table="alt"), rule(32766)],
+    )
+
+
+def test_a_diverted_prefix_with_both_halves_is_clean(
+    tmp_path: Path, diverted: dict[str, Any]
+) -> None:
+    inventory = inventory_of(tmp_path, diverted)
+    assert [found for found in rules_of(inventory) if found.startswith("W14")] == []
+
+
+def test_a_rule_looking_up_an_empty_table_is_w147(tmp_path: Path, diverted: dict[str, Any]) -> None:
+    diverted["spec"]["routes"] = []
+    inventory = inventory_of(tmp_path, diverted)
+    assert "W147" in rules_of(inventory)
+    finding = next(entry for entry in validate(inventory) if entry.rule == "W147")
+    assert "alt (table 100)" in finding.message
+    assert finding.field_path == ("spec", "route_tables", 0, "name")
+
+
+def test_a_table_no_rule_looks_up_is_w148(tmp_path: Path, diverted: dict[str, Any]) -> None:
+    diverted["spec"]["routing_policy"] = [rule(32766)]
+    inventory = inventory_of(tmp_path, diverted)
+    assert "W148" in rules_of(inventory)
+    finding = next(entry for entry in validate(inventory) if entry.rule == "W148")
+    assert "1 route placed in it is never consulted" in finding.message
+
+
+def test_w147_and_w148_cannot_both_fire_for_one_table(
+    tmp_path: Path, diverted: dict[str, Any]
+) -> None:
+    """One needs a rule and no route, the other a route and no rule."""
+    diverted["spec"]["routes"] = []
+    diverted["spec"]["routing_policy"] = [rule(32766)]
+    found = rules_of(inventory_of(tmp_path, diverted))
+    assert "W148" in found and "W147" not in found
+
+
+def test_a_rule_below_a_catch_all_is_w149(tmp_path: Path, diverted: dict[str, Any]) -> None:
+    diverted["spec"]["routing_policy"] = [
+        rule(32766),
+        rule(32800, src="10.0.0.0/24", table="alt"),
+    ]
+    inventory = inventory_of(tmp_path, diverted)
+    assert "W149" in rules_of(inventory)
+    finding = next(entry for entry in validate(inventory) if entry.rule == "W149")
+    assert "'32766: all lookup main'" in finding.message
+    assert finding.field_path == ("spec", "routing_policy", 1, "priority")
+
+
+def test_a_catch_all_in_one_family_shadows_nothing_in_the_other(
+    tmp_path: Path, diverted: dict[str, Any]
+) -> None:
+    diverted["spec"]["routing_policy"] = [
+        rule(32766, family="ipv4"),
+        rule(32800, dst="fd00::/8", table="alt"),
+    ]
+    assert "W149" not in rules_of(inventory_of(tmp_path, diverted))
+
+
+def test_a_goto_catch_all_shadows_nothing(tmp_path: Path, diverted: dict[str, Any]) -> None:
+    """A ``goto`` jumps forward, so what it jumps to is still reached."""
+    diverted["spec"]["routing_policy"] = [
+        {"priority": 100, "action": "goto", "goto": 200},
+        rule(200, src="10.0.0.0/24", table="alt"),
+    ]
+    assert "W149" not in rules_of(inventory_of(tmp_path, diverted))
+
+
+# --------------------------------------------------------------------------- #
+# Policy-based routing: the view, and the export
+# --------------------------------------------------------------------------- #
+
+
+def test_the_routing_view_carries_the_tables_and_the_database(
+    tmp_path: Path, diverted: dict[str, Any]
+) -> None:
+    graph = build_graph(inventory_of(tmp_path, diverted), layer=Layer.ROUTING)
+    view = graph.nodes["rtr"].routing
+    assert view is not None
+    assert view.tables == (("alt", 100),)
+    # In priority order, which is the order the device walks it.
+    assert view.policy == ("100: from 10.0.0.0/24 lookup alt", "32766: all lookup main")
+    assert view.routes_by_policy
+    assert "2 policy rules" in view.describe()
+
+
+def test_a_device_with_policy_and_nothing_else_is_still_in_the_routing_view(
+    tmp_path: Path,
+) -> None:
+    inventory = inventory_of(tmp_path, policy_device(rule(32766)))
+    graph = build_graph(inventory, layer=Layer.ROUTING)
+    assert "rtr" in graph.nodes
+
+
+def test_json_exports_the_policy_database(tmp_path: Path, diverted: dict[str, Any]) -> None:
+    graph = build_graph(inventory_of(tmp_path, diverted), layer=Layer.ROUTING)
+    payload = graph_to_dict(graph, RenderOptions())
+    routing = payload["nodes"][0]["routing"]
+    assert routing["tables"] == [{"name": "alt", "id": 100}]
+    assert routing["policy"][0] == "100: from 10.0.0.0/24 lookup alt"
+
+
+def test_the_tooltip_names_the_tables_and_the_rules(
+    tmp_path: Path, diverted: dict[str, Any]
+) -> None:
+    graph = build_graph(inventory_of(tmp_path, diverted), layer=Layer.ROUTING)
+    details = build_details(graph)
+    text = detail_text(details[element_ids(graph).node("rtr") or ""])
+    assert "tables: alt (100)" in text
+    assert "100: from 10.0.0.0/24 lookup alt" in text
+
+
+def test_the_route_script_writes_the_rules_beside_the_routes(
+    tmp_path: Path, diverted: dict[str, Any]
+) -> None:
+    inventory_of(tmp_path / "inv", diverted)
+    script = tmp_path / "routes.sh"
+    CliRunner().invoke(
+        cli,
+        ["-i", str(tmp_path / "inv"), "export", "routes", "-o", str(script)],
+        catch_exceptions=False,
+    )
+    written = script.read_text(encoding="utf-8")
+    # The table is named by *number*, with its name in a trailing comment: a name
+    # resolves only through /etc/iproute2/rt_tables, which this script does not edit.
+    assert "ip -4 route replace 0.0.0.0/0 via 10.9.0.2 dev eth1 table 100  # alt" in written
+    # 'ip rule' has no 'replace', so idempotence is a del-then-add at the priority.
+    assert "ip -4 rule del priority 100 2>/dev/null || :" in written
+    assert "ip -4 rule add priority 100 from 10.0.0.0/24 lookup 100  # alt" in written
+    assert "ip -4 rule add priority 32766 from all lookup 254  # main" in written
+    # The routes come first: a rule applied before the table it selects is filled
+    # diverts traffic into an empty table.
+    assert written.index("route replace 0.0.0.0/0") < written.index("rule add priority 100")
+
+
+@requires_posix_shell
+def test_the_route_script_with_rules_is_valid_shell(
+    tmp_path: Path, diverted: dict[str, Any]
+) -> None:
+    inventory_of(tmp_path / "inv", diverted)
+    script = tmp_path / "routes.sh"
+    CliRunner().invoke(
+        cli,
+        ["-i", str(tmp_path / "inv"), "export", "routes", "-o", str(script)],
+        catch_exceptions=False,
+    )
+    ran = subprocess.run(["sh", "-n", str(script)], capture_output=True, text=True)
+    assert ran.returncode == 0, ran.stderr
+
+
+def test_a_device_with_only_policy_is_not_skipped_as_routeless(tmp_path: Path) -> None:
+    inventory_of(tmp_path / "inv", policy_device(rule(32766)))
+    manifest = tmp_path / "manifest.json"
+    CliRunner().invoke(
+        cli,
+        [
+            "-i",
+            str(tmp_path / "inv"),
+            "export",
+            "routes",
+            "-o",
+            str(tmp_path / "r.sh"),
+            "--manifest",
+            str(manifest),
+        ],
+        catch_exceptions=False,
+    )
+    record = json.loads(manifest.read_text(encoding="utf-8"))
+    assert record["counts"]["emitted"] == 1
+    assert record["skipped"] == []
+
+
+def _written(out: Path) -> str:
+    """Everything an ``export -o`` wrote, however many files it chose to write.
+
+    A multi-device export writes a tree; a single-device one writes the one file,
+    banner-separated. A test about the *content* should not have to know which.
+    """
+    if out.is_file():
+        return out.read_text(encoding="utf-8")
+    return "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(out.rglob("*")) if path.is_file()
+    )
+
+
+def test_networkd_writes_the_database_as_routing_policy_rules(
+    tmp_path: Path, diverted: dict[str, Any]
+) -> None:
+    inventory_of(tmp_path / "inv", diverted)
+    out = tmp_path / "nd"
+    CliRunner().invoke(
+        cli,
+        ["-i", str(tmp_path / "inv"), "export", "networkd", "-o", str(out)],
+        catch_exceptions=False,
+    )
+    written = _written(out)
+    assert "[RoutingPolicyRule]" in written
+    assert "From=10.0.0.0/24" in written
+    assert "Table=100" in written
+
+
+def test_the_neutral_dialect_projects_the_tables_and_the_database(
+    tmp_path: Path, diverted: dict[str, Any]
+) -> None:
+    inventory_of(tmp_path / "inv", diverted)
+    out = tmp_path / "cfg"
+    CliRunner().invoke(
+        cli,
+        ["-i", str(tmp_path / "inv"), "export", "interfaces", "-o", str(out)],
+        catch_exceptions=False,
+    )
+    written = _written(out)
+    assert "route-table alt\n    id 100" in written
+    assert "policy 100\n    from 10.0.0.0/24\n    action lookup\n    table alt" in written
+
+
+def test_the_campus_west_core_routes_by_policy() -> None:
+    """§16.4 end to end, on the one example that declares it."""
+    core = load_tree(CAMPUS).devices["sites/west/core/rtr-west-core-01"]
+    spec = core.spec
+    assert [table.describe() for table in spec.route_tables] == ["lab-egress (table 100)"]
+    assert [entry.describe() for entry in spec.policy_in(AddressFamily.IPV4)] == [
+        "90: from 10.3.20.0/24 to 10.3.99.0/24 prohibit",
+        "100: from 10.3.20.0/24 lookup lab-egress",
+        "110: fwmark 0x1 lookup lab-egress",
+        "32766: all lookup main",
+    ]
+    # Both families are placed in the table, so the mark rule -- which is in both
+    # databases -- finds a route whichever one it matches in.
+    assert {route.family for route in spec.routes_in("lab-egress")} == {"ipv4", "ipv6"}

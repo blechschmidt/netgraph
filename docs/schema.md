@@ -1475,12 +1475,23 @@ and not suppressible; the rest are semantic and carry the short ids of §10.10.
 | `NG-F012` | error | A router id is claimed by at most one element. |
 | `NG-F013` | warning | A BGP neighbour address resolves to an element of the inventory. |
 | `NG-F014` | warning | Every declared VRF has at least one interface bound to it. |
+| `NG-F015` | error | `route_tables[]` names and numbers are unique within a device, and neither shadows a reserved table. |
+| `NG-F016` | error | A policy rule's `action` agrees with its argument: `lookup` needs a `table`, `goto` needs a forward `goto`, the rest take neither. |
+| `NG-F017` | error | A policy rule's selectors agree with each other and with its `family`, and `invert` has something to invert. |
+| `NG-F018` | error | A route names `vrf` or `table`, not both. |
+| `NG-F019` | error | A `table` names a declared routing table, a VRF, or one of the reserved three. |
+| `NG-F020` | error | `routing_policy[].priority` is unique within a device, per address family. |
+| `NG-F021` | error | A policy rule's `iif`/`oif` names an interface of the device. |
+| `NG-F022` | warning | Every declared routing table a policy rule looks up holds at least one route. |
+| `NG-F023` | warning | Every declared routing table is looked up by at least one policy rule. |
+| `NG-F024` | warning | No policy rule sits below one that matches every packet of its family. |
 
-`NG-F001` to `NG-F007` are schema rules, reported while the document is parsed
-and not suppressible; `NG-F008` to `NG-F014` are semantic and carry the short
-ids of §10.10. The group is lettered `F`, for *forwarding*: `NG-R` was spent on
-interface ranges (§10.9) long before routing was modelled, and an id, once
-assigned, is never reused.
+`NG-F001` to `NG-F007` and `NG-F015` to `NG-F021` are schema rules, reported
+while the document is parsed and not suppressible; `NG-F008` to `NG-F014` and
+`NG-F022` to `NG-F024` are semantic and carry the short ids of §10.10. The
+group is lettered `F`, for *forwarding*: `NG-R` was spent on interface ranges
+(§10.9) long before routing was modelled, and an id, once assigned, is never
+reused.
 
 ### 10.16 Power
 
@@ -2924,7 +2935,7 @@ only; nothing exports them, and `couplers` is netgraph's own.
 
 Routing is *state of a box*, not a thing between boxes: a route is written on
 one device, and an adjacency is configured on one device towards a neighbour it
-names by address. So all three blocks hang off a device's `spec`, which is also
+names by address. So every block hangs off a device's `spec`, which is also
 the shape [RFC 8349](https://www.rfc-editor.org/rfc/rfc8349) (`ietf-routing`)
 gives it — a control-plane protocol and a routing table live inside a *network
 instance*, which is what a VRF is
@@ -2934,8 +2945,10 @@ instance*, which is what a VRF is
 |---|---|
 | `spec.vrfs[]` | The routing instances the device implements (§16.1). |
 | `spec.interfaces[].vrf` | Which instance one interface is in (§16.1). |
-| `spec.routes[]` | Static routes (§16.2). |
-| `spec.routing` | The dynamic protocols it takes part in (§16.3). |
+| `spec.route_tables[]` | The routing tables it holds beyond the reserved three (§16.2). |
+| `spec.routes[]` | Static routes (§16.3). |
+| `spec.routing_policy[]` | Which table each packet is routed by — policy-based routing (§16.4). |
+| `spec.routing` | The dynamic protocols it takes part in (§16.5). |
 
 None of them is required, and a device that declares none of them is exactly
 what every device in an inventory written before this section was one: routing
@@ -2998,7 +3011,51 @@ An adapter has no `vrfs` of its own and its interfaces may not declare `vrf`
 (`NG-F002`): an adapter is a *port* of the host it hangs off, and the routing
 instance belongs to that host.
 
-### 16.2 `routes[]` — static routes
+### 16.2 `route_tables[]` — additional routing tables
+
+A routing table is a container routes are placed in. Every stack is born with
+three of them — `main`, `local` and `default` — and a device that routes every
+packet the same way needs no others. Declaring one is how a device gets a
+*second* answer to "where does this packet go", which is the mechanism
+policy-based routing is built on (§16.4).
+
+```yaml
+spec:
+  route_tables:
+    - name: uplink-b
+      id: 100
+      description: Everything that leaves by the backup uplink
+  routes:
+    - prefix: 0.0.0.0/0
+      via: 198.51.100.1
+      table: uplink-b       # names an entry of spec.route_tables
+```
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `name` | element name | yes | How a route and a policy rule refer to the table. Unique within the device (`NG-F015`). |
+| `id` | 1–4294967295 | yes | The number the table is known by. Unique within the device (`NG-F015`). |
+| `description` | string | no | Free text. |
+
+**The reserved three are never declared.** `main` (254), `local` (255) and
+`default` (253) exist on every stack, are nameable from `routes[].table` and
+`routing_policy[].table` without appearing here, and cannot be declared:
+neither their names nor their numbers (`NG-F015`). A second `main` is not a
+second table, it is a document that has stopped describing the device.
+
+**A VRF is a table too.** `table: mgmt` resolves against `spec.vrfs` as readily
+as against `spec.route_tables` (`NG-F019`) — a routing instance *is* a routing
+table, which is the whole of §16.1. What netgraph does not have for it is a
+*number*: a route distinguisher identifies the VRF in BGP and says nothing about
+which table an implementation gave it, so every emitter that needs a number
+refuses rather than inventing one, and says so in its manifest.
+
+**A table is inert on its own.** Nothing consults it until a policy rule looks
+it up, so a declared table nothing selects is `NG-F023` and a rule selecting a
+table nothing is placed in is `NG-F022`. The two halves are only useful
+together, which is why they are declared next to each other.
+
+### 16.3 `routes[]` — static routes
 
 ```yaml
 spec:
@@ -3020,6 +3077,7 @@ spec:
 | `via` | IP address | no | The next hop. |
 | `dev` | interface name | no | The egress interface. |
 | `vrf` | element name | no | The instance holding the route; the global one when unset. |
+| `table` | element name | no | The table holding the route; `main` when unset (§16.2). |
 | `metric` | integer | no | Administrative distance or cost, as this device counts it. |
 | `blackhole` | boolean | no | Discard matching packets. Default `false`. |
 
@@ -3035,12 +3093,113 @@ definition. `dev` names an interface of this device (`NG-F009`).
 destination is either a typo or a `/32`, and guessing which would put a route in
 the diagram that the device does not have.
 
+`table` names an entry of `spec.route_tables`, a VRF, or one of the reserved
+three (`NG-F019`). A route that names neither `table` nor `vrf` is in `main`,
+which is where routing looks unless a policy rule sends it elsewhere. `vrf` and
+`table` are *alternatives*, not a pair: a VRF is a table of its own, so naming
+both is a contradiction rather than a refinement (`NG-F018`).
+
 Nothing here computes a best path. `metric` is recorded, routes are not sorted,
 and two routes for one prefix are two declarations rather than a decision:
 netgraph describes the configuration, and which route wins is the device's
 business.
 
-### 16.3 `routing` — dynamic protocols
+### 16.4 `routing_policy[]` — policy-based routing
+
+Ordinary routing asks one question: which route in *the* table matches this
+destination? Policy-based routing puts a question in front of it — which table
+should this packet be routed by at all? — and answers it from where the packet
+came from, what the firewall marked it with, which interface it arrived on, or
+what it asked for in its DSCP.
+
+`spec.routing_policy` is that question, modelled the way every implementation
+implements it ([RFC 1812](https://www.rfc-editor.org/rfc/rfc1812) §5.2.4.3, and
+Linux's routing policy database): an ordered list of rules, walked from the
+lowest `priority` upwards, first match deciding.
+
+```yaml
+spec:
+  route_tables:
+    - name: uplink-b
+      id: 100
+  routes:
+    - prefix: 0.0.0.0/0          # what the guest VLAN gets
+      via: 198.51.100.1
+      table: uplink-b
+    - prefix: 0.0.0.0/0          # what everything else gets
+      via: 203.0.113.1
+  routing_policy:
+    - priority: 100
+      src: 10.20.0.0/16          # guests leave by the backup uplink
+      table: uplink-b
+      description: Guest VLAN egress
+    - priority: 110
+      fwmark: '0x1'              # and so does anything the firewall marked
+      table: uplink-b
+    - priority: 200
+      src: 192.0.2.0/24
+      action: blackhole          # this prefix goes nowhere at all
+    - priority: 32766
+      table: main                # the terminator: everything else, as usual
+```
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `priority` | 0–4294967295 | yes | Where the rule sits in the walk. Unique within the device, per family (`NG-F020`). |
+| `family` | `ipv4` \| `ipv6` | no | Which database the rule is installed in. Derived from `src`/`dst`; both when neither says. |
+| `src` | IPv4/IPv6 prefix | no | Match packets **from** this prefix. |
+| `dst` | IPv4/IPv6 prefix | no | Match packets **to** this prefix. |
+| `fwmark` | mark | no | Match the mark a firewall put on the packet: `'0x1'`, `'0x1/0xff'`, or a plain number. |
+| `iif` | interface name | no | Match packets that arrived on this interface (`NG-F021`). |
+| `oif` | interface name | no | Match packets that would leave by it — locally originated traffic (`NG-F021`). |
+| `dscp` | 0–63 | no | Match this DSCP code point ([RFC 2474](https://www.rfc-editor.org/rfc/rfc2474) §3). |
+| `invert` | boolean | no | Match everything the selectors do *not*. Default `false`. |
+| `action` | see below | no | What happens to a match. Default `lookup`. |
+| `table` | element name | no | The table to route by. Required by `lookup`, refused by the rest (`NG-F016`). |
+| `goto` | 0–4294967295 | no | The priority to jump to. Required by `goto`, refused by the rest (`NG-F016`). |
+
+**The five actions.**
+
+| `action` | What it does |
+|---|---|
+| `lookup` | Route the packet by `table`, and stop walking. The ordinary case, and the default. |
+| `blackhole` | Discard it silently. |
+| `unreachable` | Discard it and answer *no route to host*. |
+| `prohibit` | Discard it and answer *administratively prohibited*. |
+| `goto` | Jump to the rule at `goto`, skipping everything between. |
+
+A `goto` jumps **forward**: the database is walked from the lowest priority
+upwards, so a target that is not greater than the rule's own priority is a loop,
+and is refused (`NG-F016`).
+
+**Priority is the rule's identity.** It is where the rule sits in the walk, and
+it is what makes a document say what the device does: two rules of one family at
+one priority leave the order they are consulted in unstated, which is `NG-F020`.
+The document may list them in any order — netgraph sorts by priority everywhere
+it shows the database, because that is the only order in which the list means
+anything.
+
+**A rule with no selector matches everything**, which is how the database is
+terminated (the `32766: lookup main` above) and also the most common way to
+break one: everything after it in the same family is unreachable, whatever it
+says. That is `NG-F024`. `invert` needs something to invert, so a rule carrying
+it and no selector is refused outright (`NG-F017`).
+
+**A rule with no `family` is installed in both.** `src: 10.20.0.0/16` says IPv4
+by itself; a rule selecting only on `fwmark` says nothing, so it goes in both
+databases — which is what an operator typing `ip rule` and `ip -6 rule` would
+do. State `family` to install it in one.
+
+**Layer 4 is deliberately not a selector.** There is no `sport`, no `dport` and
+no protocol field: the portable way to route by port, by user or by application
+is to *mark* the packet where marking belongs and match `fwmark` here. See
+§16.7.
+
+`netgraph export routes` writes the database as `ip rule` commands beside the
+routes it selects; `netgraph export networkd` writes it as
+`[RoutingPolicyRule]` sections. See [`docs/export.md`](export.md).
+
+### 16.5 `routing` — dynamic protocols
 
 ```yaml
 spec:
@@ -3085,9 +3244,9 @@ itself, so OSPF drops an adjacency with a neighbour claiming the local id
 not a duplicate, and is the normal configuration.
 
 One area per device, deliberately. An area border router is a real thing, but
-modelling it needs per-interface areas; see §16.5.
+modelling it needs per-interface areas; see §16.7.
 
-### 16.4 Peers are addresses, never names
+### 16.6 Peers are addresses, never names
 
 A BGP neighbour is written as an **address**, because that is what the device is
 configured with. netgraph resolves it against every address the inventory
@@ -3112,15 +3271,27 @@ area and are addressed in one subnet form one. Deriving it from the addressing
 rather than from the cables is what makes it right for two routers facing each
 other across a layer-2 switch, which no cable joins directly.
 
-### 16.5 What routing does not hold
+### 16.7 What routing does not hold
 
 Deferred, and listed so nobody designs around the absence:
 
 * **Per-interface OSPF areas**, and therefore area border routers, stub and NSSA
   area types, interface costs and network types.
-* **Route policy**: prefix lists, route maps, communities, local preference.
-  A policy language is a language, and inventing a half of one would make an
-  inventory that says what a router does *not* do.
+* **Route policy** — which is a different thing from the policy-based routing of
+  §16.4, and the two are worth telling apart. §16.4 decides which *table* a
+  packet is routed by. Route policy decides which *routes* a protocol accepts,
+  advertises and rewrites: prefix lists, route maps, communities, local
+  preference. A policy language is a language, and inventing a half of one would
+  make an inventory that says what a router does *not* do.
+* **Layer-4 selectors in a policy rule**: no `sport`, no `dport`, no protocol.
+  `ip rule` grew them late, no two implementations agree on them, and the
+  portable way to route by port, by user or by application is to mark the packet
+  where marking belongs and match `fwmark` (§16.4). Modelling the marking itself
+  is the firewall's business, not routing's.
+* **Table numbers for a VRF**: §16.1 records a route distinguisher, which
+  identifies the instance in BGP and says nothing about which table an
+  implementation gave it. A rule may look a VRF up by name; an emitter that
+  needs the number refuses rather than inventing one.
 * **Protocols other than OSPF and BGP**: IS-IS, RIP, EIGRP, and the
   redistribution between any two of them.
 * **Route reflectors and confederations**: an iBGP mesh here is a set of
@@ -3131,14 +3302,16 @@ Deferred, and listed so nobody designs around the absence:
   is what a router computed from it, and comparing the two is
   `netgraph drift`'s business, not the schema's.
 
-### 16.6 The routing view
+### 16.8 The routing view
 
 `netgraph render --layer routing` draws the control plane:
 
 * **Nodes** are the elements that take part in routing — anything declaring
-  `routing`, `routes` or `vrfs` — labelled with the AS number and router id
-  their peers know them by, and carrying their instances and their static
-  routes.
+  `routing`, `routes`, `vrfs`, `route_tables` or `routing_policy` — labelled
+  with the AS number and router id their peers know them by, and carrying their
+  instances, their tables, their static routes and their policy database. The
+  label counts the policy rules; the tooltip and the JSON list them, **in
+  priority order**, which is the order the device walks them.
 * **Edges** are the adjacencies: a BGP session is drawn solid and labelled with
   the AS pair (`65001 → 65002`, or `iBGP 65001` when both ends are in one AS),
   an OSPF adjacency dotted and labelled with the area.
@@ -3150,11 +3323,11 @@ Deferred, and listed so nobody designs around the absence:
 Nothing physical appears. Two routers are adjacent here because they exchange
 routes, which a cable neither guarantees nor is needed for.
 
-`netgraph export routes` writes the same static routes out as an iproute2
-script, one shell function per device; see
+`netgraph export routes` writes the same static routes and the same policy
+database out as an iproute2 script, one shell function per device; see
 [`docs/export.md`](export.md).
 
-### 16.7 YANG mapping
+### 16.9 YANG mapping
 
 | netgraph | YANG |
 |---|---|
@@ -3167,6 +3340,9 @@ script, one shell function per device; see
 | `spec.routes[].dev` | `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface` |
 | `spec.routes[].blackhole` | `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop` = `blackhole` |
 | `spec.routes[].metric` | — (`ietf-routing` leaves the metric to each protocol) |
+| `spec.routes[].table` | — (`ietf-routing` has one RIB per network instance and no second table inside it) |
+| `spec.route_tables[]` | — (the same; a table is a netgraph-level container, as it is an iproute2-level one) |
+| `spec.routing_policy[]` | — (no IETF module models the routing policy database; `ietf-routing-policy` is *route* policy, which is §16.7) |
 | `spec.routing.ospf` | `…/rt:control-plane-protocols/rt:control-plane-protocol` with `type: ospf` |
 | `spec.routing.bgp` | the same list entry with `type: bgp` |
 | `spec.routing.*.router_id` | — (`ietf-ospf` and `ietf-bgp` model it per protocol instance) |
@@ -4809,7 +4985,7 @@ spec:
     dash: bold
 ```
 
-The nodes a *view* derives rather than reads — a subnet (§16.6), a rack (§18.3),
+The nodes a *view* derives rather than reads — a subnet (§16.8), a rack (§18.3),
 a namespace collapsed by `--collapse` — have no document, so there is nothing to
 hang a `spec.style` on. They are not unstyleable: a theme reaches them by kind,
 which is the next section.

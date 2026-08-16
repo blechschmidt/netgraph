@@ -391,6 +391,8 @@ instance and everybody else calls a VRF.
 | `spec.routes[].dev` | `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface` |
 | `spec.routes[].blackhole` | `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop` = `blackhole` |
 | `spec.routes[].metric` | — (`ietf-routing` leaves the metric to each protocol) |
+| `spec.routes[].table`, `spec.route_tables[]` | — (`ietf-routing` gives a network instance one RIB and models no second table inside it) |
+| `spec.routing_policy[]` | — (no IETF module models the routing policy database; see below) |
 | `spec.routing.ospf` | `…/rt:control-plane-protocols/rt:control-plane-protocol` with `type: ospf` |
 | `spec.routing.bgp` | the same list entry with `type: bgp` |
 | `spec.routing.*.router_id` | — (`ietf-ospf` and `ietf-bgp` model it per protocol instance) |
@@ -405,9 +407,10 @@ written out.
 | `rt:routing-state`, `rt:routes` | Operational state: the table a router *computed*. The inventory holds what somebody configured. |
 | `rt:route/rt:source-protocol`, `rt:active`, `rt:last-updated` | The same — properties of a route in a running table. |
 | `rt:ribs`, `rt:default-rib` | A device's internal organisation of tables netgraph does not model the contents of. |
-| `rt:next-hop-list` (ECMP), `rt:next-hop/rt:recurse` | A multi-path or recursive next hop is a forwarding decision; the schema records one hop per route (§16.5). |
-| `ietf-ospf` areas, interfaces, costs, network types | One area per device, deliberately (§16.5). Per-interface areas, costs and DR priorities describe how the IGP behaves rather than who is in it. |
+| `rt:next-hop-list` (ECMP), `rt:next-hop/rt:recurse` | A multi-path or recursive next hop is a forwarding decision; the schema records one hop per route (§16.7). |
+| `ietf-ospf` areas, interfaces, costs, network types | One area per device, deliberately (§16.7). Per-interface areas, costs and DR priorities describe how the IGP behaves rather than who is in it. |
 | `ietf-bgp` policy, capabilities, timers, route reflection | Policy is a language and the rest is behaviour; both are on the far side of the boundary above. |
+| `ietf-routing-policy` (RFC 9067) | *Route* policy — which routes a protocol accepts, advertises and rewrites — which is the item above, and a different thing from the policy-based routing of §16.4. That has no IETF model at all: the routing policy database is an implementation's, not a standard's, so `spec.routing_policy` follows the one every implementation shares (RFC 1812 §5.2.4.3) rather than a YANG module. |
 | `ni:vrf-root` sub-trees | RFC 8529 mounts a whole per-instance configuration tree under each instance. netgraph binds interfaces to instances and stops there. |
 
 ## Power — RFC 3621 and RFC 7460
