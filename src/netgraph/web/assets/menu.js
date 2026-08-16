@@ -222,7 +222,7 @@ window.netgraphMenu = (function () {
    * new subject, so it is that shape's menu.
    */
   function targetFor(record) {
-    var address = record ? String(record.id || "") : "";
+    var address = window.netgraphSelect.addressOf(record);
     if (address && window.netgraphSelect.size() > 1 && window.netgraphSelect.has(address)) {
       return "selection";
     }
@@ -250,7 +250,7 @@ window.netgraphMenu = (function () {
     // `r1` in two sites are the case where it matters most.
     if (container) { return "namespace " + container.namespace; }
     if (!record) { return "the diagram"; }
-    var address = String(record.id || "");
+    var address = window.netgraphSelect.addressOf(record);
     if (!address) { return target === "link" ? "this link" : "this element"; }
     return address;
   }

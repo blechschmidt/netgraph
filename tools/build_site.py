@@ -155,6 +155,15 @@ DEMOS: Final[tuple[Demo, ...]] = (
         ),
         layers=("l1", "l3", "netns"),
     ),
+    Demo(
+        name="docker",
+        summary=(
+            "A container runtime at the scale it really runs at: two Docker hosts, "
+            "seven namespaces on one of them, a swarm overlay between them and the "
+            "firewall zones that decide what crosses."
+        ),
+        layers=("l1", "l3", "netns", "overlay", "security"),
+    ),
 )
 
 #: Site navigation. Every page carries it, and it is short on purpose.

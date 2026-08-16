@@ -413,6 +413,12 @@ def _node(
         payload["power"] = _power(node.power)
     if node.netns is not None:
         payload["netns"] = _netns(node.netns)
+        if node.address != node.fqn:
+            # The element a click on this node acts on (§23.1). Emitted only
+            # where it differs from ``id`` — that is, on a stack node, which is
+            # the one node whose identity is not an address ``netgraph edit``
+            # accepts. See :attr:`~netgraph.render.graph.Node.address`.
+            payload["address"] = node.address
     if node.security is not None:
         payload["zone"] = _zone(node.security)
     if node.cluster:

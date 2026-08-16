@@ -26,7 +26,6 @@ test can vary one field at a time.
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -73,6 +72,8 @@ from netgraph.render.mermaid import to_mermaid
 from netgraph.render.options import RenderOptions
 from netgraph.render.palette import edge_palette_key
 from netgraph.validate import validate
+
+from platform_marks import NFT, requires_nft  # isort: skip -- tests/ is on sys.path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CAMPUS = REPO_ROOT / "examples" / "campus"
@@ -1287,17 +1288,17 @@ def test_a_half_stated_closer_shadows_what_it_covers(tmp_path: Path) -> None:
 # The second opinion
 # --------------------------------------------------------------------------- #
 
-#: ``nft --check``, which parses a ruleset without touching the kernel. The one
-#: gate here that is not netgraph reading its own output: every assertion above
-#: says the file holds what the inventory states, and this one says the file is
-#: a file nftables would take. It caught two real defects when it was written —
-#: a NAT chain at the wrong hook priority, and a translation nft refuses in an
-#: ``inet`` table without a family — neither of which any amount of string
-#: comparison would have found.
-requires_nft = pytest.mark.skipif(
-    shutil.which("nft") is None,
-    reason="no 'nft' to syntax-check the generated ruleset with",
-)
+#: ``nft --check``, which parses a ruleset without committing it. The one gate
+#: here that is not netgraph reading its own output: every assertion above says
+#: the file holds what the inventory states, and this one says the file is a file
+#: nftables would take. It caught two real defects when it was written — a NAT
+#: chain at the wrong hook priority, and a translation nft refuses in an ``inet``
+#: table without a family — neither of which any amount of string comparison
+#: would have found.
+#:
+#: Whether it can run is a question about the *process*, not about ``PATH``:
+#: ``--check`` still opens a netlink socket, which needs ``CAP_NET_ADMIN``. See
+#: :func:`platform_marks._nft_that_can_check`, which measures it.
 
 
 @requires_nft
@@ -1307,7 +1308,7 @@ def test_the_generated_ruleset_is_one_nftables_would_take(example: str, tmp_path
     path = tmp_path / "nftables.conf"
     path.write_text(ruleset(inventory), encoding="utf-8")
     result = subprocess.run(
-        [shutil.which("nft") or "nft", "--check", "-f", str(path)],
+        [NFT or "nft", "--check", "-f", str(path)],
         capture_output=True,
         text=True,
         check=False,
@@ -1395,7 +1396,7 @@ def test_every_construct_this_emitter_writes_parses(tmp_path: Path) -> None:
     path = tmp_path / "nftables.conf"
     path.write_text(ruleset(inventory), encoding="utf-8")
     result = subprocess.run(
-        [shutil.which("nft") or "nft", "--check", "-f", str(path)],
+        [NFT or "nft", "--check", "-f", str(path)],
         capture_output=True,
         text=True,
         check=False,

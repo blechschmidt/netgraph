@@ -107,9 +107,14 @@ def _by_address(
     """
     matches = list(_placements(inventory, address))
     if len(matches) == 1:
-        element, interface, configured, kind = matches[0]
+        element, interface, configured, kind, netns = matches[0]
         return Endpoint(
-            spec=spec, element=element, kind=kind, interface=interface, address=configured
+            spec=spec,
+            element=element,
+            kind=kind,
+            interface=interface,
+            address=configured,
+            netns=netns,
         )
     if not matches:
         hint = (
@@ -123,7 +128,7 @@ def _by_address(
             f"({role} argument).{hint}"
         )
 
-    ports = [f"{element}:{interface}" for element, interface, _, _ in matches]
+    ports = [f"{element}:{interface}" for element, interface, _, _, _ in matches]
     raise TraceError(
         f"{echo_value(spec)} is configured on {len(ports)} interfaces ({role} argument), so it "
         f"does not identify one: {_listed(ports)}. Name the port instead, as 'element:interface'. "
@@ -134,15 +139,26 @@ def _by_address(
 
 def _placements(
     inventory: Inventory, address: ipaddress.IPv4Address | ipaddress.IPv6Address
-) -> Iterator[tuple[str, str, str, str]]:
-    """``(element, interface, address, kind)`` for every port holding ``address``."""
+) -> Iterator[tuple[str, str, str, str, str]]:
+    """``(element, interface, address, kind, netns)`` per port holding ``address``.
+
+    The namespace comes along because an address identifies a *stack* and not
+    only a machine (§23.1): two containers of one host may legitimately hold the
+    same address, and a routed trace has to start in the one the argument named.
+    """
     for fqn, element in inventory.elements.items():
         if not isinstance(element, (Device, Adapter)):
             continue
         for interface in element.interfaces:
             for configured in interface.addresses():
                 if configured.ip == address and is_routable_address(configured):
-                    yield fqn, interface.name, str(configured), element.kind
+                    yield (
+                        fqn,
+                        interface.name,
+                        str(configured),
+                        element.kind,
+                        interface.netns_name,
+                    )
 
 
 # --------------------------------------------------------------------------- #
@@ -162,12 +178,18 @@ def _by_port(inventory: Inventory, spec: str, *, role: str) -> Endpoint:
             f"({role} argument). It has: {_listed(names)}.",
             candidates=names,
         )
+    port = element.interface(interface)
     return Endpoint(
         spec=spec,
         element=endpoint.element,
         kind=endpoint.kind,
         interface=interface,
         address=_first_address(element, interface),
+        # An interface is in exactly one network stack, so naming it names one
+        # (§23.1). An adapter has none — it is a bus, not a machine — and
+        # ``netns_name`` answers ``""`` for it, which is the initial namespace
+        # and the only one it could be in.
+        netns=port.netns_name if port is not None else "",
     )
 
 

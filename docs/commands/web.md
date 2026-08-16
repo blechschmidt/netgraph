@@ -691,6 +691,9 @@ cable it, undo both — without dispatching a single mouse event.
 | `Space` | Pin the inspector | the diagram | a focused element | Keeps the inspector up, and tells the other tabs what this one is looking at. |
 | `Ctrl-G` | Go to element… | anywhere | — | The palette, opened over element addresses alone. |
 | `Ctrl-O` | Open file… | anywhere | a folder | The palette, opened over the inventory's file paths alone. |
+| `Ctrl-F` / `/` | Search with a query | anywhere | — | The selector language: 'kind = switch and not has vrf', 'within 2 hops of fw-edge', 'interface[address in 10.20.0.0/16]'. A bare word is a name match, as it always was. See docs/query.md. |
+| `Alt-Enter` | Select what the query matched | anywhere | — | Puts every match in the selection, so a query feeds straight into a bulk edit, an alignment or a delete. Enter does it too, from the box. |
+| *palette only* | Clear the query | anywhere | — | Empties the box, stops highlighting, and un-narrows the drawing. |
 | `Ctrl-A` | Select everything in this view | the diagram | — | Every element and link the diagram is drawing, including the ones culled off screen. The canvas only — Ctrl-A in the YAML pane is still the text. |
 | `Ctrl-Shift-A` | Clear the selection | anywhere | — | Escape does this too, before it closes anything else. |
 | `Shift-ArrowRight` / `Shift-ArrowLeft` / `Shift-ArrowUp` / `Shift-ArrowDown` | Extend the selection | the diagram | — | Steps the way the arrow keys do — preferring an element this one is linked to — and adds what it lands on, so a trunk and everything hanging off it can be collected without a pointer. |
@@ -743,6 +746,7 @@ cable it, undo both — without dispatching a single mouse event.
 
 | Keys | Command | Where | Needs | What it does |
 |---|---|---|---|---|
+| `Ctrl-Shift-F` | Draw only what the query selects | anywhere | — | Narrows the drawing itself rather than highlighting inside it — the same narrowing 'netgraph render --select' does. |
 | *palette only* | Switch layer… | anywhere | — | Physical, l1, l2, l3, overlay, routing, rack, power, identity. |
 | `]` | Next layer | anywhere | — | The next entry of the layer menu. |
 | `[` | Previous layer | anywhere | — | The previous entry of the layer menu. |

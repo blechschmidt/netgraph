@@ -1,0 +1,25 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: vx-app
+  description: >-
+    The swarm overlay network 'app-overlay'. Its two ends are the VXLAN devices
+    in the two nodes' sandbox namespaces, and what it carries is one broadcast
+    domain - 10.0.9.0/24 - stretched between two containers that have no cable
+    between them.
+spec:
+  type: vxlan
+  endpoints:
+    - srv-dock-01:ov-vxlan0
+    - srv-dock-02:ov-vxlan0
+  # Docker allocates VNIs from 4096 upwards, one per overlay network. `docker
+  # network inspect` prints it as com.docker.network.driver.overlay.vxlanid_list.
+  vni: 4097
+  # `docker network create --opt encrypted`: swarm wraps the VXLAN in IPsec ESP
+  # between every pair of nodes. It is one flag and it is off by default, which
+  # is why an unencrypted overlay is worth the warning netgraph gives it.
+  encrypted: true
+  # 1500 for the underlay less 50 bytes of VXLAN header: the number the bridge
+  # and both container interfaces carry, and the one whose absence produces the
+  # 'small requests work, large ones hang' failure.
+  mtu: 1450

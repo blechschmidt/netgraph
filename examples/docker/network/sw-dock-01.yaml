@@ -1,0 +1,45 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-dock-01
+  description: >-
+    The lab switch both container hosts hang off. Four ports, two VLANs: the
+    hosts' primary uplinks in one, their second uplinks in the other, which is
+    what makes the policy-based routing on srv-dock-01 mean something.
+spec:
+  vendor: MikroTik
+  model: CRS310-1G-5S-4S+
+  interfaces:
+    - name: ether1
+      type: ethernet
+      description: srv-dock-01 primary uplink
+      vlan:
+        mode: access
+        access_vlan: 20
+    - name: ether2
+      type: ethernet
+      description: srv-dock-02 primary uplink
+      vlan:
+        mode: access
+        access_vlan: 20
+    - name: ether3
+      type: ethernet
+      description: srv-dock-01 second uplink
+      vlan:
+        mode: access
+        access_vlan: 21
+    - name: ether4
+      type: ethernet
+      description: srv-dock-02 second uplink
+      vlan:
+        mode: access
+        access_vlan: 21
+  vlans:
+    - id: 20
+      name: lab
+      description: The lab segment; the VXLAN underlay runs over this one.
+    - id: 21
+      name: egress-b
+      description: >-
+        The second path out. Nothing is bridged between it and VLAN 20: a host
+        reaches it only by routing, which is the point of the table that does.

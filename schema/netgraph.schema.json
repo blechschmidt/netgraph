@@ -622,6 +622,19 @@
           "default": null,
           "title": "Select"
         },
+        "query": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Query"
+        },
         "prefix": {
           "anyOf": [
             {
@@ -758,7 +771,8 @@
         "port-count-at-least",
         "unique",
         "count",
-        "no-single-point-of-failure"
+        "no-single-point-of-failure",
+        "query"
       ],
       "title": "AssertionType",
       "type": "string"

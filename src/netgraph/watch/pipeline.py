@@ -27,6 +27,7 @@ from netgraph.config import load_config
 from netgraph.errors import NetgraphError, RenderError, format_path
 from netgraph.fsio import write_bytes_atomically
 from netgraph.loader import DocumentCache, Inventory, LoadError, load_tree
+from netgraph.query.apply import narrow as narrow_graph
 from netgraph.render import (
     AggregateSpec,
     FilterSpec,
@@ -35,7 +36,6 @@ from netgraph.render import (
     UnknownElementError,
     aggregate_graph,
     build_graph,
-    filter_graph,
     render_layers,
 )
 from netgraph.rules import Severity
@@ -226,7 +226,7 @@ def run_cycle(request: RenderRequest) -> CycleResult:
 
         graphs = [
             aggregate_graph(
-                filter_graph(build_graph(inventory, layer=layer), request.spec), request.aggregate
+                narrow_graph(build_graph(inventory, layer=layer), request.spec), request.aggregate
             )
             for layer in request.layers
         ]

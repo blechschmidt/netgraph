@@ -70,6 +70,7 @@ from netgraph.models.scalars import ApiVersion, VlanId
 
 __all__ = [
     "MAX_ASSERTIONS",
+    "QUERY_ASSERTIONS",
     "REACHABILITY_ASSERTIONS",
     "SELECTOR_ASSERTIONS",
     "TEST_SUITE_KIND",
@@ -115,6 +116,11 @@ class AssertionType(str, Enum):
     COUNT = "count"
     #: No single element or link, on its own, cuts anything off.
     NO_SINGLE_POINT_OF_FAILURE = "no-single-point-of-failure"
+    #: A selector query, graded against how much it matches. The general form:
+    #: anything the language can express is an assertion, and the default claim
+    #: — "this matches nothing" — is how a network invariant is written, because
+    #: an invariant is a search for counterexamples (§20.3).
+    QUERY = "query"
 
     def __str__(self) -> str:
         return self.value
@@ -161,6 +167,16 @@ SELECTOR_ASSERTIONS: Final[frozenset[AssertionType]] = frozenset(
     }
 )
 
+#: The assertions that take a ``query`` instead of, or as well as, a ``select``.
+#: Every selector assertion does — one selector language means an assertion that
+#: took the old spelling takes the new one — plus ``query`` itself, whose whole
+#: subject it is, and ``no-single-point-of-failure``, which narrows the
+#: candidates it reports.
+QUERY_ASSERTIONS: Final[frozenset[AssertionType]] = SELECTOR_ASSERTIONS | {
+    AssertionType.QUERY,
+    AssertionType.NO_SINGLE_POINT_OF_FAILURE,
+}
+
 #: Layers a reachability assertion may name. ``l1`` is not one of them: a trace
 #: answers "how does A reach B", and a cable is not an answer to that.
 _TRACE_LAYERS: Final[frozenset[AssertionLayer]] = frozenset(
@@ -189,13 +205,14 @@ _KEYS: Final[dict[str, frozenset[AssertionType]]] = {
     "vlan": REACHABILITY_ASSERTIONS | {AssertionType.SAME_VLAN},
     "layer": REACHABILITY_ASSERTIONS | {AssertionType.NO_SINGLE_POINT_OF_FAILURE},
     "select": SELECTOR_ASSERTIONS | {AssertionType.NO_SINGLE_POINT_OF_FAILURE},
+    "query": QUERY_ASSERTIONS,
     "prefix": frozenset({AssertionType.WITHIN_PREFIX}),
     "interface": frozenset({AssertionType.HAS_INTERFACE}),
     "ports": frozenset({AssertionType.PORT_COUNT_AT_LEAST}),
     "field": frozenset({AssertionType.UNIQUE}),
-    "equals": frozenset({AssertionType.COUNT}),
-    "at_least": frozenset({AssertionType.COUNT}),
-    "at_most": frozenset({AssertionType.COUNT}),
+    "equals": frozenset({AssertionType.COUNT, AssertionType.QUERY}),
+    "at_least": frozenset({AssertionType.COUNT, AssertionType.QUERY}),
+    "at_most": frozenset({AssertionType.COUNT, AssertionType.QUERY}),
     "min_isolated": frozenset({AssertionType.NO_SINGLE_POINT_OF_FAILURE}),
 }
 
@@ -212,6 +229,7 @@ _REQUIRED: Final[dict[AssertionType, tuple[str, ...]]] = {
     AssertionType.UNIQUE: ("select", "field"),
     AssertionType.COUNT: ("select",),
     AssertionType.NO_SINGLE_POINT_OF_FAILURE: (),
+    AssertionType.QUERY: ("query",),
 }
 
 
@@ -246,6 +264,14 @@ class Assertion(NetgraphModel):
     #: Which elements the claim is about, in ``netgraph render``'s filter
     #: vocabulary: ``kind=switch, namespace=sites/north, name=sw-*``.
     select: str | None = Field(default=None, min_length=1)
+    #: The same thing said in the selector language (:mod:`netgraph.query`),
+    #: which can say things the vocabulary above cannot: ``kind in (switch,
+    #: router) and not interface[name ~ 'Vlan*' and has address]``. Either key
+    #: supplies the elements a selector assertion is graded over; ``assert:
+    #: query`` takes this one and nothing else, and grades the match count
+    #: against ``equals`` / ``at_least`` / ``at_most`` — defaulting, when none is
+    #: given, to the claim that the query matches *nothing*.
+    query: str | None = Field(default=None, min_length=1)
     #: ``within-prefix``: the CIDR every selected address must lie inside.
     prefix: str | None = Field(default=None, min_length=1)
     #: ``has-interface``: the interface name, or a glob matching it.
@@ -285,8 +311,11 @@ class Assertion(NetgraphModel):
         if self.assert_ in REACHABILITY_ASSERTIONS:
             bound = f" in under {self.hops} hops" if self.hops is not None else ""
             return f"{self.assert_}: {self.from_} -> {self.to}{bound}"
+        if self.assert_ is AssertionType.QUERY:
+            return f"query: {self.query}" + (f" ({self._bounds()})" if self._bounds() else "")
+        subject = self.select or self.query
         if self.assert_ is AssertionType.NO_SINGLE_POINT_OF_FAILURE:
-            return f"{self.assert_}{f' among {self.select}' if self.select else ''}"
+            return f"{self.assert_}{f' among {subject}' if subject else ''}"
         detail = {
             AssertionType.WITHIN_PREFIX: self.prefix,
             AssertionType.HAS_INTERFACE: self.interface,
@@ -294,7 +323,7 @@ class Assertion(NetgraphModel):
             AssertionType.UNIQUE: self.field,
             AssertionType.COUNT: self._bounds(),
         }.get(self.assert_)
-        return f"{self.assert_} of {self.select}" + (f": {detail}" if detail else "")
+        return f"{self.assert_} of {subject}" + (f": {detail}" if detail else "")
 
     def _bounds(self) -> str:
         """The ``count`` comparison as it is written in a message."""
@@ -321,9 +350,16 @@ class Assertion(NetgraphModel):
                     path=(key,),
                 )
         for key in _REQUIRED[self.assert_]:
+            if key == "select" and self.query is not None:
+                # 'select' and 'query' are two spellings of the same thing, so
+                # either satisfies the requirement. Both is not an error either:
+                # they are ANDed, which is how "the switches, and of those the
+                # ones with no uplink" is written without a single long query.
+                continue
             if getattr(self, _attribute(key)) is None:
                 raise field_error(
-                    f"a {self.assert_!s} assertion needs {key!r}",
+                    f"a {self.assert_!s} assertion needs {key!r}"
+                    + (" or 'query'" if key == "select" else ""),
                     rule="NG-K003",
                     path=(key,),
                 )
@@ -349,10 +385,20 @@ class Assertion(NetgraphModel):
             )
 
     def _check_count(self) -> None:
-        """``NG-K003`` — a ``count`` compares against something, and not against nothing."""
-        if self.assert_ is not AssertionType.COUNT:
+        """``NG-K003`` — a ``count`` compares against something, and not against nothing.
+
+        A ``query`` assertion is exempt from the first half: with no bound it
+        means "this matches nothing", which is a claim and the most useful one.
+        The second half — a range no number can be in — is a mistake either way.
+        """
+        if self.assert_ not in (AssertionType.COUNT, AssertionType.QUERY):
             return
-        if self.equals is None and self.at_least is None and self.at_most is None:
+        if (
+            self.assert_ is AssertionType.COUNT
+            and self.equals is None
+            and self.at_least is None
+            and self.at_most is None
+        ):
             raise field_error(
                 "a count assertion needs at least one of 'equals', 'at_least' or 'at_most'; "
                 "without one it claims nothing",

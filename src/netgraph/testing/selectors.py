@@ -28,12 +28,15 @@ selector is typed once and read for years.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import replace
 
 from netgraph.errors import echo_value
 from netgraph.models.scalars import MAX_VLAN_ID, MIN_VLAN_ID
-from netgraph.render.graph import FilterSpec, Graph, UnknownElementError, filter_graph
+from netgraph.query import QueryError
+from netgraph.query.apply import narrow as narrow_graph
+from netgraph.render.graph import FilterSpec, Graph, UnknownElementError
 
-__all__ = ["SELECTOR_KEYS", "SelectorError", "parse_selector", "select_nodes"]
+__all__ = ["SELECTOR_KEYS", "SelectorError", "parse_selector", "query_spec", "select_nodes"]
 
 #: Every key a selector may name, and the ``netgraph render`` flag it is.
 SELECTOR_KEYS: dict[str, str] = {
@@ -157,6 +160,18 @@ def _depth(value: str) -> int:
     return depth
 
 
+def query_spec(text: str | None, spec: FilterSpec | None = None) -> FilterSpec:
+    """Fold an assertion's ``query:`` into the filter its ``select:`` produced.
+
+    Both keys mean "which elements is this about", so both end up in the same
+    :class:`~netgraph.render.graph.FilterSpec` and are combined with AND — which
+    is what makes ``select: kind=switch`` plus ``query: not has address`` read
+    the way it looks. Given neither, the spec is returned unchanged.
+    """
+    base = spec if spec is not None else FilterSpec()
+    return base if text is None else replace(base, select=text)
+
+
 def select_nodes(graph: Graph, spec: FilterSpec) -> tuple[str, ...]:
     """The declared elements ``spec`` selects, in load order.
 
@@ -168,7 +183,13 @@ def select_nodes(graph: Graph, spec: FilterSpec) -> tuple[str, ...]:
         SelectorError: ``neighbors-of`` names no node of the graph.
     """
     try:
-        narrowed = filter_graph(graph, spec)
+        narrowed = narrow_graph(graph, spec, source="query")
+    except QueryError as exc:
+        # A malformed query is a broken *assertion*, not a broken network, and
+        # the engine reports it the same way it reports a malformed selector —
+        # so it is re-raised as the one error type the caller already catches,
+        # carrying the caret block whole.
+        raise SelectorError(str(exc)) from exc
     except UnknownElementError as exc:
         hint = f"; did you mean {', '.join(exc.candidates[:5])}?" if exc.candidates else ""
         raise SelectorError(

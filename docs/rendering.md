@@ -487,6 +487,41 @@ themselves.
 | `--name GLOB` | yes | Elements whose short **or** fully-qualified name matches the shell-style glob. |
 | `--neighbors-of NAME` | no | Only the neighbourhood of one element. An unknown name is a usage error, with suggestions. |
 | `--depth N` | no | How many hops `--neighbors-of` reaches. Default 1. |
+| `--select QUERY` | no | Elements a [selector query](query.md) matches. |
+
+`--select` is the general case, and the six options above are **sugar** for it —
+each denotes a query, and `netgraph query --explain` with the flags prints which:
+
+| Flag | Query |
+|---|---|
+| `--namespace NS` | `namespace under NS` |
+| `--vlan V` | `vlan = V` |
+| `--kind K` | `kind = K` |
+| `--name G` | `name ~ G` |
+| `--neighbors-of N --depth D` | `within D hops of (fqn = N or name = N)` |
+
+The flags are not going anywhere: they are shorter for what they do, they
+complete in a shell, and they are in every runbook anybody has written. But they
+cannot say "every access switch with no uplink", and `--select` can:
+
+<!-- run: -->
+```console
+$ netgraph -i examples/campus render --select 'label.role = access and label.site = north' -f mermaid --no-annotations
+flowchart TB
+    n0["sw-north-acc-01<br/>[switch]<br/>10.1.99.11/24<br/>vlans: 1,10,20,30,99"]
+    n1["sw-north-acc-02<br/>[switch]<br/>10.1.99.12/24<br/>vlans: 1,10,20,30,99"]
+    n2["sw-north-acc-03<br/>[switch]<br/>10.1.99.13/24<br/>vlans: 1,10,20,30,99"]
+
+    classDef switch fill:#dcf0dc,stroke:#16a34a,stroke-width:1px
+    class n0,n1,n2 switch
+rendered 3 node(s) and 0 edge(s) as mermaid at layer l1
+```
+
+A query and the flags are combined with AND, exactly as two flags are. The same
+expression narrows `watch`, `show`, `list`, `export` and `report`, and is what
+`netgraph query` answers and the editor's search box takes —
+[`docs/query.md`](query.md) is the grammar, the attribute vocabulary and a
+cookbook.
 
 At `--layer l3` every filter still selects **elements**; the subnet nodes are
 derived, so each one survives exactly as long as one selected element is still

@@ -777,7 +777,7 @@ Named claims about the network the other documents describe. `netgraph test` gra
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `assert` | `reachable` \| `not-reachable` \| `path-shorter-than` \| `same-vlan` \| `distinct-vlan` \| `within-prefix` \| `has-interface` \| `port-count-at-least` \| `unique` \| `count` \| `no-single-point-of-failure` | **yes** | — | What is being claimed: `reachable`, `not-reachable`, `path-shorter-than`, `same-vlan`, `distinct-vlan`, `within-prefix`, `has-interface`, `port-count-at-least`, `unique`, `count` or `no-single-point-of-failure`. Every other key is read in its light. | — |
+| `assert` | `reachable` \| `not-reachable` \| `path-shorter-than` \| `same-vlan` \| `distinct-vlan` \| `within-prefix` \| `has-interface` \| `port-count-at-least` \| `unique` \| `count` \| `no-single-point-of-failure` \| `query` | **yes** | — | What is being claimed: `reachable`, `not-reachable`, `path-shorter-than`, `same-vlan`, `distinct-vlan`, `within-prefix`, `has-interface`, `port-count-at-least`, `unique`, `count` or `no-single-point-of-failure`. Every other key is read in its light. | — |
 | `name` | string, ≤ 200 characters | no | *unset* | How the claim is reported — a sentence a reader who has never seen the inventory can act on. Defaults to a description built from the other keys. | — |
 | `description` | string | no | *unset* | Why the claim is made. Printed under a failure, so it is where the ticket number or the standard that demands it belongs. | — |
 | `from` | string, ≥ 1 character | no | *unset* | Where the trace starts: an element, `element:interface`, an IP address, or a selector matching several of them. The spellings `netgraph path` accepts. | — |
@@ -787,13 +787,14 @@ Named claims about the network the other documents describe. `netgraph test` gra
 | `vlan` | integer, 1–4094 | no | *unset* | Restrict a trace to one VLAN, or pin which VLAN `same-vlan` means. | — |
 | `layer` | `any` \| `l1` \| `l2` \| `l3` \| `power` | no | *unset* | Which view the claim is about: `any`, `l2` or `l3` for a trace; `any`, `l1`, `l2`, `l3` or `power` for `no-single-point-of-failure`. | — |
 | `select` | string, ≥ 1 character | no | *unset* | Which elements the claim is about, in `netgraph render`'s filter vocabulary: `kind=switch, namespace=sites/north, name=sw-*`. A bare word is a name glob. | — |
+| `query` | string, ≥ 1 character | no | *unset* | The same thing said in the selector language (`docs/query.md`), which can express what the vocabulary above cannot: `kind in (switch, router) and not interface[name ~ 'Vlan*' and has address]`. Either key supplies the elements a selector assertion is graded over, and both together are ANDed. An `assert: query` takes this one and grades how much it matches against `equals` / `at_least` / `at_most`, defaulting — with none of them — to the claim that it matches nothing. | — |
 | `prefix` | string, ≥ 1 character | no | *unset* | `within-prefix`: the CIDR every routable address on a selected element must lie inside. | — |
 | `interface` | string, ≥ 1 character | no | *unset* | `has-interface`: the interface name every selected element must declare, or a glob matching it. | — |
 | `ports` | integer, ≥ 0 | no | *unset* | `port-count-at-least`: the inclusive lower bound on how many interfaces each selected element declares. | — |
 | `field` | string, ≥ 1 character | no | *unset* | `unique`: the field expression whose values must all differ, e.g. `spec.interfaces[name=mgmt0].ipv4[]`. | — |
-| `equals` | integer, ≥ 0 | no | *unset* | `count`: how many elements the selector must match, exactly. | — |
-| `at_least` | integer, ≥ 0 | no | *unset* | `count`: the inclusive lower bound on how many elements the selector matches. | — |
-| `at_most` | integer, ≥ 0 | no | *unset* | `count`: the inclusive upper bound on how many elements the selector matches. | — |
+| `equals` | integer, ≥ 0 | no | *unset* | `count` and `query`: how many elements the selector must match, exactly. | — |
+| `at_least` | integer, ≥ 0 | no | *unset* | `count` and `query`: the inclusive lower bound on how many elements the selector matches. | — |
+| `at_most` | integer, ≥ 0 | no | *unset* | `count` and `query`: the inclusive upper bound on how many elements the selector matches. | — |
 | `min_isolated` | integer, ≥ 1 | no | *unset* | `no-single-point-of-failure`: ignore a candidate that isolates fewer endpoints than this. 1, the default, reports every one of them. | — |
 
 * `reachable`, `not-reachable` and `path-shorter-than` take `from` and `to` in the spellings `netgraph path` accepts: an element, `element:interface`, an IP address, or a selector matching several of them.

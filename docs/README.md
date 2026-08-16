@@ -25,6 +25,7 @@ This whole documentation set is also published, with those demos beside it, at
 | look up one validation rule by its id | [validation-rules.md](validation-rules.md) |
 | check subnet utilisation, find free space, hunt overlaps | [ipam.md](ipam.md) |
 | find out how two machines reach each other | [paths.md](paths.md) |
+| ask "every access switch in site north with no uplink" — once, and everywhere | [query.md](query.md) |
 | keep the YAML in one canonical form | [format.md](format.md) |
 | change the inventory safely, from a script or an editor | [editing.md](editing.md) |
 | get completion, inline errors and rename in your editor | [lsp.md](lsp.md) |
@@ -117,6 +118,10 @@ This whole documentation set is also published, with those demos beside it, at
 
 * **[commands/](commands/README.md)** — one page per command, with every flag. The tables
   are generated from the CLI, so they cannot drift.
+* **[query.md](query.md)** — the selector language: the grammar, the attribute
+  vocabulary, the traversal forms and a cookbook of ten worked queries. One expression
+  answers `netgraph query`, `--select` on six commands, an `assert: query` and the
+  editor's search box.
 * **[schema-reference.md](schema-reference.md)** — every field of every kind, with types,
   defaults and its YANG counterpart. Generated from the models.
 * **[validation-rules.md](validation-rules.md)** — every rule, with what triggers it, why

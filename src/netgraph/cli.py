@@ -102,6 +102,7 @@ from netgraph.completion import (
     complete_namespace,
     complete_node,
     complete_profile,
+    complete_query,
     complete_rule,
     complete_test_suite,
     completion_script,
@@ -270,6 +271,10 @@ from netgraph.plan import (
 from netgraph.plan import (
     diff as diff_states,
 )
+from netgraph.query import DOMAINS, Domain, QueryError, QueryResult, attribute_names, evaluate
+from netgraph.query import parse as parse_query
+from netgraph.query.apply import narrow as narrow_graph
+from netgraph.query.sugar import as_query
 from netgraph.render import (
     DEFAULT_RANKDIR,
     FORMATS,
@@ -294,7 +299,6 @@ from netgraph.render import (
     collapse_targets,
     diff_formats,
     draws_racks,
-    filter_graph,
     icon_theme,
     is_binary_format,
     load_theme,
@@ -381,6 +385,12 @@ CONTEXT_SETTINGS = {
 #: Exit status when an inventory is rejected. The task of every command that
 #: checks an inventory is to answer "is this usable?", so they share one answer.
 EXIT_INVALID: Final = 1
+
+#: Exit status when a query selects nothing. The same value as
+#: :data:`EXIT_INVALID` and a different name on purpose: an empty selection is
+#: not a broken inventory, and a shell that only looks at the status should not
+#: have to care about the difference while a reader of this file does.
+EXIT_NO_MATCH: Final = 1
 
 #: Exit status when a plan is not empty: 'netgraph converge plan' exits 0 when
 #: the network already matches the inventory and 2 when changes are pending.
@@ -3314,6 +3324,27 @@ def _resolve_link_template(
         raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
 
 
+def _check_query(ctx: click.Context, param: click.Parameter, value: str | None) -> str | None:
+    """``--select``: parse it now, so a typo costs a usage error and not a load.
+
+    Validated in a callback like ``--icons`` and ``--link-template``, and for
+    the same reason: a selector with a misspelled attribute in it should be
+    refused before an inventory is read, with the column underlined, rather than
+    after a thousand documents have been parsed to produce an empty diagram.
+
+    The parsed query is thrown away. It is cheap to parse and the answer depends
+    on a graph that does not exist yet, so carrying it would only mean carrying
+    it through six commands' worth of parameter plumbing.
+    """
+    if value is None:
+        return None
+    try:
+        parse_query(value, source="--select")
+    except QueryError as exc:
+        raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
+    return value
+
+
 #: Which *elements* a rendering covers. Only the commands that draw the whole
 #: inventory take these: ``path`` draws the route it traced, so narrowing the
 #: graph underneath it would hide the very thing the reader is being shown.
@@ -3362,6 +3393,20 @@ _FILTER_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
         default=1,
         show_default=True,
         help="How many hops --neighbors-of reaches.",
+    ),
+    click.option(
+        "--select",
+        "select",
+        metavar="QUERY",
+        default=None,
+        callback=_check_query,
+        shell_complete=complete_query,
+        help=(
+            "Keep only the elements this query selects, e.g. "
+            '"kind = switch and not has vrf". The flags above are sugar for the '
+            "equivalent query and are combined with it; 'netgraph query --explain' "
+            "prints which. See docs/query.md."
+        ),
     ),
 )
 
@@ -3693,7 +3738,14 @@ def _layout_flags(command: _Command) -> _Command:
 
 
 def _filter_spec(params: Mapping[str, Any]) -> FilterSpec:
-    """Build the element filter from the parsed :data:`_GRAPH_OPTIONS`."""
+    """Build the element filter from the parsed :data:`_GRAPH_OPTIONS`.
+
+    ``--select`` arrives as text and leaves as text: the query is *answered*
+    against a graph, and the graph does not exist yet here. What fills
+    :attr:`FilterSpec.selected` is :func:`netgraph.query.apply.resolve`, called
+    from the one place that has both — see :mod:`netgraph.query.apply` for why
+    the order is fixed.
+    """
     return FilterSpec(
         namespaces=tuple(params["namespaces"]),
         vlans=frozenset(params["vlans"]),
@@ -3701,6 +3753,7 @@ def _filter_spec(params: Mapping[str, Any]) -> FilterSpec:
         names=tuple(params["names"]),
         neighbors_of=params["neighbors_of"],
         depth=params["depth"],
+        select=params.get("select"),
     )
 
 
@@ -4452,7 +4505,7 @@ def _build_graph(
     if not spec.is_empty:
         app.log(f"applying filters: {spec.describe()}", level=1)
     try:
-        filtered = filter_graph(graph, spec)
+        filtered = narrow_graph(graph, spec)
     except UnknownElementError as exc:
         raise _unknown_element(exc) from exc
 
@@ -6444,6 +6497,243 @@ def _open_browser(app: AppContext, url: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# query
+# --------------------------------------------------------------------------- #
+
+#: What ``netgraph query`` can print. ``elements`` is the default because a
+#: query selects elements; the other two report the sub-objects a scope matched,
+#: which is the answer when the question was about one.
+QUERY_SUBJECTS: Final[tuple[str, ...]] = ("elements", "interfaces", "links")
+
+
+def _query_matches(app: AppContext, inventory: Inventory, select: str) -> tuple[str, ...]:
+    """The elements ``select`` picks out, across every layer that holds one.
+
+    The union of the physical, overlay and power views, exactly as
+    :func:`_selected_inventory` takes it and for the same reason: no single
+    layer holds every kind of element, so a query answered against one of them
+    would silently miss the PDUs or the tunnel endpoints.
+    """
+    found: dict[str, None] = {}
+    for layer in (Layer.PHYSICAL, Layer.OVERLAY, Layer.POWER):
+        result = evaluate(
+            parse_query(select, source="--select"), build_graph(inventory, layer=layer)
+        )
+        for fqn in result.nodes:
+            found.setdefault(fqn, None)
+    return tuple(found)
+
+
+def _query_flags(command: _Command) -> _Command:
+    """Apply the options ``query`` shares: the filters, then the validation flags.
+
+    The same pair ``report`` takes. A query is answered *within* whatever the
+    flags scope, so ``--namespace sites/north`` narrows the question rather than
+    the answer — see :func:`_filter_spec_without_query`.
+    """
+    return _apply((*_FILTER_OPTIONS, *_VALIDATION_OPTIONS), command)
+
+
+@cli.command("query")
+@click.argument("expression", metavar="QUERY", required=False, default=None)
+@_LAYER_OPTION
+@click.option(
+    "--print",
+    "subject",
+    type=click.Choice(QUERY_SUBJECTS),
+    default="elements",
+    show_default=True,
+    help=(
+        "elements prints what the query selected; interfaces and links print the "
+        "sub-objects an interface[...] or link[...] scope matched inside them."
+    ),
+)
+@click.option("--json", "as_json", is_flag=True, default=False, help="Report as JSON.")
+@click.option(
+    "--count",
+    "count_only",
+    is_flag=True,
+    default=False,
+    help="Print how many matched, and nothing else.",
+)
+@click.option(
+    "--explain",
+    "explain",
+    is_flag=True,
+    default=False,
+    help=(
+        "Print the grammar and the attribute vocabulary instead of running a query, "
+        "and — with the filter flags — the query they are sugar for."
+    ),
+)
+@_query_flags
+@click.pass_context
+def query_command(
+    ctx: click.Context,
+    /,
+    expression: str | None,
+    subject: str,
+    as_json: bool,
+    count_only: bool,
+    explain: bool,
+    **_options: Any,
+) -> None:
+    """Select elements with one selector language, and print what matched.
+
+    QUERY is a kind filter, attribute predicates over the resolved model, and
+    optional graph traversal, combined with and/or/not and grouping:
+
+    \b
+    netgraph query 'kind = switch and label.role = access'
+    netgraph query 'interface[address in 10.20.0.0/16 and not has vrf]' --print interfaces
+    netgraph query 'within 2 hops of fw-edge'
+    netgraph query 'kind in (switch, router) and not has address' --count
+
+    The same language answers ``--select`` on render, watch, show, list, export
+    and report, an ``assert: query`` in a test suite, and the editor's search
+    box. ``--explain`` prints the grammar and the attributes; with the filter
+    flags it prints the query those flags are sugar for.
+
+    Exits 1 when nothing matched, so a query is usable as a check in a script.
+    """
+    app: AppContext = ctx.obj
+    console = app.console()
+    params = ctx.params
+
+    if explain:
+        _explain_query(console, _filter_spec(params), expression)
+        return
+    if expression is None:
+        raise click.UsageError("give a query, or --explain to print the grammar")
+
+    try:
+        query = parse_query(expression, source="query")
+    except QueryError as exc:
+        raise click.BadParameter(str(exc), ctx=ctx, param_hint="'QUERY'") from exc
+
+    inventory = app.load()
+    _warn_about_load_errors(console, inventory)
+    findings = _run_validation(app, inventory, strict=bool(params["strict"]))
+    if _is_rejected(inventory, findings) and not params["force"]:
+        _report_problems(console, inventory.errors, findings, commentary=True)
+        console.error(
+            "refusing to answer a query about an inventory with errors; fix them, or "
+            "pass --force to answer it anyway"
+        )
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+    layer = Layer(params["layers"][-1])
+    graph = _build_graph(app, inventory, layer=layer, spec=_filter_spec_without_query(params))
+    result = evaluate(query, graph)
+    _report_query(console, result, subject=subject, as_json=as_json, count_only=count_only)
+    if not result.nodes:
+        raise click.exceptions.Exit(EXIT_NO_MATCH)
+
+
+def _filter_spec_without_query(params: Mapping[str, Any]) -> FilterSpec:
+    """The flags alone, so ``query`` narrows first and then answers.
+
+    ``netgraph query 'X' --kind switch`` is "among the switches, which match X" —
+    the flags scope the graph the query runs against, rather than being ANDed
+    into it afterwards. That is the reading that makes ``--neighbors-of`` useful
+    here: it says which part of the network the question is about.
+    """
+    return replace(_filter_spec(params), select=None, selected=None)
+
+
+def _report_query(
+    console: Console,
+    result: QueryResult,
+    *,
+    subject: str,
+    as_json: bool,
+    count_only: bool,
+) -> None:
+    """Print what a query matched, in whichever of the four shapes was asked for.
+
+    ``--count`` and ``--json`` compose: the JSON document is the same one either
+    way, minus ``matches``. A count that carried the matches anyway would make
+    the flag a formatting preference rather than an answer to a different
+    question.
+    """
+    rows: tuple[dict[str, str], ...] = (
+        tuple({"element": fqn} for fqn in result.nodes)
+        if subject == "elements"
+        else tuple(
+            {"element": one.element, subject.removesuffix("s"): one.name}
+            for one in result.witnesses
+            if one.domain == _WITNESS_DOMAIN[subject]
+        )
+    )
+    if as_json:
+        payload: dict[str, Any] = {
+            "query": result.query.text,
+            "count": len(rows),
+            "subject": subject,
+        }
+        if not count_only:
+            payload["matches"] = list(rows)
+        console.print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return
+    if count_only:
+        console.print(str(len(rows)))
+        return
+    for row in rows:
+        console.print(":".join(row.values()))
+
+
+#: Which scope's witnesses each ``--print`` value reports. ``elements`` is absent
+#: because it reports the nodes rather than any sub-object.
+_WITNESS_DOMAIN: Final[dict[str, str]] = {
+    "interfaces": Domain.INTERFACE.value,
+    "links": Domain.LINK.value,
+}
+
+
+def _explain_query(console: Console, spec: FilterSpec, expression: str | None) -> None:
+    """Print the grammar, the vocabulary, and what the flags desugar to.
+
+    Generated from :mod:`netgraph.query.attributes` rather than written out, so
+    an attribute added to the tables documents itself here and cannot drift.
+    """
+    if not spec.is_empty or expression is not None:
+        console.print("# the filter flags, as the query they are sugar for")
+        console.print(as_query(replace(spec, select=None, selected=None)))
+        console.print("")
+    console.print("# grammar")
+    for line in QUERY_GRAMMAR:
+        console.print(f"  {line}")
+    console.print("")
+    for domain in (Domain.ELEMENT, *(Domain(name) for name in DOMAINS)):
+        scope = "" if domain is Domain.ELEMENT else f"{domain}[...]"
+        console.print(f"# {domain} attributes{f' -- inside {scope}' if scope else ''}")
+        console.print(f"  {', '.join(attribute_names(domain))}")
+        console.print("")
+
+
+#: The grammar, as ``--explain`` prints it. A summary of the normative statement
+#: in :mod:`netgraph.query.parser`, kept short enough to read in a terminal;
+#: ``docs/query.md`` carries the whole of it.
+QUERY_GRAMMAR: Final[tuple[str, ...]] = (
+    "query    := or",
+    "or       := and ( 'or' and )*",
+    "and      := unary ( 'and' unary )*",
+    "unary    := 'not' unary | primary",
+    "primary  := '(' query ')'",
+    "          | 'neighbors' 'of' unary",
+    "          | 'within' N 'hops' 'of' unary",
+    "          | 'reachable' 'from' unary",
+    "          | ('interface'|'link'|'netns'|'zone') '[' query ']'",
+    "          | 'has' attribute",
+    "          | attribute operator value",
+    "          | attribute 'in' '(' value ( ',' value )* ')'",
+    "          | '*'",
+    "          | word                        -- sugar for: name ~ *word*",
+    "operator := '=' | '!=' | '~' | '!~' | '=~' | '<' | '<=' | '>' | '>=' | 'in' | 'under'",
+)
+
+
+# --------------------------------------------------------------------------- #
 # lsp
 # --------------------------------------------------------------------------- #
 
@@ -6570,12 +6860,36 @@ def _lsp_log(path: Path | None) -> Iterator[Callable[[str], None] | None]:
     show_default=True,
     help="table is for reading; json and yaml are for piping.",
 )
+@click.option(
+    "--select",
+    "select",
+    metavar="QUERY",
+    default=None,
+    callback=_check_query,
+    shell_complete=complete_query,
+    help=(
+        'List only what this query selects, e.g. "label.role = access". A cable or '
+        "a tunnel is listed when everything it joins was selected. See docs/query.md."
+    ),
+)
 @click.pass_obj
-def list_command(app: AppContext, what: str, output_format: str) -> None:
-    """List the devices, cables, tunnels, VLANs, BSSs, subnets, PDUs or identities."""
+def list_command(app: AppContext, what: str, output_format: str, select: str | None) -> None:
+    """List the devices, cables, tunnels, VLANs, BSSs, subnets, PDUs or identities.
+
+    ``--select`` narrows every subject with one selector language. It is the
+    same query ``render --select`` takes and the same one an assertion writes,
+    so "the access switches" means one thing across all three:
+
+    \b
+    netgraph list devices --select 'label.role = access'
+    netgraph list subnets --select 'namespace under sites/north'
+    """
     console = app.console()
     inventory = app.load()
     _warn_about_load_errors(console, inventory)
+
+    if select is not None:
+        inventory = _selected_inventory(app, inventory, FilterSpec(select=select))
 
     listing = LISTINGS[what](inventory)
     if output_format == "table":
@@ -7758,7 +8072,7 @@ def report_command(
         _report_problems(console, (), findings, commentary=True)
 
     spec = _filter_spec(params)
-    selection = _report_selection(app, inventory, spec)
+    selection = _selected_inventory(app, inventory, spec)
     found_revision, revision_state = _revision(app, inventory.root, revision)
     options = ReportOptions(
         format=report_format,
@@ -7808,16 +8122,16 @@ def _revision(app: AppContext, root: Path, given: str | None) -> tuple[str, str]
     return (found.commit, found.state)
 
 
-def _report_selection(app: AppContext, inventory: Inventory, spec: FilterSpec) -> Inventory:
-    """The inventory narrowed to what the filters select.
+def _selected_inventory(app: AppContext, inventory: Inventory, spec: FilterSpec) -> Inventory:
+    """The inventory narrowed to what the filters and ``--select`` select.
 
-    The filters are graph filters (``--vlan`` and ``--neighbors-of`` are only
-    answerable from a topology), and a report documents *elements* — so they are
-    applied to the graphs and the surviving elements become the inventory every
-    page is then built from. The union of three layers, because no single one
-    holds every kind of element: a patch panel is spliced out above the cabling, a
-    PDU only exists in the power view, and a tunnel's endpoints only meet in the
-    overlay.
+    The filters are graph filters (``--vlan``, ``--neighbors-of`` and a query's
+    traversals are only answerable from a topology), and ``report`` and ``list``
+    are about *elements* — so they are applied to the graphs and the surviving
+    elements become the inventory every page or row is then built from. The
+    union of three layers, because no single one holds every kind of element: a
+    patch panel is spliced out above the cabling, a PDU only exists in the power
+    view, and a tunnel's endpoints only meet in the overlay.
 
     Raises:
         click.BadParameter: ``--neighbors-of`` names no element in any layer.
@@ -7830,7 +8144,7 @@ def _report_selection(app: AppContext, inventory: Inventory, spec: FilterSpec) -
     unknown: UnknownElementError | None = None
     for layer in (Layer.PHYSICAL, Layer.OVERLAY, Layer.POWER):
         try:
-            filtered = filter_graph(build_graph(inventory, layer=layer), spec)
+            filtered = narrow_graph(build_graph(inventory, layer=layer), spec)
         except UnknownElementError as exc:
             unknown = unknown or exc
             continue
@@ -7869,7 +8183,7 @@ def _report_bundle(
 
 
 @cli.command("show")
-@click.argument("name", shell_complete=complete_element)
+@click.argument("name", required=False, default=None, shell_complete=complete_element)
 @click.option(
     "-F",
     "--output-format",
@@ -7885,8 +8199,19 @@ def _report_bundle(
     is_flag=True,
     help="Print the document as written: ranges unexpanded, 'from' unmerged.",
 )
+@click.option(
+    "--select",
+    "select",
+    metavar="QUERY",
+    default=None,
+    callback=_check_query,
+    shell_complete=complete_query,
+    help=("Show every element this query selects instead of one named element. See docs/query.md."),
+)
 @click.pass_obj
-def show_command(app: AppContext, name: str, output_format: str, raw: bool) -> None:
+def show_command(
+    app: AppContext, name: str | None, output_format: str, raw: bool, select: str | None
+) -> None:
     """Print the fully resolved configuration of one element.
 
     NAME is a fully-qualified name (``sites/hq/sw1``) or a short name that is
@@ -7896,11 +8221,29 @@ def show_command(app: AppContext, name: str, output_format: str, raw: bool) -> N
     ``--raw`` (``--no-expand``) prints the document exactly as it stands in the
     file instead: an ``interfaces[].range`` still a range, a ``spec.from`` still
     a reference. Diffing the two outputs is how a template merge is inspected.
+
+    ``--select`` takes a query instead of a name and prints every element it
+    selects — a YAML stream of documents, or a JSON array — so the whole of what
+    a selector means can be read rather than counted:
+
+    \b
+    netgraph show --select 'kind = router and has vrf'
     """
     console = app.console()
+    if (name is None) == (select is None):
+        raise click.UsageError(
+            "give a NAME or a --select query, not both"
+            if name is not None
+            else "give a NAME, or a --select query to show everything it selects"
+        )
     inventory = app.load()
     _warn_about_load_errors(console, inventory)
 
+    if select is not None:
+        _show_selection(app, console, inventory, select, output_format=output_format, raw=raw)
+        return
+
+    assert name is not None
     fqn, element = _resolve_element(inventory, name)
     source = inventory.source_of(fqn)
     app.log(f"{fqn} declared in {source}" if source else f"{fqn}", level=1)
@@ -7910,6 +8253,52 @@ def show_command(app: AppContext, name: str, output_format: str, raw: bool) -> N
     else:
         document = element.model_dump(mode="json", by_alias=True, exclude_none=True)
     console.print(_serialise(document, output_format).rstrip("\n"))
+
+
+def _show_selection(
+    app: AppContext,
+    console: Console,
+    inventory: Inventory,
+    select: str,
+    *,
+    output_format: str,
+    raw: bool,
+) -> None:
+    """Print every element a query selects, in load order.
+
+    YAML gets a document stream, which is what an inventory file is and what
+    ``netgraph fmt`` and the loader both read back; JSON gets an array, because
+    a stream of JSON values is not a JSON document. Either way the output of a
+    selection of one is *not* the output of ``show NAME`` — a caller asking for
+    a set gets a set, even when it holds a single thing.
+
+    Exits 1 when the query selects nothing, so a script can tell "none" from
+    "one that happens to be empty" without parsing the output.
+    """
+    matched = _query_matches(app, inventory, select)
+    documents = [
+        _as_written(inventory, fqn)
+        if raw
+        else _element_of(inventory, fqn).model_dump(mode="json", by_alias=True, exclude_none=True)
+        for fqn in matched
+        if fqn in inventory.elements
+    ]
+    app.log(f"{select!r} selects {_plural(len(documents), 'element')}", level=1)
+    if not documents:
+        console.error(f"no element matches {select!r}")
+        raise click.exceptions.Exit(EXIT_NO_MATCH)
+    if output_format == "json":
+        console.print(_serialise(documents, "json").rstrip("\n"))
+        return
+    console.print(
+        "\n".join(f"---\n{_serialise(document, 'yaml').rstrip()}" for document in documents)
+    )
+
+
+def _element_of(inventory: Inventory, fqn: str) -> Element:
+    """The element at ``fqn``. Present by construction: it came from the graph."""
+    element = inventory.elements[fqn]
+    return element
 
 
 def _as_written(inventory: Inventory, fqn: str) -> Any:

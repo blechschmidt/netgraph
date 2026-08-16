@@ -364,6 +364,50 @@ BINDINGS: Final[tuple[Binding, ...]] = (
     # which is what lets it survive a re-render and be posted verbatim as the
     # subject of a batch. ``select.js`` owns it; every command below is the same
     # set said a different way.
+    # -- the selector language ---------------------------------------------
+    #
+    # One language for the CLI, the renderer and this page (:mod:`netgraph.query`).
+    # The box answers it live; Enter turns the answer into the selection, which
+    # is what every bulk gesture below already acts on — so "set spec.site on
+    # every access switch with no uplink" is a query and then a bulk edit.
+    Binding(
+        id="search.focus",
+        title="Search with a query",
+        section="Moving around",
+        keys=("Ctrl-F", "/"),
+        detail=(
+            "The selector language: 'kind = switch and not has vrf', 'within 2 hops "
+            "of fw-edge', 'interface[address in 10.20.0.0/16]'. A bare word is a "
+            "name match, as it always was. See docs/query.md."
+        ),
+    ),
+    Binding(
+        id="search.select",
+        title="Select what the query matched",
+        section="Moving around",
+        keys=("Alt-Enter",),
+        detail=(
+            "Puts every match in the selection, so a query feeds straight into a "
+            "bulk edit, an alignment or a delete. Enter does it too, from the box."
+        ),
+    ),
+    Binding(
+        id="search.filter",
+        title="Draw only what the query selects",
+        section="The view",
+        keys=("Ctrl-Shift-F",),
+        detail=(
+            "Narrows the drawing itself rather than highlighting inside it — the "
+            "same narrowing 'netgraph render --select' does."
+        ),
+    ),
+    Binding(
+        id="search.clear",
+        title="Clear the query",
+        section="Moving around",
+        keys=(),
+        detail="Empties the box, stops highlighting, and un-narrows the drawing.",
+    ),
     Binding(
         id="select.all",
         title="Select everything in this view",

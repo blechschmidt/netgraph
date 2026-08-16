@@ -42,3 +42,31 @@ spec:
   netns:
     - name: sandbox
       description: Throwaway namespace for testing; routed off the host.
+
+  # A namespace is a whole second stack, so it has its own routing table and its
+  # own policy database. netgraph places a route by the interface it leaves by:
+  # 'dev: veth-sbx' is inside the sandbox, 'dev: eno1' is the host's own stack.
+  # Both entries below name 10.30.0.0/24 - the tenants over on srv-host-a - and
+  # they are two different answers, which is exactly what two stacks means.
+  route_tables:
+    - name: sandbox-egress
+      id: 100
+      description: What the sandbox routes by; nothing outside it looks this up.
+  routes:
+    # The host reaches srv-host-a's tenant bridge over the lab LAN.
+    - prefix: 10.30.0.0/24
+      via: 10.20.0.11
+      dev: eno1
+    # The sandbox reaches the same tenants, but only through its host: its stack
+    # has no interface on the lab LAN at all.
+    - prefix: 10.30.0.0/24
+      via: 10.32.0.1
+      dev: veth-sbx
+      table: sandbox-egress
+  routing_policy:
+    - priority: 100
+      src: 10.32.0.2/32
+      oif: veth-sbx
+      action: lookup
+      table: sandbox-egress
+      description: Traffic the sandbox originates is routed by the sandbox's table.

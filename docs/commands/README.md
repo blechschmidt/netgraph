@@ -46,6 +46,7 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph path`](path.md) | Trace how two elements reach each other, hop by hop. | [path.md](path.md) |
 | [`netgraph impact`](impact.md) | Simulate a failure: blast radius, single points of failure, promises. | [impact.md](impact.md) |
 | [`netgraph list`](list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](list.md) |
+| [`netgraph query`](query.md) | Select elements with one selector language, and print what matched. | [query.md](query.md) |
 | [`netgraph ipam`](ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](ipam.md) |
 | [`netgraph export`](export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](export.md) |
 | [`netgraph report`](report.md) | Write the as-built documentation: a page per site and per device. | [report.md](report.md) |

@@ -43,6 +43,15 @@ describes something that cannot be asked for.
 * **routed** — `srv-host-b` addresses both ends of its pair out of a `/30`, so
   the sandbox is reached over a route rather than a broadcast domain.
 
+**A stack of its own has a routing table of its own.** `srv-host-b` declares
+`10.30.0.0/24` — the tenants over on `srv-host-a` — *twice*: once over the lab
+LAN (`dev: eno1`), which is the host's own answer, and once through the host
+(`dev: veth-sbx`, in `table: sandbox-egress`), which is the sandbox's. That is not
+a duplicate; it is two stacks answering one question differently, which is the
+whole of what a namespace is. A policy rule sends what the sandbox originates to
+the sandbox's table. netgraph places each entry by the interface it names, because
+that is the only thing in the document that says which stack it is installed in.
+
 **A namespace partitions the address space, and netgraph knows it.** The `/30`
 on both ends of a pair would be overlapping prefixes on one machine
 ([`W111`](../../docs/validation-rules.md#w111--overlapping-prefixes-on-one-element))

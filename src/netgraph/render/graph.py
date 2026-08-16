@@ -102,7 +102,7 @@ from typing import TYPE_CHECKING, Final, TypeAlias
 from netgraph.annotations import AnnotationSet, annotations_for_view, area_members, note_anchor
 from netgraph.errors import count_text
 from netgraph.identity import identities, identity_plan
-from netgraph.layout.geometry import Geometry
+from netgraph.layout.geometry import Geometry, Placement
 from netgraph.layout.resolve import resolve_geometry
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of, short_name
 from netgraph.models import (
@@ -187,8 +187,10 @@ __all__ = [
     "filter_graph",
     "is_routable_address",
     "netns_node_id",
+    "netns_views",
     "rack_elevations",
     "resolve_tunnels",
+    "security_views",
     "splice_patch_panels",
     "zone_node_id",
 ]
@@ -350,6 +352,14 @@ ZONE_ID_PREFIX: Final = "zone:"
 ANY_ZONE: Final = "any"
 
 
+#: How far a derived stack node is placed from the machine it runs in, in
+#: Graphviz points. Right by a little under a node's width and down by a little
+#: over its height, so a host's containers form a readable column beside it
+#: rather than landing on top of it or on each other. See :func:`_placed_stacks`.
+STACK_OFFSET_X: Final = 90.0
+STACK_OFFSET_Y: Final = -70.0
+
+
 def zone_node_id(element: str, zone: str) -> str:
     """Identity of the node standing for ``zone`` on ``element`` (§24.5).
 
@@ -442,6 +452,12 @@ class PortView:
     #: The other end of the veth pair this port is one end of, or ``None``
     #: (§23.2). An interface name on the *same* element, always.
     peer: str | None = None
+    #: The VRF the port is bound to, or ``None`` for the global table (§16.2).
+    #: Carried here rather than looked up out of ``spec.vrfs`` because the
+    #: binding is a fact about the *port* — "is this address in a VRF" is a
+    #: question asked of an interface, by the selector language and by a
+    #: tooltip, and neither should have to re-read the device to answer it.
+    vrf: str | None = None
 
     @classmethod
     def of(cls, interface: Interface) -> PortView:
@@ -462,6 +478,7 @@ class PortView:
             vlans=vlan.vlan_ids() if vlan is not None else frozenset(),
             netns=interface.netns_name,
             peer=interface.peer,
+            vrf=interface.vrf,
         )
 
     @property
@@ -626,11 +643,29 @@ class NetnsView:
     #: The interfaces in this namespace, in declaration order.
     ports: tuple[PortView, ...] = ()
     description: str | None = None
+    #: The machine's own document. Carried because a stack node stands for
+    #: something the machine declares and not for a document of its own, yet two
+    #: consumers still have to ask the machine a question about it: ``--kind
+    #: server`` has to select the containers of a server, and a routed trace has
+    #: to know whether the machine forwards before it will pass *through* a
+    #: stack (§6.1.1). Both would otherwise need the machine's node to be in the
+    #: same graph, and at layer 3 it need not be — a bridging host with no
+    #: address of its own is absent while its containers are drawn.
+    device: Device | None = None
 
     @property
     def id(self) -> str:
         """Identity of the node standing for this namespace."""
         return netns_node_id(self.element, self.name)
+
+    @property
+    def owner_kind(self) -> str:
+        """``kind`` of the machine running this stack, or ``""`` if unresolved.
+
+        A stack has no kind of its own — it is drawn as a namespace, not as
+        hardware — so this is what a ``--kind`` filter answers from.
+        """
+        return self.device.kind if self.device is not None else ""
 
     @property
     def is_root(self) -> bool:
@@ -646,6 +681,22 @@ class NetnsView:
     def label(self) -> str:
         """``blue/web`` — the namespace as a reader spells its containment."""
         return "/".join(self.path) if self.path else short_name(self.element)
+
+    @property
+    def qualified_label(self) -> str:
+        """``srv-host-a/blue`` — the stack named from *outside* its machine.
+
+        :attr:`label` names a stack from inside the box the netns view draws
+        around each machine, where the machine's own name is on the box. Layer 3
+        draws no such box — a prefix spans machines, so grouping its members by
+        the hardware they run on would be a second grouping fighting the first —
+        so a stack drawn there has to carry the machine's name itself, or two
+        containers called ``blue`` on two hosts would be two nodes labelled the
+        same.
+        """
+        return (
+            short_name(self.element) if self.is_root else f"{short_name(self.element)}/{self.label}"
+        )
 
     @property
     def addresses(self) -> tuple[str, ...]:
@@ -1210,6 +1261,42 @@ class Node:
         )
 
     @classmethod
+    def for_stack(cls, view: NetnsView, node: Node) -> Node:
+        """The node standing for one *non-initial* network stack of a machine.
+
+        ``node`` is the machine's own node, and the stack borrows two things
+        from it. The namespace, so ``--group-by-namespace`` draws the container
+        inside the directory that declared its host — a namespace has no
+        document of its own, so the only honest answer is its machine's. And,
+        through :attr:`netns`, the machine itself, which is what
+        :attr:`Node.address` answers and therefore what a click selects.
+
+        Unlike :meth:`for_zone` the ports are not filtered out of ``node``: a
+        stack already carries exactly the interfaces that are in it, so taking
+        them from the view is both cheaper and the only way this node and the
+        one :func:`_netns_view` mints cannot come to disagree.
+
+        The two do differ in two respects, and both are decisions about the
+        drawing rather than about the stack. The netns view boxes every stack of
+        one machine together and labels the box with the machine, so its nodes
+        say ``blue``; nothing boxes them here, so they say ``srv-01/blue``. And
+        no :attr:`cluster` is set here: layer 3 groups by namespace or not at
+        all, and a second grouping by machine would fight it.
+        """
+        return cls(
+            fqn=view.id,
+            name=view.qualified_label,
+            kind=NETNS_KIND,
+            namespace=node.namespace,
+            ports=view.ports,
+            vlans=frozenset().union(*(port.vlans for port in view.ports))
+            if view.ports
+            else frozenset(),
+            type=NodeType.NETNS,
+            netns=view,
+        )
+
+    @classmethod
     def for_rack(cls, view: RackView) -> Node:
         """The node standing for one rack and its elevation.
 
@@ -1288,6 +1375,22 @@ class Node:
     def is_element(self) -> bool:
         """Does this node stand for a device or an adapter the reader can point at?"""
         return self.type is NodeType.ELEMENT
+
+    @property
+    def address(self) -> str:
+        """The *element* a click on this node acts on (§18, §23.4).
+
+        Since layer 3 draws one node per network stack, a machine running three
+        containers is four nodes, and an editor that took the node id as the
+        thing selected would offer to rename ``netns:hosts/srv-01:blue`` — an
+        address no document has and ``netgraph edit`` would refuse. A stack is
+        not separately editable: it exists because ``spec.netns`` on the machine
+        says so, so the machine is what a click selects, what a drag moves (all
+        of its stacks together) and what a bulk edit is posted for.
+
+        Everything else answers its own id, which is what it has always been.
+        """
+        return self.netns.element if self.netns is not None else self.fqn
 
     @property
     def _document(self) -> Device | Adapter | PatchPanel | Pdu | User | Group | Tunnel | None:
@@ -1644,6 +1747,53 @@ def _narrowed(geometry: Geometry, nodes: Mapping[str, Node], edges: Sequence[Edg
     return geometry.narrowed(nodes, (edge.id for edge in edges))
 
 
+def _placed_stacks(geometry: Geometry, nodes: Mapping[str, Node]) -> Geometry:
+    """Give a split element's extra stacks a position derived from its own (§18).
+
+    Stored geometry is keyed per element, because that is what somebody dragged
+    and what a ``kind: layout`` document names. A layer that draws an element as
+    *several* nodes therefore has coordinates for one of them and none for the
+    rest, and a diagram that was fully arranged before its host declared a
+    namespace would drop from :attr:`~netgraph.layout.geometry.LayoutMode.FIXED`
+    to ``PARTIAL`` — the whole drawing re-laid-out around one new box.
+
+    The rule, so that nobody has to guess it:
+
+    * the **initial** namespace *is* the element node and inherits its
+      coordinates outright — it keeps the element's id, so there is nothing to
+      derive;
+    * every **further** stack is placed relative to it, offset down and to the
+      right in declaration order, which puts the containers of one host in a
+      readable column beside it and — being derived from a stored position —
+      moves with the host when somebody drags it.
+
+    A stack that has a stored position of its own keeps it: this fills gaps and
+    never overrides. Nothing derived here is written to a document; ``netgraph
+    layout --write`` persists what the engine settled on, and ``--prune`` sees
+    these ids in :func:`~netgraph.layout.seed.live_keys` because they are nodes
+    of the drawing, so a hand-placed ``netns:...`` entry is not stale.
+    """
+    if geometry.is_empty or not geometry.nodes:
+        return geometry
+    derived: dict[str, Placement] = {}
+    ordinals: dict[str, int] = {}
+    for fqn, node in nodes.items():
+        view = node.netns
+        if view is None or view.is_root or fqn in geometry.nodes:
+            continue
+        anchor = geometry.nodes.get(view.element)
+        if anchor is None:
+            continue
+        step = ordinals[view.element] = ordinals.get(view.element, 0) + 1
+        derived[fqn] = Placement(
+            x=anchor.x + STACK_OFFSET_X,
+            y=anchor.y + step * STACK_OFFSET_Y,
+        )
+    if not derived:
+        return geometry
+    return replace(geometry, nodes={**geometry.nodes, **derived})
+
+
 def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
     """Resolve an inventory into a renderable graph.
 
@@ -1742,14 +1892,14 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         layer=layer,
         dangling=dangling,
         sources=dict(inventory.sources),
-        geometry=_narrowed(geometry, nodes, edges),
+        geometry=_narrowed(_placed_stacks(geometry, nodes), nodes, edges),
         annotations=annotations,
-        annotation_targets=_annotation_targets(inventory, annotations),
+        annotation_targets=_annotation_targets(inventory, annotations, nodes),
     )
 
 
 def _annotation_targets(
-    inventory: Inventory, annotations: AnnotationSet
+    inventory: Inventory, annotations: AnnotationSet, nodes: Mapping[str, Node]
 ) -> dict[str, tuple[str, ...]]:
     """What every annotation of this view refers to, resolved once (§21).
 
@@ -1765,14 +1915,35 @@ def _annotation_targets(
     rather than being dropped: whether that is fatal to the drawing is the
     renderer's decision (an area with no members is not drawn; a note with no
     anchor still says what it says), and this map does not make it.
+
+    **A member that splits.** An area names *elements*, and at layer 3 an
+    element may be drawn as several stacks (§23.1). An area that enclosed only
+    the machine would draw its frame around the host and leave the containers
+    running on it outside — a box labelled "tenant blue" with tenant blue's
+    namespace outside it. So enclosing an element encloses every stack of it,
+    appended after the element itself so that a *note*, which anchors to the
+    first target, still points at the machine rather than at one of its
+    containers.
     """
     targets: dict[str, tuple[str, ...]] = {}
     for fqn, area in annotations.areas:
-        targets[fqn] = area_members(inventory, fqn, area)
+        targets[fqn] = _with_stacks(area_members(inventory, fqn, area), nodes)
     for fqn, note in annotations.notes:
         anchor = note_anchor(inventory, fqn, note)
-        targets[fqn] = () if anchor is None else (anchor,)
+        targets[fqn] = () if anchor is None else _with_stacks((anchor,), nodes)
     return targets
+
+
+def _with_stacks(elements: Sequence[str], nodes: Mapping[str, Node]) -> tuple[str, ...]:
+    """``elements``, each followed by the stack nodes standing for the same machine."""
+    stacks: dict[str, list[str]] = {}
+    for fqn, node in nodes.items():
+        view = node.netns
+        if view is not None and not view.is_root:
+            stacks.setdefault(view.element, []).append(fqn)
+    if not stacks:
+        return tuple(elements)
+    return tuple(name for element in elements for name in (element, *stacks.get(element, ())))
 
 
 # --------------------------------------------------------------------------- #
@@ -2187,7 +2358,7 @@ def _security_view(nodes: Mapping[str, Node]) -> tuple[dict[str, Node], tuple[Ed
         device = node.element if isinstance(node.element, Device) else None
         if device is None:
             continue
-        views = _security_views(fqn, device)
+        views = security_views(fqn, device)
         if not views:
             continue
         for view in views:
@@ -2196,7 +2367,7 @@ def _security_view(nodes: Mapping[str, Node]) -> tuple[dict[str, Node], tuple[Ed
     return kept, tuple(edges)
 
 
-def _security_views(fqn: str, device: Device) -> tuple[SecurityView, ...]:
+def security_views(fqn: str, device: Device) -> tuple[SecurityView, ...]:
     """Every zone of one device, declared ones first, or ``()`` for a device with none.
 
     Declared first and in declaration order, then ``local`` and ``any`` if the
@@ -2319,44 +2490,87 @@ def _policy_edge(policy: PolicyView) -> Edge:
 def _routed_view(
     nodes: Mapping[str, Node], subnets: Sequence[Subnet]
 ) -> tuple[dict[str, Node], tuple[Edge, ...]]:
-    """Turn the physical graph into the routed one.
+    """Turn the physical graph into the routed one: one node per network stack.
 
-    The physical edges are discarded: at layer 3 two elements are adjacent
-    because they share a prefix, and a cable between them is neither necessary
-    (a route may cross three switches) nor sufficient (a trunk carries VLANs the
-    two ends do not both route). Elements keep the VLAN membership derived from
-    the physical graph, so ``--vlan 10`` still selects the broadcast domain
-    rather than only the ports that spell the VLAN out.
+    The physical edges are discarded: at layer 3 two stacks are adjacent because
+    they share a prefix, and a cable between them is neither necessary (a route
+    may cross three switches) nor sufficient (a trunk carries VLANs the two ends
+    do not both route). Elements keep the VLAN membership derived from the
+    physical graph, so ``--vlan 10`` still selects the broadcast domain rather
+    than only the ports that spell the VLAN out.
 
-    Nodes come out as the addressed elements in inventory order, followed by the
-    subnets in prefix order; edges follow the elements, then the interface order
-    within each one, so the output reads the way the inventory does.
+    One node per **stack**, not per element (§23.1)
+    ----------------------------------------------
+
+    A machine running containers is several routing tables, and drawing one node
+    for it says the wrong thing twice over. It claims the container's address is
+    on the host — so ``netgraph list subnets`` and the diagram disagree with the
+    machine — and it makes a route that has to pass *through* the host to leave
+    the container a path of length zero, which is why ``netgraph path`` could not
+    trace out of one (follow-up 23). The split here is exactly the one
+    :func:`_netns_view` performs at layer 1, so the two views name the same
+    stacks with the same ids (:func:`netns_node_id`).
+
+    A machine with **one** stack is left exactly as it was: its node id is its
+    fully-qualified name, it keeps every port, and it carries no
+    :attr:`Node.netns`. That is what makes this change invisible to an inventory
+    that declares no ``spec.netns`` — the overwhelming majority — and it is
+    checked by the golden fixtures rather than asserted here.
+
+    An edge keeps being identified by ``<element>:<interface>#<prefix>`` rather
+    than by the stack it now leaves from. Interface names are unique within a
+    device (``NG-I001``), so that is still unambiguous, and it means a stored
+    waypoint or a highlighted hop survives a machine growing its first namespace.
+
+    Nodes come out as the addressed stacks in inventory order — each machine's
+    initial namespace first, then its declared ones in declaration order —
+    followed by the subnets in prefix order; edges follow the stacks, then the
+    interface order within each one, so the output reads the way the inventory
+    does.
     """
-    addressed = {element for subnet in subnets for element in subnet.elements}
-    kept = {fqn: node for fqn, node in nodes.items() if fqn in addressed}
-
+    stacks = _stack_views(nodes)
     memberships: dict[str, list[tuple[Subnet, AddressPlacement]]] = {}
     for subnet in subnets:
         for member in subnet.members:
-            memberships.setdefault(member.element, []).append((subnet, member))
+            memberships.setdefault(netns_node_id(member.element, member.netns), []).append(
+                (subnet, member)
+            )
+
+    kept: dict[str, Node] = {}
+    for fqn, node in nodes.items():
+        views = stacks.get(fqn)
+        if views is None:
+            if fqn in memberships:
+                kept[fqn] = node
+            continue
+        for view in views:
+            if view.id not in memberships:
+                # A stack holding no routable address is not at layer 3 at all,
+                # the same rule an unaddressed machine has always been under.
+                continue
+            kept[view.id] = (
+                replace(node, ports=view.ports, netns=view)
+                if view.is_root
+                else Node.for_stack(view, node)
+            )
 
     edges: list[Edge] = []
-    for fqn in kept:
+    for node_id in kept:
         # One edge per (interface, prefix): a second address on the same
         # interface in the same prefix is another label, not another adjacency.
-        grouped: dict[tuple[str, str, str], list[AddressPlacement]] = {}
+        grouped: dict[tuple[str, str, str, str], list[AddressPlacement]] = {}
         for subnet, member in sorted(
-            memberships[fqn], key=lambda entry: (entry[1].index, entry[0].sort_key)
+            memberships[node_id], key=lambda entry: (entry[1].index, entry[0].sort_key)
         ):
-            key = (member.interface, subnet.node_id, subnet.prefix)
+            key = (member.element, member.interface, subnet.node_id, subnet.prefix)
             grouped.setdefault(key, []).append(member)
-        for (interface, node_id, prefix), placements in grouped.items():
+        for (element, interface, subnet_node, prefix), placements in grouped.items():
             edges.append(
                 Edge(
-                    id=f"{fqn}:{interface}#{prefix}",
+                    id=f"{element}:{interface}#{prefix}",
                     kind=EdgeKind.SUBNET,
-                    source=fqn,
-                    target=node_id,
+                    source=node_id,
+                    target=subnet_node,
                     source_port=interface,
                     medium="",
                     addresses=tuple(placement.address for placement in placements),
@@ -2368,6 +2582,26 @@ def _routed_view(
         node = Node.for_subnet(subnet)
         kept[node.fqn] = node
     return kept, tuple(edges)
+
+
+def _stack_views(nodes: Mapping[str, Node]) -> dict[str, tuple[NetnsView, ...]]:
+    """The stacks of every machine that runs more than one, by element (§23.1).
+
+    Absent from the mapping means "one stack", which is what every device was
+    before §23 and what every device of an inventory that declares no
+    ``spec.netns`` still is. Keeping that case out of the mapping rather than
+    representing it as a single-entry tuple is deliberate: it is the case a
+    caller must leave untouched, and a shape that cannot be confused with the
+    split one is the cheapest way of saying so.
+    """
+    views: dict[str, tuple[NetnsView, ...]] = {}
+    for fqn, node in nodes.items():
+        if not node.is_element or not isinstance(node.element, Device):
+            continue
+        stacks = netns_views(fqn, node.element)
+        if len(stacks) > 1:
+            views[fqn] = stacks
+    return views
 
 
 def _netns_view(
@@ -2412,7 +2646,7 @@ def _netns_view(
 
     for fqn, node in nodes.items():
         device = node.element if isinstance(node.element, Device) else None
-        views = _netns_views(fqn, device) if device is not None else ()
+        views = netns_views(fqn, device) if device is not None else ()
         if device is None or not views:
             kept[fqn] = node
             for port in node.ports:
@@ -2476,7 +2710,7 @@ def _netns_view(
     return kept, (*surviving, *veths, *nesting)
 
 
-def _netns_views(fqn: str, device: Device) -> tuple[NetnsView, ...]:
+def netns_views(fqn: str, device: Device) -> tuple[NetnsView, ...]:
     """Every namespace of one machine, the initial one first.
 
     ``()`` when the machine has only one stack, which is what leaves it drawn as
@@ -2498,6 +2732,7 @@ def _netns_views(fqn: str, device: Device) -> tuple[NetnsView, ...]:
             parent=parents.get(name, ROOT_NETNS),
             ports=tuple(PortView.of(interface) for interface in spec.interfaces_in_netns(name)),
             description=described.get(name),
+            device=device,
         )
         for name in spec.netns_names()
     )
@@ -2556,6 +2791,17 @@ def _routing_view(
       in one subnet form one. Deriving it from the subnets rather than from the
       cables is what makes it right for two routers facing each other across a
       layer-2 switch, which no cable joins directly.
+
+    **One node per element, not per stack.** Layer 3 splits a machine into its
+    network stacks (§23.1, :func:`_routed_view`); this view deliberately does
+    not, because the thing it draws is declared per *machine*: ``spec.routing``,
+    ``spec.vrfs`` and ``spec.routes`` are one statement about one document, and
+    §23 gives no way to say "OSPF runs in the ``blue`` namespace". Drawing four
+    boxes for a container host and putting one AS number on all of them would
+    claim four routers where the inventory declares one. The consequence is in
+    :func:`_ospf_adjacencies`: two stacks of one machine that share a prefix are
+    *not* an adjacency, because there is one process, and the ``left == right``
+    test that says so is a test on the element on purpose.
 
     Nodes come out in inventory order, BGP edges before OSPF ones.
     """
@@ -2733,6 +2979,10 @@ def _ospf_adjacencies(
             speakers, 2
         ):
             area = left_view.area
+            # ``left == right`` is a test on the *element*, not on the stack it
+            # is addressed in: a machine's two namespaces sharing a prefix are
+            # one OSPF process talking to itself, not an adjacency. See
+            # :func:`_routing_view` for why this view is not split by stack.
             if left == right or area is None or area != views[right].area:
                 continue
             source, source_port, target, target_port = (
@@ -3278,15 +3528,45 @@ class FilterSpec:
     #: Keep only the neighbourhood of this element, at most :attr:`depth` hops away.
     neighbors_of: str | None = None
     depth: int = 1
+    #: The elements a ``--select`` query matched, or ``None`` when none was
+    #: given. **Already answered**: the query is parsed and evaluated by
+    #: :mod:`netgraph.query` against the unfiltered graph, and what arrives here
+    #: is the set of fully-qualified names it selected.
+    #:
+    #: The layering is deliberate and is what keeps one implementation of
+    #: *selects*. A query can traverse and can ask about interfaces, so it must
+    #: see the whole graph; the fields above cannot express it, so they are not
+    #: asked to. Both then narrow the same graph in one place, AND-ed together
+    #: like every other pair of fields — ``--kind switch --select 'has vrf'``
+    #: keeps the switches that have one.
+    selected: frozenset[str] | None = None
+    #: The query as written, for a diagnostic and for ``describe``.
+    select: str | None = None
 
     @property
     def is_empty(self) -> bool:
-        """Would this filter keep the graph unchanged?"""
-        return not (self.namespaces or self.vlans or self.kinds or self.names or self.neighbors_of)
+        """Would this filter keep the graph unchanged?
+
+        A spec carrying an *unanswered* query is not empty, even though there is
+        nothing yet to narrow with: a caller that skipped the filter on the
+        strength of this would silently render the whole inventory for a query
+        that selects three devices.
+        """
+        return not (
+            self.namespaces
+            or self.vlans
+            or self.kinds
+            or self.names
+            or self.neighbors_of
+            or self.select is not None
+            or self.selected is not None
+        )
 
     def describe(self) -> str:
         """A one-line summary for diagnostics, e.g. ``kind=switch, vlan=10``."""
         parts: list[str] = []
+        if self.select is not None:
+            parts.append(f"select={self.select}")
         if self.namespaces:
             parts.append(f"namespace={','.join(self.namespaces)}")
         if self.vlans:
@@ -3322,6 +3602,17 @@ def filter_graph(graph: Graph, spec: FilterSpec) -> Graph:
     Raises:
         UnknownElementError: ``spec.neighbors_of`` names no node.
     """
+    if spec.select is not None and spec.selected is None:
+        # The query has not been answered, and this function cannot answer it:
+        # doing so needs the vocabulary, the parser and the traversal, none of
+        # which the renderer knows about. :func:`netgraph.query.apply.narrow` is
+        # the entry point that answers it and then calls this; a spec that got
+        # here unanswered came from a caller that bypassed it, and rendering the
+        # whole inventory instead would be a silently wrong picture.
+        raise ValueError(
+            f"the --select query {spec.select!r} has not been answered; "
+            "call netgraph.query.apply.narrow() rather than filter_graph()"
+        )
     if spec.is_empty:
         return graph
 
@@ -3336,6 +3627,11 @@ def filter_graph(graph: Graph, spec: FilterSpec) -> Graph:
     kept = {fqn for fqn, node in graph.nodes.items() if node.is_element}
     if reachable is not None:
         kept &= reachable
+    if spec.selected is not None:
+        # A query may legitimately select a derived node — a layer-3 prefix, a
+        # tunnel — and those are decided below, by _kept_derived, exactly as
+        # they are for every other field. Here only the elements are narrowed.
+        kept &= spec.selected
     if spec.namespaces:
         kept &= {fqn for fqn in kept if _in_namespaces(graph.nodes[fqn].namespace, spec.namespaces)}
     if spec.kinds:
@@ -3389,8 +3685,12 @@ def _kept_derived(
 
     A prefix nobody selected still has is dropped, and so is a tunnel with no
     endpoint left: an empty box would claim a broadcast domain — or an overlay —
-    the diagram no longer shows anything in. The one exception is a node named
-    directly by ``--neighbors-of``, which is the thing the reader asked about.
+    the diagram no longer shows anything in. There are two exceptions, and both
+    are "the reader asked for this node itself": the node named directly by
+    ``--neighbors-of``, and a node a ``--select`` query matched. The second is
+    what makes ``--select 'prefix in 10.1.0.0/16'`` at layer 3 draw those
+    prefixes rather than nothing — a query can name a derived node, which none
+    of the flags can, so it must be able to keep one.
 
     A rack is the one derived node whose members are *not* nodes of the graph:
     at :attr:`Layer.RACK` the elements are slots inside the cabinet rather than
@@ -3398,38 +3698,49 @@ def _kept_derived(
     applied to the slots directly.
     """
     elements = set(kept)
+    chosen = spec.selected if spec.selected is not None else frozenset()
     surviving: dict[str, Node] = {}
     for fqn, node in graph.nodes.items():
         if node.is_element:
             continue
         if reachable is not None and fqn not in reachable:
             continue
+        pinned = fqn == seed or fqn in chosen
         if node.subnet is not None:
             narrowed = node.subnet.restricted_to(elements)
-            if not narrowed.members and fqn != seed:
+            if not narrowed.members and not pinned:
                 continue
             surviving[fqn] = replace(node, subnet=narrowed, vlans=narrowed.vlans)
         elif node.tunnel is not None:
             restricted = node.tunnel.restricted_to(elements)
-            if not restricted.ends and fqn != seed:
+            if not restricted.ends and not pinned:
                 continue
             surviving[fqn] = replace(node, tunnel=restricted)
         elif node.rack is not None:
+            if spec.selected is not None and fqn not in chosen:
+                # A query is answered over the *nodes* of the graph, and at this
+                # layer the cabinet is the node while its contents are slots. So
+                # a query selects cabinets, and the flags — which reach the
+                # slots through _slot_selected — still select what is in them.
+                continue
             elevation = replace(
                 node.rack,
                 slots=tuple(slot for slot in node.rack.slots if _slot_selected(slot, spec)),
             )
-            if not elevation.slots and fqn != seed:
+            if not elevation.slots and not pinned:
                 continue
             surviving[fqn] = replace(node, rack=elevation)
         elif node.netns is not None:
-            # A namespace has exactly one member and it is not in the graph: the
-            # machine that runs it, which is drawn as the node standing for its
-            # initial namespace. So a stack survives when its machine does —
-            # ``--name srv-01`` selects the host *and everything inside it*,
-            # which is what somebody who asked for a container host by name
-            # meant on the one layer that draws its containers.
-            if node.netns.element not in elements and fqn != seed:
+            # A namespace has exactly one member: the machine that runs it. At
+            # the netns layer that machine is a node of this graph (its initial
+            # namespace) and at layer 3 it need not be — a bridging host with no
+            # address of its own is not at layer 3 while its containers are — so
+            # the predicates are applied to the machine directly, exactly as a
+            # zone applies them to its device. ``--name srv-01`` therefore
+            # selects the host *and everything inside it*, which is what
+            # somebody who asked for a container host by name meant on the
+            # layers that draw its containers.
+            if not _stack_selected(node, spec) and not pinned:
                 continue
             surviving[fqn] = node
         elif node.security is not None:
@@ -3438,10 +3749,25 @@ def _kept_derived(
             # :attr:`Layer.SECURITY` stands for the box. So the predicates are
             # applied to it directly, exactly as a rack applies them to its
             # slots, and ``--name fw-edge`` selects that firewall's zones.
-            if not _zone_selected(node, spec) and fqn != seed:
+            if not _zone_selected(node, spec) and not pinned:
                 continue
             surviving[fqn] = node
     return surviving
+
+
+def _owner_selected(spec: FilterSpec, fqn: str, owner: str) -> bool:
+    """Did a ``--select`` query keep this derived node, or the element behind it?
+
+    Either answer is a yes, and both are needed. A query evaluates over the
+    nodes of the graph, so at :attr:`Layer.NETNS` it can match a *container* by
+    name and only that container should survive; but it can equally match the
+    machine — ``kind = server`` never matches a stack node, whose kind is not a
+    server's — and selecting a machine has to select the stacks inside it, for
+    the same reason ``--name srv-01`` does.
+
+    True when no query was given, so every other caller is unaffected.
+    """
+    return spec.selected is None or fqn in spec.selected or owner in spec.selected
 
 
 def _zone_selected(node: Node, spec: FilterSpec) -> bool:
@@ -3455,6 +3781,8 @@ def _zone_selected(node: Node, spec: FilterSpec) -> bool:
     view = node.security
     if view is None:  # pragma: no cover - the caller checked
         return False
+    if not _owner_selected(spec, node.fqn, view.element):
+        return False
     if spec.namespaces and not _in_namespaces(namespace_of(view.element), spec.namespaces):
         return False
     if spec.kinds and view.owner_kind not in spec.kinds:
@@ -3467,12 +3795,52 @@ def _zone_selected(node: Node, spec: FilterSpec) -> bool:
     )
 
 
+def _stack_selected(node: Node, spec: FilterSpec) -> bool:
+    """Does ``spec`` select the machine whose network stack this node is (§23.1)?
+
+    Three decisions, each of which had to be made once the graph could hold a
+    stack node:
+
+    * **Namespace and kind come from the machine.** A network namespace is not
+      an inventory namespace — one is a routing table inside a host, the other
+      is the directory the host's document lives in — so ``--namespace`` cannot
+      name a stack and does not try to. Selecting a directory selects the
+      machines in it and therefore every stack of them.
+    * **A name may select one stack.** ``--name srv-01`` selects the machine, so
+      it selects all of its stacks; ``--name 'srv-01/blue'`` selects that one
+      container, because the stack's qualified label is how the diagram spells
+      it and a filter should be able to name what the reader can see.
+    * **VLANs come from the node.** A stack carries exactly the ports that are
+      in it, so which broadcast domains it is in is a fact about the stack and
+      not about the machine — the same split :func:`_zone_selected` makes.
+    """
+    view = node.netns
+    if view is None:  # pragma: no cover - the caller checked
+        return False
+    if not _owner_selected(spec, node.fqn, view.element):
+        return False
+    if spec.namespaces and not _in_namespaces(namespace_of(view.element), spec.namespaces):
+        return False
+    if spec.kinds and view.owner_kind not in spec.kinds:
+        return False
+    if spec.vlans and not (node.vlans & spec.vlans):
+        return False
+    return not spec.names or any(
+        fnmatchcase(view.element, pattern)
+        or fnmatchcase(short_name(view.element), pattern)
+        or fnmatchcase(view.qualified_label, pattern)
+        for pattern in spec.names
+    )
+
+
 def _slot_selected(slot: RackSlot, spec: FilterSpec) -> bool:
     """Does ``spec`` select the element mounted in this slot?
 
     Namespace, kind and name are answerable from the slot itself. A VLAN filter
     is not — a slot records where a thing is bolted, not what it carries — and
-    is therefore ignored here rather than silently emptying every cabinet.
+    is therefore ignored here rather than silently emptying every cabinet. Nor
+    is a ``--select`` query: it is answered over the nodes of the graph, and at
+    this layer the node is the cabinet (see :func:`_kept_derived`).
     """
     if spec.namespaces and not _in_namespaces(namespace_of(slot.element), spec.namespaces):
         return False

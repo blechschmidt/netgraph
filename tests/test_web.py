@@ -920,13 +920,15 @@ def _normalise_chord(chord: str) -> str:
 
 #: Where a command's implementation may live. ``keys.js`` owns the machinery,
 #: ``app.js`` the view and navigation commands, ``select.js`` the selection and
-#: the tidying that needs one, ``session.js`` everything that writes, ``style.js``
-#: the style inspector, ``tour.js`` the guided tour — but which of the six a
-#: given id is in is not this test's business.
+#: the tidying that needs one, ``search.js`` the selector language, ``session.js``
+#: everything that writes, ``style.js`` the style inspector, ``tour.js`` the
+#: guided tour — but which of the seven a given id is in is not this test's
+#: business.
 _COMMAND_FILES = (
     "keys.js",
     "app.js",
     "select.js",
+    "search.js",
     "session.js",
     "style.js",
     "tour.js",

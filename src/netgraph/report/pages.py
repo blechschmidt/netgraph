@@ -12,6 +12,13 @@ a sentence saying the inventory declares none of whatever it is about. "This
 network has no tunnels" and "this report forgot about tunnels" look identical
 otherwise, and only one of them is true.
 
+The exception is a section about a *feature* rather than about a fact of the
+network: the tunnels, power and accounts sections of the overview, and the
+namespace section of a device page (:func:`_netns_section`), are drawn only where
+something declares them. An inventory that has never heard of network namespaces
+should get the report it always got, down to the byte — the alternative is a
+heading and a shrug on every page of every inventory that predates the feature.
+
 **Every cross-reference is a real one.** A device named on a site page links to its
 own page; a device page links back to its site, to the diagrams it appears in and
 to the far end of every cable on it. The anchors those links point at are declared
@@ -31,7 +38,8 @@ from netgraph.export.context import ExportContext, ExportOptions, location_of
 from netgraph.export.manifest import Recorder
 from netgraph.ipam import build_report as build_ipam_report
 from netgraph.loader.inventory import Inventory, short_name, subset
-from netgraph.models import Element, Pdu, format_watts
+from netgraph.models import Element, Interface, Pdu, format_watts
+from netgraph.models.netns import ROOT_NETNS, NetnsDefinition
 from netgraph.render.graph import Edge, EdgeKind, Graph, Layer, Node
 from netgraph.report.collect import (
     DATA_LAYER,
@@ -788,12 +796,17 @@ def _device_page(context: Context, fqn: str) -> Page:
     """One element: what it is, where it is, what is on it and what it routes."""
     element = context.inventory.elements[fqn]
     node = context.report.node(fqn)
+    # The routing section is built first because the namespace section links to
+    # it — and must not, on a machine that routes nothing and therefore has no
+    # such section for the link to land on.
+    routing = _routing_section(context, fqn)
     sections = [
         _identity_section(context, fqn, element),
         _placement_section(context, fqn, element, node),
         _interface_section(context, fqn, element, node),
+        _netns_section(element, node, routed=routing is not None),
         _link_section(context, fqn),
-        _routing_section(context, fqn),
+        routing,
         _appearance_section(context, fqn),
     ]
     return Page(
@@ -931,46 +944,65 @@ def _interface_section(context: Context, fqn: str, element: Element, node: Node 
         for member in interface.members or ():
             member_of.setdefault(member, []).append(interface.name)
 
+    # A NETNS column only when at least one interface on *this* page is in a
+    # stack other than the machine's initial one. Drawn unconditionally it would
+    # be a column of dashes on every page of every inventory that does not use
+    # §23, which is almost all of them — see follow-up 22.
+    stacked = any(getattr(interface, "netns", None) for interface in interfaces)
+
     rows: list[tuple[Cell, ...]] = []
     for interface in interfaces:
         port = ports.get(interface.name)
         addresses = port.addresses if port is not None else ()
-        rows.append(
+        row = [
+            Cell(text=interface.name),
+            Cell(text=interface.type.value),
+            Cell(text="yes" if interface.enabled else "no"),
+            Cell(text=str(interface.mac) if interface.mac else BLANK),
+            Cell(text=str(interface.mtu) if interface.mtu is not None else BLANK),
+            Cell(text=", ".join(addresses) if addresses else BLANK),
+            Cell(text=_vlan_text(interface)),
+        ]
+        if stacked:
+            row.append(_netns_cell(interface.netns_name))
+        row.extend(
             (
-                Cell(text=interface.name),
-                Cell(text=interface.type.value),
-                Cell(text="yes" if interface.enabled else "no"),
-                Cell(text=str(interface.mac) if interface.mac else BLANK),
-                Cell(text=str(interface.mtu) if interface.mtu is not None else BLANK),
-                Cell(text=", ".join(addresses) if addresses else BLANK),
-                Cell(text=_vlan_text(interface)),
                 Cell(text=interface.vrf or BLANK),
                 Cell(text=_aggregation_text(interface, member_of.get(interface.name, ()))),
                 Cell(text=interface.description or BLANK),
             )
         )
+        rows.append(tuple(row))
 
+    columns = [
+        Column("NAME"),
+        Column("TYPE"),
+        Column("UP"),
+        Column("MAC"),
+        Column("MTU", "right"),
+        Column("ADDRESSES"),
+        Column("VLANS"),
+        *((Column("NETNS"),) if stacked else ()),
+        Column("VRF"),
+        Column("AGGREGATION"),
+        Column("DESCRIPTION"),
+    ]
+    note = (
+        "Addresses are as configured, prefix length included. VLANS reads "
+        "'mode: ids', with the native VLAN named where a trunk has one."
+    )
+    if stacked:
+        note += (
+            " NETNS is the network stack the interface is in; it is a whole second stack "
+            "rather than a second routing table, so it composes with VRF."
+        )
     tables = [
         Table(
             key="interfaces",
             title="Interfaces",
-            columns=(
-                Column("NAME"),
-                Column("TYPE"),
-                Column("UP"),
-                Column("MAC"),
-                Column("MTU", "right"),
-                Column("ADDRESSES"),
-                Column("VLANS"),
-                Column("VRF"),
-                Column("AGGREGATION"),
-                Column("DESCRIPTION"),
-            ),
+            columns=tuple(columns),
             rows=tuple(rows),
-            note=(
-                "Addresses are as configured, prefix length included. VLANS reads "
-                "'mode: ids', with the native VLAN named where a trunk has one."
-            ),
+            note=note,
             empty="This element declares no interface.",
         )
     ]
@@ -1046,6 +1078,270 @@ def _aggregation_text(interface: object, member_of: Sequence[str]) -> str:
     if member_of:
         parts.append(f"member of {', '.join(sorted(member_of))}")
     return "; ".join(parts) or BLANK
+
+
+# --------------------------------------------------------------------------- #
+# Network namespaces (§23)
+# --------------------------------------------------------------------------- #
+
+#: How the initial namespace is named to a reader. No document declares it — it
+#: is the machine itself — and an empty cell reads as an omission, so it is
+#: spelled out, in parentheses so it cannot be mistaken for a declared name.
+_INITIAL_NETNS: Final = "(initial)"
+
+#: One level of nesting in the namespace tree. Repeated, never padded with
+#: spaces: a Markdown cell collapses runs of whitespace, so indentation has to
+#: be made of characters that survive it.
+_NETNS_INDENT: Final = "└─ "
+
+
+def _netns_label(name: str) -> str:
+    """A namespace as a reader should see it, the initial one included."""
+    return name or _INITIAL_NETNS
+
+
+def _netns_cell(name: str) -> Cell:
+    """A namespace, linked to the section of this page that describes it.
+
+    The initial namespace is deliberately *not* linked: it is what every other
+    section of the page is already about, and a column in which every row is the
+    same link is a column of noise.
+    """
+    return Cell(text=_netns_label(name), fragment="netns" if name else "")
+
+
+def _netns_order(namespaces: Sequence[NetnsDefinition]) -> tuple[tuple[NetnsDefinition, int], ...]:
+    """``spec.netns`` depth-first from the initial namespace, with each depth.
+
+    Declaration order among siblings, so the table reads in the order the
+    document was written wherever the tree does not decide it. Depth counts from
+    the initial namespace, which is depth 0 and is not in this list.
+
+    ``NG-N021`` refuses a cycle and a dangling ``parent``, so a loaded inventory
+    cannot produce either — but this also runs over a document the editor is
+    half-way through rewriting, so an entry the walk never reaches is appended at
+    the end rather than dropped. A report that silently omitted a namespace would
+    be worse than one that shows it in the wrong place.
+    """
+    children: dict[str, list[NetnsDefinition]] = {}
+    for entry in namespaces:
+        children.setdefault(entry.parent or ROOT_NETNS, []).append(entry)
+
+    ordered: list[tuple[NetnsDefinition, int]] = []
+    seen: set[str] = set()
+
+    def walk(parent: str, depth: int) -> None:
+        for entry in children.get(parent, ()):
+            if entry.name in seen:
+                continue
+            seen.add(entry.name)
+            ordered.append((entry, depth))
+            walk(entry.name, depth + 1)
+
+    walk(ROOT_NETNS, 1)
+    ordered.extend((entry, 1) for entry in namespaces if entry.name not in seen)
+    return tuple(ordered)
+
+
+def _netns_of_interface(name: str | None, interfaces: Mapping[str, Interface]) -> str:
+    """The stack an interface named by a route, a rule or a ``peer`` is in.
+
+    The only thing in a document that says which stack a route is installed in:
+    a route names an egress interface, an interface names a namespace, and there
+    is no third place to look. A name that resolves to nothing — a ``dev``
+    ``NG-F009`` reports — is read as the initial namespace rather than invented;
+    this is a document, and the finding belongs in the findings table.
+    """
+    if not name:
+        return ROOT_NETNS
+    interface = interfaces.get(name)
+    return interface.netns_name if interface is not None else ROOT_NETNS
+
+
+#: What the initial namespace's row says about itself, since no document does.
+_INITIAL_NETNS_BLURB: Final = (
+    "The machine itself; the stack every other section on this page is about."
+)
+
+
+def _netns_section(element: Element, node: Node | None, *, routed: bool) -> Section | None:
+    """The stacks this machine runs beside its initial one — when it runs any.
+
+    Conditional, and that is the whole design of it (follow-up 22). A machine
+    that declares no ``spec.netns`` and no veth pair has one network stack, every
+    other section of its page already describes it, and a section saying so would
+    be a heading and a shrug on every page of every inventory that predates §23.
+
+    ``routed`` says whether the page also carries a routing section, which is
+    what decides how much of the control plane is repeated here: a VRF is
+    described there, once, and named here only to say which stack holds it.
+    """
+    if not _runs_namespaces(element):
+        return None
+    spec = element.spec
+    namespaces: tuple[NetnsDefinition, ...] = tuple(getattr(spec, "netns", ()) or ())
+    interfaces: tuple[Interface, ...] = tuple(getattr(element, "interfaces", ()) or ())
+    veths = tuple(interface for interface in interfaces if interface.peer is not None)
+
+    by_name = {interface.name: interface for interface in interfaces}
+    ports = {port.name: port for port in (node.ports if node is not None else ())}
+    homed: dict[str, list[Interface]] = {}
+    for interface in interfaces:
+        homed.setdefault(interface.netns_name, []).append(interface)
+
+    def addresses_of(*names: str) -> str:
+        found = [address for name in names if name in ports for address in ports[name].addresses]
+        return ", ".join(found) or BLANK
+
+    tree = ((ROOT_NETNS, 0), *((entry.name, depth) for entry, depth in _netns_order(namespaces)))
+    declared = {entry.name: entry for entry in namespaces}
+    rows: list[tuple[Cell, ...]] = []
+    for name, depth in tree:
+        members = homed.get(name, [])
+        entry = declared.get(name)
+        rows.append(
+            (
+                Cell(text=_NETNS_INDENT * depth + _netns_label(name)),
+                Cell(text=_netns_label(entry.parent or ROOT_NETNS) if entry is not None else BLANK),
+                Cell(text=", ".join(member.name for member in members) or BLANK),
+                Cell(text=addresses_of(*(member.name for member in members))),
+                Cell(
+                    text=(entry.description or BLANK) if entry is not None else _INITIAL_NETNS_BLURB
+                ),
+            )
+        )
+
+    tables = [
+        Table(
+            key="namespaces",
+            title="Network namespaces",
+            columns=(
+                Column("NAMESPACE"),
+                Column("PARENT"),
+                Column("INTERFACES"),
+                Column("ADDRESSES"),
+                Column("DESCRIPTION"),
+            ),
+            rows=tuple(rows),
+            note=(
+                "One row per stack, the initial one first and every declared namespace "
+                "indented under the namespace it was created from. A namespace is a whole "
+                "second stack: its own interface names, its own addresses, its own routes."
+            ),
+            empty="This element declares no network namespace.",
+        ),
+        Table(
+            key="veth",
+            title="veth pairs",
+            columns=(
+                Column("INTERFACE"),
+                Column("NAMESPACE"),
+                Column("PEER"),
+                Column("PEER NAMESPACE"),
+                Column("ADDRESSES"),
+                Column("DESCRIPTION"),
+            ),
+            rows=tuple(
+                (
+                    Cell(text=interface.name),
+                    Cell(text=_netns_label(interface.netns_name)),
+                    Cell(text=str(interface.peer)),
+                    Cell(text=_netns_label(_netns_of_interface(str(interface.peer), by_name))),
+                    Cell(text=addresses_of(interface.name)),
+                    Cell(text=interface.description or BLANK),
+                )
+                for interface in veths
+            ),
+            note=(
+                "One row per end, so a pair is named from both sides; 'NG-N023' is what "
+                "makes the two rows agree. A veth end is an ordinary ethernet interface "
+                "whose far side is another interface of this machine rather than a socket, "
+                "which is why no cable terminates on one."
+            ),
+            empty="This element declares no veth pair.",
+        ),
+    ]
+
+    # Only what a *declared* namespace holds. Everything installed in the initial
+    # namespace is the routing section's, and stating it in both places is how two
+    # statements of one fact start disagreeing.
+    routes = tuple(
+        (name, route)
+        for route in getattr(spec, "routes", ())
+        for name in (_netns_of_interface(route.dev, by_name),)
+        if name
+    )
+    policy = tuple(
+        (name, rule)
+        for rule in getattr(spec, "routing_policy", ())
+        for name in (_netns_of_interface(rule.iif or rule.oif, by_name),)
+        if name
+    )
+    if routes:
+        tables.append(
+            Table(
+                key="netns-routes",
+                title="Routes inside a namespace",
+                columns=(Column("NAMESPACE"), Column("ROUTE")),
+                rows=tuple(
+                    (_netns_cell(name), Cell(text=route.describe())) for name, route in routes
+                ),
+                note=(
+                    "A route is installed in the stack of the interface it leaves by, so 'dev' "
+                    "is what places it here. The routing section holds every route this element "
+                    "declares, the initial namespace's included; these are the ones a declared "
+                    "namespace answers with, and two stacks may hold one prefix and answer "
+                    "differently."
+                ),
+                empty="No static route is installed in a declared namespace.",
+            )
+        )
+    if policy:
+        tables.append(
+            Table(
+                key="netns-policy",
+                title="Policy rules inside a namespace",
+                columns=(Column("NAMESPACE"), Column("RULE")),
+                rows=tuple(
+                    (_netns_cell(name), Cell(text=rule.describe())) for name, rule in policy
+                ),
+                note=(
+                    "Placed by 'iif' or 'oif', for the reason the route table gives. Each stack "
+                    "walks its own database from the lowest priority, so a priority here does "
+                    "not compete with the same priority in another stack."
+                ),
+                empty="No policy rule is installed in a declared namespace.",
+            )
+        )
+
+    notes: list[str] = []
+    bound = sorted(
+        {
+            f"{interface.vrf} in {_netns_label(interface.netns_name)}"
+            for interface in interfaces
+            if interface.vrf
+        }
+    )
+    if bound and routed:
+        notes.append(
+            "A VRF partitions the routing table of one stack, so it composes with a namespace "
+            f"rather than replacing it: {', '.join(bound)}. Each VRF is described once, in the "
+            "routing section below, and is not restated per namespace here."
+        )
+    elif routed:
+        notes.append(
+            "The routing section below is the whole control plane of this element — its VRFs, "
+            "its tables, its routes and its adjacencies — and is not restated per namespace "
+            "here."
+        )
+    return Section(
+        key="netns",
+        title="Network namespaces",
+        blurb="The network stacks this machine runs, and the veth pairs that join them.",
+        tables=tuple(tables),
+        links=(Cell(text="Routing", fragment="routing"),) if routed else (),
+        notes=tuple(notes),
+    )
 
 
 def _link_section(context: Context, fqn: str) -> Section:
@@ -1179,6 +1475,10 @@ def _routing_section(context: Context, fqn: str) -> Section | None:
     view = node.routing if node is not None else None
     if view is None:
         return None
+    # Whether the page also carries a namespace section, which is what decides
+    # whether this one may point at ``#netns``. Asked once: a link to an anchor
+    # the page does not offer is exactly what tests/test_report.py refuses.
+    stacked = _runs_namespaces(context.inventory.elements[fqn])
 
     adjacencies = tuple(
         (
@@ -1248,6 +1548,29 @@ def _routing_section(context: Context, fqn: str) -> Section | None:
                 empty="This element has no adjacency.",
             ),
         ),
+        links=((Cell(text="Network namespaces", fragment="netns"),) if stacked else ()),
+        notes=(
+            (
+                "This element runs more than one network stack, so these are the routes and "
+                "the instances of all of them together. Which stack each one is in is in the "
+                "namespace section above.",
+            )
+            if stacked
+            else ()
+        ),
+    )
+
+
+def _runs_namespaces(element: Element) -> bool:
+    """Does this element have a namespace section on its page (§23)?
+
+    One predicate, consulted by the routing section and by the section itself, so
+    the cross-reference cannot point at an anchor the page does not offer.
+    """
+    if getattr(element.spec, "netns", ()):
+        return True
+    return any(
+        interface.peer is not None for interface in (getattr(element, "interfaces", ()) or ())
     )
 
 

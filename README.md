@@ -230,6 +230,7 @@ report.txt` both do what they look like they do.
 | [`netgraph path`](docs/commands/path.md) | Trace how two elements reach each other, hop by hop. | [path.md](docs/commands/path.md) |
 | [`netgraph impact`](docs/commands/impact.md) | Simulate a failure: blast radius, single points of failure, promises. | [impact.md](docs/commands/impact.md) |
 | [`netgraph list`](docs/commands/list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](docs/commands/list.md) |
+| [`netgraph query`](docs/commands/query.md) | Select elements with one selector language, and print what matched. | [query.md](docs/commands/query.md) |
 | [`netgraph ipam`](docs/commands/ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](docs/commands/ipam.md) |
 | [`netgraph export`](docs/commands/export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](docs/commands/export.md) |
 | [`netgraph report`](docs/commands/report.md) | Write the as-built documentation: a page per site and per device. | [report.md](docs/commands/report.md) |

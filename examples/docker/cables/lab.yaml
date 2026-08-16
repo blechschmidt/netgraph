@@ -1,0 +1,39 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: sw-dock-01-to-srv-dock-01-eno1
+spec:
+  endpoints: [sw-dock-01:ether1, srv-dock-01:eno1]
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: sw-dock-01-to-srv-dock-02-eno1
+spec:
+  endpoints: [sw-dock-01:ether2, srv-dock-02:eno1]
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: sw-dock-01-to-srv-dock-01-eno2
+spec:
+  endpoints: [sw-dock-01:ether3, srv-dock-01:eno2]
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: sw-dock-01-to-srv-dock-02-eno2
+spec:
+  endpoints: [sw-dock-01:ether4, srv-dock-02:eno2]
+  medium: copper
+  speed: 1Gbps
+  category: cat6

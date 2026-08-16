@@ -38,7 +38,7 @@ from netgraph.impact.graphs import LAYERS, POWER, LayerView, views
 from netgraph.loader.inventory import Inventory, short_name
 from netgraph.models import Assertion, AssertionLayer, AssertionType, TestSuite
 from netgraph.power import PowerPlan, power_plan
-from netgraph.render.graph import Graph, Layer, Node, build_graph
+from netgraph.render.graph import FilterSpec, Graph, Layer, Node, build_graph
 from netgraph.testing.fields import FieldError, evaluate, render_value
 from netgraph.testing.model import (
     FAILED,
@@ -49,7 +49,12 @@ from netgraph.testing.model import (
     TestReport,
     Verdict,
 )
-from netgraph.testing.selectors import SelectorError, parse_selector, select_nodes
+from netgraph.testing.selectors import (
+    SelectorError,
+    parse_selector,
+    query_spec,
+    select_nodes,
+)
 from netgraph.trace import DEFAULT_MAX_HOPS, TracedPath, TraceError, TraceResult, trace
 
 __all__ = ["MAX_PAIRS", "MAX_REPORTED", "run_tests", "suite_location"]
@@ -401,9 +406,16 @@ def _involved(pairs: Sequence[tuple[str, str]]) -> tuple[str, ...]:
 
 
 def _selected(context: _Context, assertion: Assertion) -> tuple[str, ...]:
-    """The elements the assertion is about."""
-    assert assertion.select is not None  # required by the model
-    return select_nodes(context.graph(), parse_selector(assertion.select))
+    """The elements the assertion is about, from ``select``, ``query`` or both.
+
+    One implementation of *selects*: whichever key was written, the answer comes
+    out of the same :func:`~netgraph.testing.selectors.select_nodes` the renderer
+    filters with. Written together they are ANDed, which is how "the switches,
+    and of those the ones with no uplink" is said without one long query.
+    """
+    assert assertion.select is not None or assertion.query is not None  # required by the model
+    spec = parse_selector(assertion.select) if assertion.select is not None else FilterSpec()
+    return select_nodes(context.graph(), query_spec(assertion.query, spec))
 
 
 def _require_selection(context: _Context, assertion: Assertion) -> tuple[tuple[str, ...], str]:
@@ -416,7 +428,13 @@ def _require_selection(context: _Context, assertion: Assertion) -> tuple[tuple[s
     selected = _selected(context, assertion)
     if selected:
         return selected, ""
-    return (), f"the selector {assertion.select!r} matches no element, so nothing was checked"
+    return (), f"the selector {_subject(assertion)!r} matches no element, so nothing was checked"
+
+
+def _subject(assertion: Assertion) -> str:
+    """How a message names what the assertion was about: both keys, when both."""
+    written = [one for one in (assertion.select, assertion.query) if one is not None]
+    return " and ".join(written)
 
 
 def _same_vlan(context: _Context, assertion: Assertion) -> _Outcome:
@@ -644,7 +662,7 @@ def _count(context: _Context, assertion: Assertion) -> _Outcome:
         return _Outcome(PASSED, elements=selected)
     return _Outcome(
         FAILED,
-        f"the selector {assertion.select!r} matches {_plural(found, 'element')}: "
+        f"the selector {_subject(assertion)!r} matches {_plural(found, 'element')}: "
         + "; ".join(failures),
         detail=_capped(list(selected)),
         elements=selected,
@@ -677,7 +695,11 @@ def _no_single_point_of_failure(context: _Context, assertion: Assertion) -> _Out
             "no element is designated a gateway and no router is declared, so there is "
             "nothing for a failure to cut anything off from",
         )
-    selected = _selected(context, assertion) if assertion.select is not None else None
+    selected = (
+        _selected(context, assertion)
+        if assertion.select is not None or assertion.query is not None
+        else None
+    )
     spofs, _ = single_points(
         context.inventory,
         built,
@@ -749,6 +771,55 @@ def _capped(lines: Sequence[str]) -> tuple[str, ...]:
     return (*lines[:MAX_REPORTED], f"... and {len(lines) - MAX_REPORTED} more")
 
 
+# -- the query assertion -----------------------------------------------------
+
+
+def _query(context: _Context, assertion: Assertion) -> _Outcome:
+    """``query`` — the selector language, graded against how much it matches.
+
+    With no bound the claim is that it matches **nothing**, because that is how
+    a network invariant is written: "no device is missing a management address"
+    is a search for the counterexamples, and the counterexamples are the
+    failure report. With a bound it is a ``count`` over an expression the
+    ``select:`` vocabulary cannot express, which is the other half of why the
+    language exists.
+    """
+    selected = _selected(context, assertion)
+    found = len(selected)
+    bounds = tuple(
+        (word, bound)
+        for word, bound in (
+            ("exactly", assertion.equals),
+            ("at least", assertion.at_least),
+            ("at most", assertion.at_most),
+        )
+        if bound is not None
+    )
+    if not bounds:
+        if not found:
+            return _Outcome(PASSED)
+        return _Outcome(
+            FAILED,
+            f"{_plural(found, 'element')} match {assertion.query!r}, and the assertion is "
+            f"that none does",
+            detail=_capped(list(selected)),
+            elements=selected,
+        )
+    failures = [
+        f"{found} is not {word} {bound}"
+        for word, bound in bounds
+        if not _compare(found, word, bound)
+    ]
+    if not failures:
+        return _Outcome(PASSED, elements=selected)
+    return _Outcome(
+        FAILED,
+        f"{assertion.query!r} matches {_plural(found, 'element')}: " + "; ".join(failures),
+        detail=_capped(list(selected)),
+        elements=selected,
+    )
+
+
 #: One evaluator per assertion, so adding a claim is adding a function and a row.
 _EVALUATORS: Final[dict[AssertionType, Callable[[_Context, Assertion], _Outcome]]] = {
     AssertionType.REACHABLE: _reachable,
@@ -762,6 +833,7 @@ _EVALUATORS: Final[dict[AssertionType, Callable[[_Context, Assertion], _Outcome]
     AssertionType.UNIQUE: _unique,
     AssertionType.COUNT: _count,
     AssertionType.NO_SINGLE_POINT_OF_FAILURE: _no_single_point_of_failure,
+    AssertionType.QUERY: _query,
 }
 
 assert set(_EVALUATORS) == set(AssertionType), "every assertion needs an evaluator"

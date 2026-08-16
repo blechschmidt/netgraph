@@ -2410,14 +2410,25 @@ A device that declares *no* zones never triggers this. Having no partition at al
 is the ordinary case and says nothing; it is once a partition exists that a gap
 in it is a statement.
 
+Three kinds of interface are never counted: a **loopback**, a **member** of a
+bridge or a LAG — governed by the aggregate above it, exactly as
+[§10.6](schema.md#106-lag-resolution) has it everywhere else — and an interface
+**in a network namespace** ([§23.1](schema.md#231-specnetns-and-interfacesnetns)).
+`spec.zones` partitions the stack the policy above it is written for, and that is
+the machine's initial namespace; a container's `eth0` is in a second stack with a
+netfilter instance of its own, which nothing on the host's policy can see and
+nothing on it can reach. Counting those would report a container host once per
+container, and the only edit that silenced it would be a lie about which firewall
+filters that interface.
+
 **Why it matters.** Traffic on an unzoned interface cannot be named by policy. A
 rule saying `from lan` does not reach it, so what it gets is whichever chain
 default applies — which on a default-deny firewall means it silently stops
 working, and on a default-permit one means it silently is not filtered.
 
 **Suppress with** `W151` / `NG-B011`, or an annotation on the device. A console
-port, a namespace-internal veth end and a dedicated out-of-band management
-interface are all legitimately outside every zone.
+port and a dedicated out-of-band management interface are both legitimately
+outside every zone.
 
 #### `W152` — firewall mark nothing reads
 

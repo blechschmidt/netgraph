@@ -1,0 +1,164 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-dock-02
+  description: >-
+    The second swarm node. One user-defined bridge and one container, plus the
+    other end of the overlay - which is the half of the picture that shows what
+    a VXLAN is for: two containers on two machines in one broadcast domain that
+    no cable in this inventory carries.
+spec:
+  vendor: Supermicro
+  model: SYS-5019C-MR
+  interfaces:
+    - name: eno1
+      type: ethernet
+      description: Primary uplink, and the VXLAN underlay.
+      mtu: 1500
+      ipv4:
+        addresses:
+          - ip: 10.20.0.22
+            prefix_length: 24
+        gateway: 10.20.0.1
+    - name: eno2
+      type: ethernet
+      description: Second uplink, on VLAN 21 like its neighbour's.
+      mtu: 1500
+      ipv4:
+        addresses:
+          - ip: 10.20.1.22
+            prefix_length: 24
+
+    - name: br-edge
+      type: bridge
+      description: >-
+        Network 'edge', out of a different pool than srv-dock-01's 'app'. On a
+        real pair of hosts both daemons would allocate 172.18.0.0/16 and both
+        gateways would be 172.18.0.1, because a private prefix behind a
+        masquerade is local to the machine. An inventory has one address space,
+        so this one gives each host a pool of its own; see follow-up 25.
+      ipv4:
+        addresses:
+          - ip: 172.28.0.1
+            prefix_length: 24
+      members: [veth-svc]
+    - name: veth-svc
+      type: ethernet
+      description: Host end of the pair into c-svc; a port of br-edge.
+      peer: svc-eth0
+
+    - name: svc-eth0
+      type: ethernet
+      description: eth0 in c-svc, on 'edge'.
+      ipv4:
+        addresses:
+          - ip: 172.28.0.2
+            prefix_length: 24
+        gateway: 172.28.0.1
+      netns: c-svc
+      peer: veth-svc
+    - name: svc-eth1
+      type: ethernet
+      description: >-
+        eth1 in c-svc, on the overlay - the same layer-2 segment as c-web over
+        on srv-dock-01, and one address out of the same /24.
+      mtu: 1450
+      ipv4:
+        addresses:
+          - ip: 10.0.9.3
+            prefix_length: 24
+
+      netns: c-svc
+      peer: ov-veth-svc
+    - name: ov-br0
+      type: bridge
+      description: >-
+        br0 in this node's sandbox. The real one would carry 10.0.9.1 like its
+        twin on srv-dock-01; here it holds an address of its own, because an
+        inventory has one address space and the swarm's distributed gateway
+        does not (follow-up 25).
+      mtu: 1450
+      ipv4:
+        addresses:
+          - ip: 10.0.9.4
+            prefix_length: 24
+      members: [ov-vxlan0, ov-veth-svc]
+      netns: ov-app
+    - name: ov-vxlan0
+      type: tunnel
+      description: >-
+        The other end of the VXLAN, in the sandbox and sending out of eno1 in
+        the initial namespace.
+      mtu: 1450
+      parent: eno1
+      netns: ov-app
+    - name: ov-veth-svc
+      type: ethernet
+      description: The sandbox end of the pair into c-svc; a port of ov-br0.
+      netns: ov-app
+      peer: svc-eth1
+
+  forwarding:
+    ipv4: true
+    ipv6: false
+  netns:
+    - name: c-svc
+      description: >-
+        The service task the swarm scheduled here. On 'edge' for its way out and
+        on the overlay for its way to c-web.
+    - name: ov-app
+      description: >-
+        This node's sandbox for the same overlay network. Every node running a
+        task on the network has one, and they are joined by the VXLAN rather
+        than by anything either of them can see.
+  zones:
+    - name: wan
+      interfaces: [eno1]
+      description: The lab LAN.
+    - name: wan-b
+      interfaces: [eno2]
+      description: The second uplink. Nothing is routed this way on this node yet.
+    - name: net-edge
+      interfaces: [br-edge]
+      description: Network 'edge'.
+
+  firewall:
+    default_input: drop
+    default_forward: drop
+    default_output: accept
+    rules:
+      - priority: 10
+        ct_state: [established, related]
+        action: accept
+      - priority: 20
+        src_zone: wan
+        dst_zone: local
+        protocol: tcp
+        dst_ports: ['22']
+        action: accept
+        description: SSH to the host itself.
+      - priority: 30
+        src_zone: wan
+        dst_zone: local
+        protocol: udp
+        dst_ports: ['4789']
+        action: accept
+        description: >-
+          The VXLAN itself. It terminates *on this machine* even though the
+          device that decapsulates it is in the sandbox namespace, because the
+          outer packet is sent and received in the initial one - which is the
+          reason this rule is in the input chain rather than in forward.
+      - priority: 100
+        src_zone: net-edge
+        dst_zone: wan
+        action: accept
+    nat:
+      - name: masq-edge
+        type: masquerade
+        dst_zone: wan
+        src: 172.28.0.0/24
+    description: |
+      The same shape as srv-dock-01's and much shorter, because this node runs
+      one network. What survives the shrinking is the part every Docker host
+      has: established traffic back, one way out for the containers, and a
+      masquerade to make it work.

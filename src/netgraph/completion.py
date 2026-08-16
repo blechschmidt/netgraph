@@ -58,6 +58,7 @@ from netgraph.errors import NetgraphError, count_text
 from netgraph.export import EXPORTERS
 from netgraph.models import DOCUMENT_KINDS
 from netgraph.models.fielddocs import KIND_NOTES
+from netgraph.query import ATTRIBUTES, DOMAINS, Domain, attribute_names
 from netgraph.render import RENDERERS, Layer
 from netgraph.rules import RULES, WILDCARD, resolve_rule_id
 
@@ -74,6 +75,7 @@ __all__ = [
     "complete_namespace",
     "complete_node",
     "complete_profile",
+    "complete_query",
     "complete_rule",
     "complete_test_suite",
     "completion_script",
@@ -324,6 +326,46 @@ def complete_layer(
 ) -> list[CompletionItem]:
     """The layer views, described by what each one draws."""
     return _items(((layer.value, _LAYER_HELP[layer.value]) for layer in Layer), incomplete)
+
+
+def complete_query(
+    ctx: click.Context, param: click.Parameter, incomplete: str
+) -> list[CompletionItem]:
+    """The selector language, completed one *term* at a time.
+
+    A query is a whole expression and a shell completes a word, so what is
+    offered is what could come next at the cursor: the element attributes at the
+    start of a term, the scope keywords and the traversal openers, and — after a
+    boolean connective — the same set again. Everything already typed is passed
+    through unchanged, so accepting a candidate extends the expression instead
+    of replacing it.
+
+    Only the ``element`` vocabulary. Inside ``interface[…]`` the attributes are
+    different, and a completion that offered ``mtu`` where only ``peer-kind``
+    is legal would be worse than no completion: a shell cannot see the bracket
+    it is inside without parsing, and a half-typed query does not parse.
+    """
+    head, separator, _typed = incomplete.rpartition(" ")
+    prefix = f"{head}{separator}" if separator else ""
+    offered: list[tuple[str, str]] = [
+        (name, ATTRIBUTES[Domain.ELEMENT][name.rstrip(".")].summary)
+        for name in attribute_names(Domain.ELEMENT)
+    ]
+    offered.extend(
+        (f"{domain}[", f"true when one of its {domain}s satisfies the terms in the brackets")
+        for domain in DOMAINS
+    )
+    offered.extend(
+        (
+            ("has ", "true when the attribute after it holds any value at all"),
+            ("not ", "the complement, within this view"),
+            ("neighbors of ", "everything one hop from what follows"),
+            ("within ", "'within N hops of …' — everything at most N hops away"),
+            ("reachable from ", "the whole connected component of what follows"),
+            ("*", "everything"),
+        )
+    )
+    return _items(((prefix + word, note) for word, note in offered), incomplete)
 
 
 def complete_rule(

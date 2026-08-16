@@ -289,6 +289,7 @@ host variables are set are [Groups](../export.md#groups),
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
+| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netgraph query --explain' prints which. See docs/query.md. |
 | `--origin` | `NAME` | — | Zone origin, e.g. 'example.com'. Required by dns-zone. |
 | `--ttl` | `SECONDS` | `3600` | $TTL of every zone written. |
 | `--soa-mname` | `NAME` | ns.<origin> | Primary nameserver for the SOA record. |

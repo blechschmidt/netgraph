@@ -155,6 +155,7 @@ not look the way you expected.
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
+| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netgraph query --explain' prints which. See docs/query.md. |
 | `--collapse` | `NS` | — | Replace this namespace and everything under it with one node, labelled with what it holds. Links crossing the boundary attach to it; links inside it are counted rather than drawn. Repeatable. |
 | `--collapse-depth` | `N` | — | Collapse every namespace N levels deep, counted from the shallowest one that branches: '--collapse-depth 1' is the site-level overview of a tree laid out as sites/<site>/<tier>. |
 | `--bundle-links`, `--no-bundle-links` | — | — | Draw parallel links between the same pair of elements as one edge, with the count in the label. Members of a declared 'lag' interface are bundled either way unless --no-bundle-links is given, since the inventory already says they are one logical link. |

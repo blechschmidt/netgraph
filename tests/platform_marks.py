@@ -13,10 +13,11 @@ there; a symlink needs a privilege an unelevated process does not hold. Those ar
 facts about the platform. "The loader mishandles paths on Windows" would not be,
 and must never be spelled with one of these.
 
-Two of the marks are not about Windows at all. ``requires_dot`` and
-``requires_node`` are about a tool that may not be installed, on any platform,
-and they live here because the reason to skip is the same kind of reason: the
-environment cannot run the test, so the test says so rather than failing.
+Three of the marks are not about Windows at all. ``requires_dot``,
+``requires_node`` and ``requires_nft`` are about a tool the environment may not
+be able to run, on any platform, and they live here because the reason to skip
+is the same kind of reason: the environment cannot run the test, so the test
+says so rather than failing.
 
 Not everything here is a mark. :data:`ON_WINDOWS`, :data:`PWSH` and
 :data:`HAVE_BASH_COMPLETION` are the same measurements exposed as values, for the
@@ -31,6 +32,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Final
 
@@ -40,10 +42,12 @@ from netgraph.render.dot import find_dot
 
 __all__ = [
     "HAVE_BASH_COMPLETION",
+    "NFT",
     "ON_WINDOWS",
     "PWSH",
     "requires_dot",
     "requires_mkfifo",
+    "requires_nft",
     "requires_node",
     "requires_posix_permissions",
     "requires_posix_shell",
@@ -67,8 +71,6 @@ def _can_symlink() -> bool:
     """
     if not ON_WINDOWS:
         return True
-    import tempfile  # pragma: no cover - Windows only
-
     with tempfile.TemporaryDirectory() as directory:  # pragma: no cover - Windows only
         link = Path(directory) / "link"
         try:
@@ -187,6 +189,56 @@ requires_dot = pytest.mark.skipif(
 #: Node, for syntax-checking the JavaScript the HTML renderer inlines.
 requires_node = pytest.mark.skipif(
     shutil.which("node") is None, reason="Node.js is not installed; 'node --check' cannot run"
+)
+
+
+def _nft_that_can_check() -> str | None:
+    """The ``nft`` binary that can syntax-check a ruleset here, or ``None``.
+
+    ``nft --check`` is documented as parsing a file without committing it, and
+    that is what it is used for -- but before it reads a byte it opens a netlink
+    socket and populates its cache, which needs ``CAP_NET_ADMIN``. So "is nft
+    installed" is the wrong question and :func:`shutil.which` is the wrong way to
+    ask it: on the GitHub Linux runners nft *is* on ``PATH`` and the job is
+    unprivileged, so every ``--check`` failed with ``cache initialization
+    failed: Operation not permitted`` -- a verdict about the process, reported
+    as though the generated ruleset were malformed.
+
+    The capability is therefore measured, by handing nft the smallest ruleset
+    every version of it accepts. If that comes back clean, nft can parse here and
+    a later failure is netgraph's; if it does not, nothing about the ruleset has
+    been established either way, and the tests that need it say so rather than
+    failing. CI grants the capability (see ``.github/workflows/ci.yml``) so the
+    gate runs there rather than skipping.
+    """
+    nft = shutil.which("nft")
+    if nft is None:
+        return None
+    with tempfile.TemporaryDirectory() as directory:
+        probe = Path(directory) / "probe.nft"
+        probe.write_text(
+            "table inet netgraph_probe {\n\tchain c {\n\t\ttype filter hook input priority 0;\n\t}\n}\n",
+            encoding="utf-8",
+        )
+        try:
+            completed = subprocess.run(
+                [nft, "--check", "-f", str(probe)], capture_output=True, text=True, timeout=30
+            )
+        except (OSError, subprocess.SubprocessError):  # pragma: no cover - nft is on PATH
+            return None
+    return nft if completed.returncode == 0 else None
+
+
+#: The ``nft`` that can syntax-check the generated nftables ruleset, or ``None``.
+#: See :func:`_nft_that_can_check`.
+NFT: Final = _nft_that_can_check()
+
+#: ``nft --check``, the one gate in tests/test_firewall.py that is not netgraph
+#: reading its own output.
+requires_nft = pytest.mark.skipif(
+    NFT is None,
+    reason="no usable 'nft' to syntax-check the generated ruleset with: it is either not "
+    "installed, or this process may not open the netlink socket '--check' needs",
 )
 
 #: The PowerShell binary that can parse the completion script netgraph generates,

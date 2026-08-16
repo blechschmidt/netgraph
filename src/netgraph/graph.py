@@ -47,10 +47,12 @@ ends in, so ``data["source_port"]`` would otherwise be ambiguous — see
 :func:`ports_of`.
 
 ``node_type`` distinguishes a declared element from a node this layer derives:
-an IP prefix at layer 3 (:data:`SUBNET_TYPE`), a tunnel drawn as a node
-(:data:`TUNNEL_TYPE`) or a VLAN broadcast domain (:data:`DOMAIN_TYPE`, produced
-by :func:`layers`). Filtering predicates apply to elements; derived nodes are
-kept exactly as long as one selected element still belongs to them.
+an IP prefix at layer 3 (:data:`SUBNET_TYPE`), a network stack inside a machine
+(:data:`NETNS_TYPE`, §23.1), a tunnel drawn as a node (:data:`TUNNEL_TYPE`) or a
+VLAN broadcast domain (:data:`DOMAIN_TYPE`, produced by :func:`layers`).
+Filtering predicates apply to elements; derived nodes are kept exactly as long
+as one selected element still belongs to them — which for a stack means its
+machine, so selecting a container host selects everything running on it.
 """
 
 from __future__ import annotations
@@ -87,6 +89,7 @@ __all__ = [
     "DOMAIN_TYPE",
     "ELEMENT_TYPE",
     "LINK_EDGE_KINDS",
+    "NETNS_TYPE",
     "PHYSICAL_EDGE_KINDS",
     # Re-exported from the resolution layer: both belong to the vocabulary of
     # node ids here, so a caller that only imports this module still has them.
@@ -118,6 +121,10 @@ ELEMENT_TYPE: Final = str(NodeType.ELEMENT)
 SUBNET_TYPE: Final = str(NodeType.SUBNET)
 #: ``node_type`` of a tunnel node (§14).
 TUNNEL_TYPE: Final = str(NodeType.TUNNEL)
+#: ``node_type`` of a network-stack node (§23.1): one namespace inside a
+#: machine. Layer 3 and ``--layer netns`` both draw them; every other layer
+#: draws the machine as one box and has none.
+NETNS_TYPE: Final = str(NodeType.NETNS)
 #: ``node_type`` of a VLAN broadcast-domain node (:func:`layers`).
 DOMAIN_TYPE: Final = "domain"
 
@@ -220,6 +227,11 @@ def _node_attrs(node: Node) -> dict[str, Any]:
         "element": node.element,
         "subnet": node.subnet,
         "tunnel": node.tunnel,
+        # The network stack this node stands for, or ``None``. Carried so that a
+        # predicate can ask "whose stack is this?" without unpacking ``node``,
+        # which is what :func:`filter_graph` does.
+        "netns": node.netns,
+        "address": node.address,
         "node": node,
     }
 
@@ -425,6 +437,16 @@ def _narrow_derived(data: Mapping[str, Any], kept: set[str]) -> dict[str, Any] |
     cannot see. Returns ``None`` when nothing it stands for is left.
     """
     attrs = dict(data)
+    netns = attrs.get("netns")
+    if netns is not None and _node_type(data) == NETNS_TYPE:
+        # A network stack has exactly one member and it is *not* a node here:
+        # the machine running it. Selecting an element therefore selects every
+        # stack inside it — asking for a container host by name and getting the
+        # host without its containers would be a filter that removed what the
+        # reader asked to see — and a machine that was filtered out takes its
+        # stacks with it.
+        return attrs if netns.element in kept else None
+
     tunnel = attrs.get("tunnel")
     if tunnel is not None and _node_type(data) == TUNNEL_TYPE:
         restricted = tunnel.restricted_to(kept)
@@ -790,6 +812,15 @@ def stats(graph: nx.MultiGraph) -> GraphStats:
         tunnel = data.get("tunnel")
         if tunnel is not None:
             tunnels.add(tunnel.fqn)
+        if _node_type(data) == NETNS_TYPE:
+            # A stack is not an element — it is one routing table inside one —
+            # so it is not counted as one and contributes no kind and no
+            # namespace. Its addresses are still this network's addresses,
+            # though: at layer 3 the machine's node carries only the ports of
+            # its initial namespace, so skipping these would make ``subnets``
+            # shrink on exactly the inventories that have the most of them.
+            prefixes |= _prefixes(data.get("ports", ()))
+            continue
         if _node_type(data) != ELEMENT_TYPE:
             continue
         elements += 1

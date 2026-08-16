@@ -4497,6 +4497,198 @@ def test_reset_unsets_the_field_rather_than_writing_the_inherited_value(
     expect(style_from(editor, "fill")).to_have_text("the built-in palette")
 
 
+# --------------------------------------------------------------------------- #
+# the search box: one selector language
+# --------------------------------------------------------------------------- #
+
+
+def search(editor: Editor, expression: str) -> None:
+    """Type a query into the box and wait for the server to answer it."""
+    box = editor.page.locator("#search")
+    box.click()
+    box.fill(expression)
+    # The box debounces, so the assertion has to wait for the answer rather
+    # than for the keystroke. What it waits for is the status line, which is
+    # only written when a response lands.
+    expect_eventually(
+        lambda: editor.page.locator("#search-status").inner_text().strip() != "",
+        what=f"the search box never answered {expression!r}",
+    )
+
+
+def search_hits(editor: Editor) -> list[str]:
+    """The addresses the page is highlighting, read out of search.js itself."""
+    return list(editor.page.evaluate("() => window.netgraphSearch.matches()"))
+
+
+def test_the_search_box_takes_a_query_and_highlights_the_matches(
+    open_editor: OpenEditor,
+) -> None:
+    """The point of the box: an expression, answered against the resolved model.
+
+    A substring match could not have answered this one — ``kind`` is not in any
+    of these names — which is why the query language exists.
+    """
+    editor = arranged(open_editor)
+    search(editor, "kind = switch")
+
+    hits = search_hits(editor)
+    assert hits == ["switches/sw-home", "wireless/ap-home"], hits
+    expect(editor.page.locator("#search-status")).to_contain_text("2 matches")
+    expect(editor.page.locator("#canvas")).to_have_class(re.compile(r"\bsearching\b"))
+    expect(editor.shape("switches/sw-home")).to_have_class(re.compile(r"\bsearch-hit\b"))
+    expect(editor.shape("routers/rtr-home")).not_to_have_class(re.compile(r"\bsearch-hit\b"))
+
+
+def test_a_bare_word_is_still_the_substring_search_it_always_was(
+    open_editor: OpenEditor,
+) -> None:
+    """The old behaviour did not go away; it became a rule of the grammar."""
+    editor = arranged(open_editor)
+    search(editor, "sw-home")
+    assert search_hits(editor) == ["switches/sw-home"]
+
+
+def test_enter_turns_the_matches_into_the_selection(open_editor: OpenEditor) -> None:
+    """A query feeds straight into every bulk gesture, which is the whole point.
+
+    The selection is what ``/api/ops`` takes, so this is the join between "which
+    elements are these" and "now change all of them".
+    """
+    editor = arranged(open_editor)
+    search(editor, "kind in (switch, router)")
+    editor.press("Enter")
+
+    picked = selected(editor)
+    # ap-home is 'kind: switch' too — an access point that bridges is a switch to
+    # the schema — so the query selects three, and the third is not a stray.
+    assert set(picked) == {"switches/sw-home", "routers/rtr-home", "wireless/ap-home"}, picked
+    assert halos(editor) >= 2
+
+
+def test_a_query_selection_can_be_bulk_edited(open_editor: OpenEditor) -> None:
+    """Query, select, set — the sentence this feature exists to make sayable."""
+    editor = arranged(open_editor)
+    search(editor, "kind in (switch, router)")
+    editor.press("Enter")
+
+    open_style(editor)
+    set_style(editor, "fill", "#123456")
+    for address in ("switches/sw-home", "routers/rtr-home"):
+        expect_style(editor, address, {"fill": "#123456"})
+
+
+def test_a_half_typed_query_is_marked_and_not_shouted_about(
+    open_editor: OpenEditor,
+) -> None:
+    """A search box spends most of its life holding something unparseable.
+
+    So a parse error is a border and a status line, never a toast and never a
+    refusal — and it names the column, exactly as the command line does.
+    """
+    editor = arranged(open_editor)
+    search(editor, "kidn = switch")
+
+    expect(editor.page.locator("#search")).to_have_class(re.compile(r"\binvalid\b"))
+    expect(editor.page.locator("#search-status")).to_contain_text("not an attribute")
+    assert search_hits(editor) == []
+    assert editor.page.locator("#toast:not([hidden])").count() == 0
+
+
+def test_the_filter_toggle_narrows_the_drawing_itself(open_editor: OpenEditor) -> None:
+    """Highlighting paints; filtering is a different picture.
+
+    And it is the *server's* different picture: the query goes into the view's
+    `select`, which is the same FilterSpec `netgraph render --select` narrows
+    one with, rather than the browser hiding shapes it was sent.
+    """
+    editor = arranged(open_editor)
+    before = editor.page.locator("#viewport .node").count()
+    assert before > 1
+
+    # 'kind = router' rather than 'kind = switch': ap-home is a switch too, so
+    # the switch query narrows to two and this one narrows to exactly one.
+    search(editor, "kind = router")
+    editor.page.locator("#search-filter").click()
+
+    expect_eventually(
+        lambda: editor.page.locator("#viewport .node").count() == 1,
+        what="the filter toggle did not narrow the drawing",
+    )
+    expect(editor.page.locator("#search-filter")).to_have_attribute("aria-pressed", "true")
+
+    editor.page.locator("#search-filter").click()
+    expect_eventually(
+        lambda: editor.page.locator("#viewport .node").count() == before,
+        what="turning the filter off did not restore the drawing",
+    )
+
+
+def test_escape_in_the_search_box_clears_the_query(open_editor: OpenEditor) -> None:
+    editor = arranged(open_editor)
+    search(editor, "kind = switch")
+    editor.page.locator("#search").press("Escape")
+
+    expect(editor.page.locator("#search")).to_have_value("")
+    expect(editor.page.locator("#canvas")).not_to_have_class(re.compile(r"\bsearching\b"))
+    assert search_hits(editor) == []
+
+
+def test_ctrl_f_focuses_the_search_box(open_editor: OpenEditor) -> None:
+    """A documented binding with a handler behind it, driven from the keyboard."""
+    editor = arranged(open_editor)
+    editor.page.locator("#canvas").focus()
+    editor.press("Control+f")
+    assert editor.page.evaluate("() => document.activeElement.id") == "search"
+
+
+def test_the_palette_answers_a_query_typed_into_it(open_editor: OpenEditor) -> None:
+    """The command palette, given an expression instead of a command name.
+
+    A live provider: the entries are a function of what has been typed, so this
+    is also the test that the palette re-consults its providers per keystroke.
+    """
+    editor = arranged(open_editor)
+    editor.press("Control+k")
+    editor.page.locator("#palette-input").fill("kind = router")
+
+    expect_eventually(
+        lambda: "Select 1 element" in editor.page.locator(".palette-list").inner_text(),
+        what="the palette did not offer the query's matches",
+    )
+    editor.page.locator(".palette-title", has_text="Select 1 element").click()
+    assert selected(editor) == ["routers/rtr-home"]
+
+
+def test_the_palette_says_why_a_mistyped_query_is_not_one(
+    open_editor: OpenEditor,
+) -> None:
+    """Silence would be the worst possible teacher of a new language."""
+    editor = arranged(open_editor)
+    editor.press("Control+k")
+    editor.page.locator("#palette-input").fill("kind = switch and vlna = 1")
+
+    expect_eventually(
+        lambda: "not an attribute" in editor.page.locator(".palette-list").inner_text(),
+        what="the palette swallowed the parse error",
+    )
+
+
+def test_a_plain_command_search_does_not_become_a_query(open_editor: OpenEditor) -> None:
+    """Typing `save` must not fire a query per keystroke, nor outrank Save."""
+    editor = arranged(open_editor)
+    editor.press("Control+k")
+    editor.page.locator("#palette-input").fill("save")
+
+    # The query provider's own rows are the ones grouped under "query"; the
+    # *binding* called "Select what the query matched" is a command like any
+    # other and is meant to be findable by name.
+    rows = editor.page.locator(".palette-item", has=editor.page.locator(".palette-group"))
+    groups = rows.locator(".palette-group").all_inner_texts()
+    assert "query" not in groups, groups
+    assert "Save" in editor.page.locator(".palette-list").inner_text()
+
+
 def test_a_multi_selection_is_one_batch_and_one_undo(open_editor: OpenEditor) -> None:
     """Task 96's rule, applied to appearance: several elements, one changeset."""
     editor = arranged(open_editor)

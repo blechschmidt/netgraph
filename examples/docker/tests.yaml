@@ -1,0 +1,92 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: testsuite
+metadata:
+  name: containers
+  description: |
+    The claims a container host is built on, written so that `netgraph test`
+    fails a change that quietly stops one being true. Every one of them is a
+    sentence somebody would say while explaining the design, and most of them
+    are about a stack rather than about a machine - which is the whole reason
+    §23 exists.
+spec:
+  description: what the two Docker hosts promise about their containers
+  assertions:
+    - assert: query
+      name: every declared namespace holds at least one interface
+      description: |
+        `ip netns add` makes an empty one, so this is legal - and far more often
+        it is isolation somebody declared and never wired up. NG-N026 says the
+        same thing; this says it in the language a reader can extend.
+      query: netns[not has interface]
+
+    - assert: query
+      name: no namespace is deeper than the Docker-in-Docker container
+      description: |
+        Depth 1 is a container, depth 2 is a container of the inner daemon.
+        Anything below that is a level nobody in this design meant to create.
+      query: netns[depth > 2]
+
+    - assert: query
+      name: every overlay interface carries the VXLAN's reduced MTU
+      description: |
+        1500 less 50 bytes of VXLAN header. An interface addressed in the
+        overlay prefix and left at 1500 is the 'small requests work, large ones
+        hang' bug, and it is invisible in every other view.
+      query: interface[address in 10.0.9.0/24 and mtu != 1450]
+
+    - assert: query
+      name: every container interface is one end of a veth pair
+      description: |
+        A namespace is entered by a veth pair or it is not entered at all - the
+        bridges and the VXLAN device in a sandbox being the exceptions, which is
+        why the query excludes them by type rather than by name.
+      query: >-
+        interface[has netns and not has peer and not type in (bridge, tunnel)]
+
+    - assert: query
+      name: both swarm nodes run a sandbox for the overlay
+      description: |
+        The sandbox belongs to the network rather than to a container, so there
+        is exactly one per node running a task on it - and a node that lost its
+        sandbox has containers that can still be started and can reach nothing.
+      query: netns[name = ov-app]
+      equals: 2
+
+    - assert: query
+      name: no container network reaches the wire unmasqueraded
+      description: |
+        Every bridge holding an RFC 1918 gateway is behind a translation, except
+        the internal one - which reaches nothing at all, and is named here so
+        that removing its isolation fails this test rather than passing it.
+      query: >-
+        zone[name in (net-default, net-app, net-edge)] and not zone[translations > 0]
+
+    - assert: unique
+      name: no two hosts claim the same uplink address
+      select: kind=server
+      field: spec.interfaces[name=eno1].ipv4.addresses[].ip
+
+    - assert: reachable
+      name: the two container hosts reach each other over the lab LAN
+      description: |
+        The underlay the VXLAN needs, and it is switched rather than routed:
+        both uplinks are access ports in VLAN 20, so the path is a layer-2 one
+        and the assertion says which layer it expects. It is also a claim about
+        the machines and not about the containers - at layer 3 a container and
+        its host are one node, which is follow-up 23.
+      from: srv-dock-01
+      to: srv-dock-02
+      layer: l2
+
+    - assert: count
+      name: two hosts, one switch
+      select: kind=server
+      equals: 2
+
+    - assert: port-count-at-least
+      name: the busy host declares a port per stack and then some
+      description: |
+        Six namespaces, eight veth ends, three bridges, two uplinks and a VXLAN
+        device. The number is here to make the loss of a container visible.
+      select: name=srv-dock-01
+      ports: 24

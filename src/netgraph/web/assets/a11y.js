@@ -249,7 +249,7 @@ var netgraphA11y = (function () {
         // The same modifiers the canvas takes, so the outline is a way of
         // building a selection and not only of jumping to one thing.
         if ((event.shiftKey || event.ctrlKey || event.metaKey) && window.netgraphSelect) {
-          window.netgraphSelect.toggle([String(record.id || "")]);
+          window.netgraphSelect.toggle([window.netgraphSelect.addressOf(record)]);
           return;
         }
         focus(id, { quiet: false });

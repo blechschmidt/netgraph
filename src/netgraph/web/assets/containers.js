@@ -575,7 +575,7 @@ window.netgraphContainers = (function () {
     if (entry) {
       addresses = [entry.namespace];
     } else {
-      var address = String(record.id || "");
+      var address = window.netgraphSelect.addressOf(record);
       addresses = window.netgraphSelect.has(address)
         ? window.netgraphSelect.addresses()
         : [address];

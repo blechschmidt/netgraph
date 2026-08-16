@@ -2283,26 +2283,64 @@ which builds the drawing that could answer it.
 
 ---
 
-## 22. The as-built report says nothing about network namespaces
+## 22. ~~The as-built report says nothing about network namespaces~~ — fixed, and nothing else moved
+
+**Status:** closed 2026-08-16. `netgraph.report.pages._netns_section` is the
+section, `tests/fixtures/report/containers-markdown.txt` the golden.
 
 `netgraph report` writes a page per device, and that page is where an operator
 looks for "what is this machine". Since §23 a machine may run several network
-stacks, and the report shows none of them: the interface table has a `VRF`
-column and no `NETNS` one, and there is no section listing `spec.netns` the way
+stacks, and the report showed none of them: the interface table had a `VRF`
+column and no `NETNS` one, and there was no section listing `spec.netns` the way
 the routing section lists `spec.vrfs`.
 
 Not fixed with §23 itself, deliberately. Every column in that table is drawn for
 every device of every inventory, so a `NETNS` column is a column of dashes on
 all 22 pages of `examples/campus`, and the report's golden fixtures under
-`docs/example-report/` would move for a feature none of those devices uses. The
-right shape is almost certainly a *conditional* section — drawn on a device that
-declares namespaces and absent on one that does not, as the wireless section
-already is — and that is a change to how a page is assembled rather than to what
-one row holds.
+`docs/example-report/` would move for a feature none of those devices uses.
 
-Until then the namespaces are visible in `netgraph show`, in `render -f json`
-(every port carries `netns` and `peer`, at every layer), in the tooltips and the
-detail panel of a rendering, in `export interfaces`, and in `--layer netns`.
+### What changed
+
+Both additions are **conditional**, which is what the entry was waiting for.
+
+* **A `NETNS` column**, added to the interface table only when at least one
+  interface *on that page* is in a stack other than the machine's initial one. It
+  sits immediately before `VRF`, because the two compose rather than compete: a
+  namespace is a whole second stack, a VRF partitions the routing table of one
+  stack, and `netns: blue` with `vrf: red` names the `red` instance of the `blue`
+  one.
+* **A *Network namespaces* section**, drawn only on a device that declares
+  `spec.netns` or a veth pair — the shape the wireless section already had. It
+  carries the namespace tree (the initial namespace first, every declared one
+  indented under the namespace it was created from, with the interfaces homed in
+  each and the addresses they carry), the veth pairs **one row per end** so a pair
+  is named from both sides, and — where a *declared* namespace holds them — that
+  namespace's own static routes and policy rules.
+
+The tree is indented with `└─` and not with spaces: a Markdown table cell
+collapses runs of whitespace, so indentation made of spaces would have arrived at
+the reader as a flat list.
+
+Routes and rules are placed by the interface they name — `dev` for a route,
+`iif`/`oif` for a rule — because that is the only thing in the document that says
+which stack an entry is installed in. Only the ones a declared namespace holds are
+repeated here; everything in the initial namespace stays the routing section's
+alone, and the two sections link to each other rather than each stating the other's
+half. A VRF is therefore described once, in *Routing*, and named here only to say
+which stack it is an instance of.
+
+`examples/containers` grew the routes and the policy rule that exercise it —
+`srv-host-b` now declares the same prefix twice, once in its own stack and once in
+the sandbox's, which is the thing two stacks *means* — and both branches are
+committed: `srv-host-a` and `srv-host-b` have the section, `sw-lab` does not.
+`docs/example-report/`, `tests/fixtures/report/home-lab-*.txt` and
+`overlay-markdown.txt` are byte-identical to what they were before this, which is
+the other half of the claim.
+
+Namespaces remain visible everywhere they already were: `netgraph show`,
+`render -f json` (every port carries `netns` and `peer`, at every layer), the
+tooltips and the detail panel of a rendering, `export interfaces`, and
+`--layer netns`.
 
 ## 23. `netgraph path` cannot trace out of a container, because layer 3 draws one node per machine
 
@@ -2336,6 +2374,83 @@ own rather than as a rider on the model.
 Until then, `--layer netns` shows the topology the trace cannot walk, and a
 trace between two addresses in the *same* prefix, or between two machines, is
 unaffected.
+
+## 24. Two containers on one host cannot both have an `eth0`
+
+Raised while writing `examples/docker`, which is what
+[§23](schema.md#23-network-namespaces-and-veth-pairs) looks like at the scale a
+container runtime produces it: six namespaces on one machine, and every one of
+them with an interface the runtime called `eth0`.
+
+`NG-I001` says interface names are unique **within their device**, and every
+interface of every namespace of a machine is on one device. So the document
+cannot say what `ip link` says:
+
+```yaml
+    - name: eth0            # in c-web
+      netns: c-web
+    - name: eth0            # in c-api -- refused, NG-I001
+      netns: c-api
+```
+
+That is a contradiction with §23's own premise. The section opens by saying a
+machine running twelve containers has *twelve interface name spaces*, and then
+the identity rule flattens them back into one. The example works around it by
+naming each end `<container>-eth<n>` and saying so, which is readable and is not
+what the machine would tell you.
+
+Scoping the name to the pair `(netns, name)` is the correct model and is not a
+small change, because that pair would have to become the interface's identity
+**everywhere it is written down**: a cable endpoint (`srv:eth0` would name six
+interfaces), a zone's `interfaces`, a bridge's `members`, `parent`, `peer`, a
+route's `dev`, a policy rule's `iif`/`oif`, the node and port ids the renderers
+emit, stored geometry (§18), every `edit` operation's target, the LSP's
+definitions, `export interfaces`, `drift` and `plan`. Each of those is a place
+where a reference resolves today by a single string, and a reference that could
+match six interfaces needs a spelling that says which — `c-web/eth0`, most
+likely, since the namespace tree already has that shape.
+
+It also interacts with entry 23: the layer-3 graph draws one node per element,
+and the same change is what would let it draw one per stack. Both want doing at
+once, and neither wants doing as a rider on an example.
+
+Until then: name a container's interfaces so they are unique on the machine.
+Nothing else in the model is affected — `netns`, `peer`, the addresses and the
+routes are all placed correctly, and `--layer netns` draws the right picture.
+
+## 25. A private prefix behind a masquerade is not globally unique, and the inventory says it is
+
+The other thing `examples/docker` could not write down. Two Docker hosts with
+default settings both have a `docker0` at `172.17.0.1/16`, both hand out
+`172.17.0.2` to their first container, and both are correct: the prefix is local
+to the machine and every packet leaving it is masqueraded to the uplink address,
+so nothing on the wire ever sees the collision.
+
+netgraph derives subnets from addresses across the *whole* inventory (§17). Two
+hosts holding `172.17.0.1` are therefore one subnet with two claimants, which is
+[`W106`](validation-rules.md#w106--one-address-claimed-twice-in-a-subnet) —
+a real finding about a real duplicate address, reported about a design that is
+deliberate and universal. The same applies to a swarm overlay's distributed
+gateway, where *every* node's `br0` carries the network's `.1` on purpose.
+
+The example sidesteps it: `srv-dock-01` and `srv-dock-02` are given different
+pools, and the overlay bridges different addresses. That is a lie of omission
+about how Docker allocates, and the example says so in both places rather than
+letting a reader copy the shape and wonder why their own inventory reports
+clashes.
+
+The fix is a scope for an address, the way §16.1 gave routes one with a VRF and
+§23.1 gave interfaces one with a namespace. The natural spelling is a per-network
+flag that says *this prefix is translated at the machine boundary*, either on the
+bridge that holds the gateway (`nat: masquerade`, which the firewall block
+already knows) or as a property of the derived subnet. Then W106, W105 and W111
+would compare addresses within a scope rather than across the inventory, and the
+comparison would be the one an operator actually makes.
+
+Deriving it from the firewall block alone is tempting and wrong: a masquerade
+rule is evidence, not a declaration, and an inventory that stopped reporting
+duplicate addresses the moment somebody wrote a NAT rule would have made the
+finding depend on an unrelated field.
 
 ## Checked and found sound
 

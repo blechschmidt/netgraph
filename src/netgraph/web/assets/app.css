@@ -264,6 +264,56 @@ main {
   color: var(--muted);
 }
 
+/* The search box. A query is an expression, so it is set in the monospace face
+ * the YAML pane is -- `label.role = access` read as prose is harder than it
+ * needs to be -- and it grows into whatever room the pane head has left. */
+.search {
+  flex: 1 1 14rem;
+  min-width: 8rem;
+  max-width: 34rem;
+  padding: .15rem .4rem;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 11px/1.6 var(--mono);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.search:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* A half-typed query is the normal state of this box, so an unparseable one is
+ * marked and not shouted about: no toast, no dialog, one border. */
+.search.invalid { border-color: var(--error); }
+
+.search-status { white-space: nowrap; max-width: 22rem; overflow: hidden; text-overflow: ellipsis; }
+.search-status.bad { color: var(--error); }
+
+/* Highlighting, rather than filtering: everything the query did not select is
+ * dimmed and everything it did keeps its colour, so the answer is read against
+ * the diagram instead of instead of it. Opacity and not display, because what a
+ * query does *not* select is half of what makes its answer checkable. */
+.canvas.searching .node,
+.canvas.searching .edge,
+.canvas.searching .cluster { opacity: .22; transition: opacity .12s ease-out; }
+
+.canvas.searching .search-hit { opacity: 1; }
+
+.canvas.searching .search-hit > ellipse,
+.canvas.searching .search-hit > polygon,
+.canvas.searching .search-hit > path,
+.canvas.searching .search-hit > rect {
+  stroke: var(--focus);
+  stroke-width: 2.5;
+}
+
+#search-filter.on {
+  border-color: var(--selected);
+  color: var(--selected);
+  font-weight: 600;
+}
+
 .problems-head { border-top: 1px solid var(--edge); }
 
 #source {

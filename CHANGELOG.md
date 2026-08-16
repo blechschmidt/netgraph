@@ -18,6 +18,77 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph report` documents network namespaces.** A device page is where an operator
+  looks to answer "what is this machine", and since `spec.netns` landed it showed none of
+  the stacks a machine runs. It now carries a **Network namespaces** section: the namespace
+  tree, with each declared namespace indented under the one it was created from; the
+  interfaces homed in each stack and the addresses they carry; the veth pairs, one row per
+  end so a pair is named from both sides of the boundary; and the static routes and policy
+  rules a declared namespace holds. The interface table gains a **`NETNS`** column beside
+  `VRF`, because the two compose rather than compete.
+
+  Both are **conditional**. The section is drawn only on a device that declares `spec.netns`
+  or a veth pair, and the column only when an interface on that page is in a stack other
+  than the initial one — so a report of an inventory that uses neither is byte-for-byte what
+  it was before. The section and the routing section link to each other and neither restates
+  the other's half: a VRF is described once, in *Routing*, and named in the namespace section
+  only to say which stack it is an instance of. Closes follow-up 22.
+
+- **`netgraph query`, and `--select` on six more commands: one selector language.** Element
+  selection was spelled a different way in every place that needed it. `filter_graph` took
+  fixed keyword predicates; `netgraph list` had its own flags; a `kind: testsuite` assertion
+  had its own matchers; the editor's search box was a substring match. None of the four could
+  express the questions operators actually ask — *every access switch in site north with no
+  uplink*, *every interface addressed in 10.20.0.0/16 that is not in a VRF*, *everything
+  within two hops of the firewall* — and no two of them could express quite the same subset
+  of the ones they could.
+
+  A **query** is a predicate over the resolved model (`kind = switch`, `label.role = access`,
+  `address in 10.20.0.0/16`, `has vrf`), existential scopes over sub-objects
+  (`interface[address in 10.20.0.0/16 and not has vrf]`, `link[peer-kind = router]`), and
+  bounded graph traversal (`neighbors of X`, `within N hops of X`, `reachable from X`),
+  combined with `and`, `or`, `not` and parentheses. It is deliberately nothing else: no
+  binding, no arithmetic, no call, and no recursion beyond the finite tree the parser builds
+  — so every query terminates and none of them can change anything, which is what makes the
+  same expression safe in a pre-commit hook, in a browser on every keystroke, and inside an
+  assertion nobody will read again for a year.
+
+  It is used in four places and implemented in one (`netgraph/query/`):
+
+  - **`netgraph query '<expr>'`** prints the matching elements, with `--json`, `--count`,
+    `--layer`, `--print interfaces|links` for the sub-objects a scope matched, and
+    `--explain` for the grammar and the whole attribute vocabulary. It exits 1 when nothing
+    matched, so a query is a check.
+  - **`--select '<expr>'`** on `render`, `watch`, `show`, `list`, `export` and `report`,
+    layered over `filter_graph` rather than replacing its internals. The existing filter
+    flags keep working and are documented as sugar for the equivalent query — `--kind K` is
+    `kind = K`, `--namespace NS` is `namespace under NS`, `--neighbors-of N --depth D` is
+    `within D hops of (fqn = N or name = N)` — with a test that each selects exactly what its
+    rendering does. `netgraph show --select` prints every match instead of one named element.
+  - **`assert: query`** in a `kind: testsuite` document, and `query:` as an alternative to
+    `select:` on every assertion that takes one. With no bound the claim is that the query
+    matches **nothing**, which is how a network invariant is written — *no device is missing a
+    management address* is one line, and the counterexamples are the failure report.
+  - **The editor's search box and command palette**, which highlight the matches live, filter
+    the drawing when asked, and turn the answer into the selection on Enter — so a query feeds
+    straight into the existing bulk edit and alignment operations.
+
+  A parse error points at the offending column with a caret, in the loader's own diagnostic
+  shape:
+
+  ```text
+  query:1:18: 'vlna' is not an attribute of element
+    kind = swtch and vlna = 99
+                     ^^^^
+    help: did you mean 'vlan'?
+  ```
+
+  [`docs/query.md`](docs/query.md) is the grammar reference, the attribute tables and a
+  cookbook of ten worked queries against `examples/campus`;
+  [`docs/commands/query.md`](docs/commands/query.md) is the command. There is a fuzz target
+  for the parser beside the loader's, and property tests that a query and its negation
+  partition the inventory.
+
 - **Firewalls and firewall policy: `kind: firewall`, `spec.zones` and `spec.firewall`
   (§24).** Everywhere else in the schema a device *forwards*, and every answer it could
   produce was some version of "and then the packet goes there". A firewall is the box whose

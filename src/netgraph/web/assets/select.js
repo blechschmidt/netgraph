@@ -80,7 +80,14 @@ window.netgraphSelect = (function () {
   var index = {};
   /** SVG id -> record, for whatever is drawn now. */
   var records = {};
-  /** address -> SVG id, the other way round. */
+  /** address -> the SVG ids drawing it, in graph order.
+   *
+   * A list and not a single id, because one address may be drawn as several
+   * shapes: layer 3 gives a machine one node per network namespace (§23.1), so
+   * a container host is its own box plus one per container, and all of them are
+   * *that machine*. A click on any of them selects the host, the halo goes
+   * round all of them, and a drag moves them together -- which is the only
+   * reading that keeps the selection something /api/ops can be posted. */
   var drawn = {};
   /** The <g> the halos live in, or null. */
   var layer = null;
@@ -121,8 +128,30 @@ window.netgraphSelect = (function () {
 
   /** The detail record behind an address, or null when it is not drawn. */
   function recordFor(address) {
-    var id = drawn[String(address || "")];
-    return id ? records[id] || null : null;
+    var ids = drawn[String(address || "")] || [];
+    return ids.length ? records[ids[0]] || null : null;
+  }
+
+  /** Every SVG id an address is drawn as; empty when it is not drawn. */
+  function shapesOf(address) { return drawn[String(address || "")] || []; }
+
+  /** The one shape an address is focused and scrolled to by: the first drawn.
+   *
+   * The first is the element's own node, because a stack node is always minted
+   * after the machine it is inside -- so focus lands on the machine and not on
+   * whichever container happened to be declared first. */
+  function shapeOf(address) { return shapesOf(address)[0] || null; }
+
+  /** The address a detail record belongs to.
+   *
+   * `id` for everything that is its own thing, and the machine for a node that
+   * is one network stack of one: `netns:hosts/srv-01:blue` is an identity the
+   * graph mints and not one any document has, so selecting it would offer a
+   * rename that `netgraph edit` would refuse. See Node.address in
+   * netgraph/render/graph.py, which is where the server decides this. */
+  function addressOf(record) {
+    if (!record) { return ""; }
+    return String(record.address || record.id || "");
   }
 
   /** Replace the selection outright. */
@@ -189,7 +218,7 @@ window.netgraphSelect = (function () {
   function targets() {
     if (picked.length) { return picked.slice(); }
     var here = window.netgraphA11y.focused();
-    var address = here ? String(here.record.id || "") : "";
+    var address = here ? addressOf(here.record) : "";
     return address ? [address] : [];
   }
 
@@ -213,8 +242,7 @@ window.netgraphSelect = (function () {
   function settled(options) {
     var opts = options || {};
     paint();
-    window.netgraphA11y.mark(picked.map(function (one) { return drawn[one]; }).filter(Boolean),
-      picked.length);
+    window.netgraphA11y.mark(marked(), picked.length);
     if (!opts.quiet) {
       window.netgraphA11y.announce(summary(), false);
     }
@@ -234,10 +262,12 @@ window.netgraphSelect = (function () {
     drawn = {};
     layer = null;
     Object.keys(records).forEach(function (id) {
-      var address = String(records[id].id || "");
-      if (address) { drawn[address] = id; }
+      var address = addressOf(records[id]);
+      if (!address) { return; }
+      if (!drawn[address]) { drawn[address] = []; }
+      drawn[address].push(id);
     });
-    var kept = picked.filter(function (address) { return !!drawn[address]; });
+    var kept = picked.filter(function (address) { return shapesOf(address).length > 0; });
     if (kept.length !== picked.length) {
       picked = kept;
       index = {};
@@ -245,8 +275,14 @@ window.netgraphSelect = (function () {
       if (host && host.changed) { host.changed(picked.slice()); }
     }
     paint();
-    window.netgraphA11y.mark(picked.map(function (one) { return drawn[one]; }).filter(Boolean),
-      picked.length);
+    window.netgraphA11y.mark(marked(), picked.length);
+  }
+
+  /** Every SVG id the selection is drawn as, for the screen reader's outline. */
+  function marked() {
+    var ids = [];
+    picked.forEach(function (one) { ids = ids.concat(shapesOf(one)); });
+    return ids;
   }
 
   /* ------------------------------------------------------------ painting */
@@ -277,10 +313,16 @@ window.netgraphSelect = (function () {
     group.setAttribute("aria-hidden", "true");
     var count = 0;
     for (var i = 0; i < picked.length && count < MAX_HALOS; i++) {
-      var box = window.netgraphCull.boxOf(drawn[picked[i]]);
-      if (!box || (window_ && !overlaps(box, window_))) { continue; }
-      group.appendChild(halo(box));
-      count += 1;
+      // One ring per *shape*, not per address: a selected container host is
+      // drawn as several boxes at layer 3 and a ring round one of them would
+      // say the others were not selected.
+      var shapes = shapesOf(picked[i]);
+      for (var s = 0; s < shapes.length && count < MAX_HALOS; s++) {
+        var box = window.netgraphCull.boxOf(shapes[s]);
+        if (!box || (window_ && !overlaps(box, window_))) { continue; }
+        group.appendChild(halo(box));
+        count += 1;
+      }
     }
     if (!count) { return; }
     root.appendChild(group);
@@ -326,7 +368,7 @@ window.netgraphSelect = (function () {
     }
     window.netgraphA11y.focus(next, { quiet: true });
     var record = records[next];
-    add([String((record && record.id) || "")]);
+    add([addressOf(record)]);
     return true;
   }
 
@@ -334,7 +376,7 @@ window.netgraphSelect = (function () {
   function fromFocus() {
     var here = window.netgraphA11y.focused();
     if (!here) { return false; }
-    add([String(here.record.id || "")], { quiet: true });
+    add([addressOf(here.record)], { quiet: true });
     return true;
   }
 
@@ -451,12 +493,12 @@ window.netgraphSelect = (function () {
     };
     var caught = [];
     Object.keys(drawn).forEach(function (address) {
-      var found = window.netgraphCull.boxOf(drawn[address]);
-      if (!found) { return; }
-      if (found.x <= region.right && found.x + found.w >= region.left &&
-          found.y <= region.bottom && found.y + found.h >= region.top) {
-        caught.push(address);
-      }
+      var hit = shapesOf(address).some(function (id) {
+        var found = window.netgraphCull.boxOf(id);
+        return !!found && found.x <= region.right && found.x + found.w >= region.left &&
+          found.y <= region.bottom && found.y + found.h >= region.top;
+      });
+      if (hit) { caught.push(address); }
     });
     return caught;
   }
@@ -528,7 +570,7 @@ window.netgraphSelect = (function () {
           detail: record ? window.netgraphA11y.label(record) : "selected",
           group: "selected",
           run: function () {
-            var id = drawn[address];
+            var id = shapeOf(address);
             if (!id) { return; }
             el.canvas.focus();
             window.netgraphA11y.focus(id, { quiet: false });
@@ -559,6 +601,9 @@ window.netgraphSelect = (function () {
   return {
     attach: attach,
     defineCommands: defineCommands,
+    addressOf: addressOf,
+    shapesOf: shapesOf,
+    shapeOf: shapeOf,
     annotate: annotate,
     paint: paint,
     size: size,

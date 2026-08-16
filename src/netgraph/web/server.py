@@ -137,6 +137,7 @@ __all__ = [
     "OPS_PATH",
     "PASTE_PATH",
     "PRESENCE_PATH",
+    "QUERY_PATH",
     "REDO_PATH",
     "RENDER_PATH",
     "REPARENT_PATH",
@@ -194,6 +195,12 @@ IMPACT_PATH: Final = "/api/impact"
 #: editor asks *before* it deletes, so the confirmation it shows names what
 #: :mod:`netgraph.edit` will actually do rather than what the picture suggests.
 CASCADE_PATH: Final = "/api/cascade"
+
+#: Where the search box and the command palette post a selector query. A GET,
+#: because it reads: the whole point of the language is that it cannot change
+#: anything, and a route that promised otherwise would be the one place that
+#: claim was not enforced by the method.
+QUERY_PATH: Final = "/api/query"
 #: The commits that changed this inventory, for the timeline scrubber.
 HISTORY_PATH: Final = "/api/history"
 #: One of them, drawn as the diff against its parent (``?rev=<commit>``).
@@ -227,6 +234,7 @@ ASSETS: Final[dict[str, tuple[str, str]]] = {
     "/menu.js": ("menu.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/select.js": ("select.js", "text/javascript; charset=utf-8"),
+    "/search.js": ("search.js", "text/javascript; charset=utf-8"),
     "/clipboard.js": ("clipboard.js", "text/javascript; charset=utf-8"),
     "/style.js": ("style.js", "text/javascript; charset=utf-8"),
     "/session.js": ("session.js", "text/javascript; charset=utf-8"),
@@ -396,6 +404,15 @@ class _Handler(LocalHandler):
             )
         elif path == CASCADE_PATH:
             self._json(HTTPStatus.OK, session.cascade(query.get("address", [])), body=body)
+        elif path == QUERY_PATH:
+            self._json(
+                HTTPStatus.OK,
+                session.search(
+                    query.get("q", [""])[-1],
+                    layer=query.get("layer", ["l1"])[-1],
+                ),
+                body=body,
+            )
         elif path == HISTORY_PATH:
             self._json(
                 HTTPStatus.OK,

@@ -153,6 +153,29 @@ from one runner is a guard that fails on the other two, so when one of these
 moves the fix is to re-measure everywhere rather than to relax it until the red
 job goes green.
 
+### `nft` can be installed and still unusable
+
+Two tests in `tests/test_firewall.py` hand the generated `etc/nftables.conf` to
+`nft --check`, which is the only gate on that file that is not netgraph reading
+its own writing. `--check` parses a ruleset without committing it — but before
+it reads a byte of the file it opens a netlink socket and populates its cache,
+and that needs `CAP_NET_ADMIN`.
+
+So "can this run" is a question about the *process*, not about `PATH`. On the
+GitHub Linux runners `nft` is on `PATH` and the job is unprivileged, so every
+`--check` failed with `cache initialization failed: Operation not permitted` —
+a verdict about the runner, reported as though the ruleset were malformed.
+`platform_marks.NFT` therefore **measures** it, by handing `nft` the smallest
+ruleset every version accepts, and `requires_nft` skips when that does not come
+back clean.
+
+A skip would mean the gate never runs where it is most wanted, so CI does not
+rely on it: the Linux test job installs `nftables` and grants the binary the
+capability (`sudo setcap cap_net_admin+ep`), then checks an empty ruleset in the
+workflow so a failure to grant it fails the job loudly instead of quietly
+turning the gate off. The skip is what a developer's unprivileged shell, macOS
+and Windows get.
+
 ## The browser layer
 
 `netgraph web` is about fourteen hundred lines of CSS and JavaScript, and until
@@ -381,12 +404,30 @@ is asserted example-wise over every inventory in the repository — `examples/`,
 `tests/fixtures/fixable/` and every single-rule fixture in
 `tests/fixtures/invalid/`.
 
-`tests/test_fuzz_loader.py` covers the one component with a real trust
-boundary. The loader reads files a user did not write — `netgraph import`
-output, a third-party inventory, a generated tree — so the contract there is not
-"parses correct input" but *terminates, fails structurally, bounds its
-diagnostics, bounds its memory*. The seed corpus is `tests/fuzz-corpus/`: one
-file per way of being wrong, mutated by the test into near misses.
+`tests/test_query.py` asserts the ones the [selector language](query.md) rests
+on, which are the reason it can be the only implementation of *selects*:
+
+| Property | What it rules out |
+|---|---|
+| a query and its negation partition the inventory | a third answer for an element that lacks the attribute |
+| `not (a and b)` is `(not a) or (not b)`, over a real graph | an `and` and an `or` that complement in different universes |
+| `not not q` is `q` | a fold that loses the universe on the way down |
+| every filter flag selects exactly what its query does | the sugar table in `docs/query.md` going stale |
+| every attribute in the tables is readable off a real model | a row nobody implemented, which answers nothing forever |
+
+`tests/test_fuzz_loader.py` and `tests/test_fuzz_query.py` cover the two
+components with a real trust boundary. The loader reads files a user did not
+write — `netgraph import` output, a third-party inventory, a generated tree — and
+the query parser reads whatever is on a command line, in an HTTP query string or
+in a `query:` key. The contract at both is not "parses correct input" but
+*terminates, fails structurally, bounds its diagnostics, bounds its memory*. The
+loader's seed corpus is `tests/fuzz-corpus/`: one file per way of being wrong.
+The parser's is a tuple in its own file — a query is one line, and a directory of
+thirty single-line files would be ceremony — holding one seed per grammar form
+plus the near misses. Both are mutated by the test into further near misses, and
+the parser's adds a fifth clause: **whatever parses, evaluates**, checked against
+three real graphs, because attributes are resolved and values checked at parse
+time precisely so that evaluation has nothing left to reject.
 
 ## The performance guards
 

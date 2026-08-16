@@ -96,6 +96,17 @@
       <span>diagram</span>
       <span class="hint">hover or focus a node for details &middot; drag or arrow keys to move &middot; scroll to zoom</span>
       <span class="spacer"></span>
+      <!-- One selector language: what is typed here is what `netgraph query`
+           answers, what `--select` narrows a render with, and what an
+           `assert: query` claims. Enter selects the matches, so a query feeds
+           straight into a bulk edit or an alignment. -->
+      <label class="visually-hidden" for="search">Select elements with a query</label>
+      <input id="search" class="search" type="search" autocomplete="off" spellcheck="false"
+        placeholder="query: kind = switch and not has vrf"
+        title="Select elements with a query (Ctrl-F). Enter selects the matches.">
+      <button id="search-filter" type="button" class="ghost" aria-pressed="false"
+        title="Draw only what the query selects, instead of highlighting it">Filter</button>
+      <span id="search-status" class="hint search-status" role="status"></span>
       <!-- Reading, not writing: offered in a read-only session too, which is
            why it is here rather than beside Save and Undo. -->
       <button id="timeline-toggle" type="button" class="ghost" hidden
@@ -204,6 +215,7 @@
 <script src="/notes.js"></script>
 <script src="/containers.js"></script>
 <script src="/select.js"></script>
+<script src="/search.js"></script>
 <script src="/clipboard.js"></script>
 <script src="/style.js"></script>
 <script src="/menu.js"></script>

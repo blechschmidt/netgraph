@@ -79,6 +79,9 @@
     group: document.getElementById("group"),
     strict: document.getElementById("strict"),
     render: document.getElementById("render"),
+    search: document.getElementById("search"),
+    searchFilter: document.getElementById("search-filter"),
+    searchStatus: document.getElementById("search-status"),
     fit: document.getElementById("fit"),
     splitter: document.getElementById("splitter"),
     files: document.getElementById("files"),
@@ -202,6 +205,7 @@
       annotations: el.annotations.checked,
       group_by_namespace: el.group.checked,
       collapse: netgraphContainers.collapsed(),
+      select: netgraphSearch.selector() || null,
       strict: el.strict.checked
     };
   }
@@ -223,6 +227,11 @@
     // the request, and in the cache key the request doubles as.
     var folded = netgraphContainers.collapsed();
     if (folded.length) { parts.push("collapse=" + encodeURIComponent(folded.join(","))); }
+    // With the search box filtering rather than highlighting, the query *is*
+    // part of which drawing this is -- the same way a folded container is --
+    // so it belongs in the request and in the cache key the request doubles as.
+    var narrowing = netgraphSearch.selector();
+    if (narrowing) { parts.push("select=" + encodeURIComponent(narrowing)); }
     return parts.join("&");
   }
 
@@ -516,6 +525,7 @@
     // The halo is drawn per visible element, so a pan that brought a selected
     // one into view has to bring its ring with it.
     netgraphSelect.paint();
+    netgraphSearch.paint();
   }
 
   /** Redraw the problems list.
@@ -744,7 +754,7 @@
       // other hand, is exactly what the other tabs should see.
       netgraphSession.select(netgraphSelect.size()
         ? netgraphSelect.addresses()
-        : [String(here.record.id || "")]);
+        : [netgraphSelect.addressOf(here.record)]);
       netgraphA11y.select(here.element);
     }
     netgraphA11y.announce("inspecting " + netgraphA11y.label(here.record), false);
@@ -1045,7 +1055,7 @@
     if (event.shiftKey || event.ctrlKey || event.metaKey) {
       var picked = hitAt(event.target);
       if (picked) {
-        netgraphSelect.toggle([String(picked.record.id || "")]);
+        netgraphSelect.toggle([netgraphSelect.addressOf(picked.record)]);
         netgraphA11y.focus(picked.record.element, { quiet: true, scroll: false });
       }
       return;
@@ -1054,18 +1064,19 @@
     if (!hit) { hideInfo(true); return; }
     // A plain click on a shape replaces whatever was selected with it, which is
     // what makes "click away, then click this" mean one thing.
-    netgraphSelect.set([String(hit.record.id || "")], { quiet: true });
+    netgraphSelect.set([netgraphSelect.addressOf(hit.record)], { quiet: true });
     // Failure mode owns the click: the gesture asks a question about the shape
     // rather than opening it, and jumping the editor to a file nobody asked to
     // edit would be the opposite of read-only.
-    if (failure.on) { askImpact(hit.record.id); return; }
+    if (failure.on) { askImpact(netgraphSelect.addressOf(hit.record)); return; }
     // In a session, clicking a shape reveals the document that declares it:
-    // that mapping is the whole point of the command. `record.id` is the
+    // that mapping is the whole point of the command. `addressOf` is the
     // element's address, which is what the tree keys documents by --
-    // `record.element` is the SVG id, and matched nothing.
+    // `record.element` is the SVG id, and matched nothing, and `record.id` is
+    // the *node* id, which on a container's box names no document at all.
     // What this page is looking at is announced by the selection above, which
     // has already told the other tabs; all that is left is to open the document.
-    if (mode === "session") { netgraphSession.reveal(hit.record.id); }
+    if (mode === "session") { netgraphSession.reveal(netgraphSelect.addressOf(hit.record)); }
     if (pinned === hit.record.element) { hideInfo(true); netgraphA11y.select(null); return; }
     pinned = hit.record.element;
     showInfo(hit, event);
@@ -1226,7 +1237,7 @@
         netgraphA11y.select(here.element);
         // Space is also how a selection is built without a pointer: it makes
         // the focused element *the* selection, which Shift-arrow then extends.
-        netgraphSelect.set([String(here.record.id || "")], { quiet: true });
+        netgraphSelect.set([netgraphSelect.addressOf(here.record)], { quiet: true });
         inspectFocused();
       }
     });
@@ -1340,7 +1351,7 @@
       return netgraphA11y.elements().map(function (entry) {
         return {
           id: entry.element,
-          title: entry.record.id || entry.record.name || entry.element,
+          title: netgraphSelect.addressOf(entry.record) || entry.record.name || entry.element,
           detail: netgraphA11y.label(entry.record),
           group: entry.record.type === "edge" ? "link" : "element",
           run: function () {
@@ -1411,7 +1422,7 @@
     /** Put the focus ring back on an element after a change redrew the SVG. */
     focusElement: function (address) {
       var found = netgraphA11y.elements().filter(function (entry) {
-        return entry.record.id === address;
+        return netgraphSelect.addressOf(entry.record) === address;
       })[0];
       if (!found) { return false; }
       netgraphA11y.focus(found.element, { quiet: false });
@@ -1510,8 +1521,18 @@
   // A resized canvas is a different viewport, so a different part of the
   // diagram has to be drawn.
   window.addEventListener("resize", function () { netgraphCull.schedule(); });
+  /* What search.js is given: the elements, which layer a query is asked about,
+   * how to refuse, and how to ask for the drawing again -- which it needs
+   * because "filter by this query" is a different drawing and not a repaint. */
+  netgraphSearch.attach({
+    el: el,
+    layer: function () { return el.layer.value; },
+    refuse: function (why) { toast(why, "error"); },
+    rerender: render
+  });
   defineCommands();
   netgraphSelect.defineCommands();
+  netgraphSearch.defineCommands();
   netgraphStyle.attach({
     el: el,
     writable: function () { return mode === "session" && netgraphSession.isWritable(); },

@@ -1311,6 +1311,15 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "Which elements the claim is about, in `netgraph render`'s filter vocabulary: "
         "`kind=switch, namespace=sites/north, name=sw-*`. A bare word is a name glob."
     ),
+    ("Assertion", "query"): Doc(
+        "The same thing said in the selector language (`docs/query.md`), which can express "
+        "what the vocabulary above cannot: `kind in (switch, router) and not "
+        "interface[name ~ 'Vlan*' and has address]`. Either key supplies the elements a "
+        "selector assertion is graded over, and both together are ANDed. An "
+        "`assert: query` takes this one and grades how much it matches against `equals` / "
+        "`at_least` / `at_most`, defaulting — with none of them — to the claim that it "
+        "matches nothing."
+    ),
     ("Assertion", "prefix"): Doc(
         "`within-prefix`: the CIDR every routable address on a selected element must lie inside."
     ),
@@ -1326,12 +1335,14 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "`unique`: the field expression whose values must all differ, e.g. "
         "`spec.interfaces[name=mgmt0].ipv4[]`."
     ),
-    ("Assertion", "equals"): Doc("`count`: how many elements the selector must match, exactly."),
+    ("Assertion", "equals"): Doc(
+        "`count` and `query`: how many elements the selector must match, exactly."
+    ),
     ("Assertion", "at_least"): Doc(
-        "`count`: the inclusive lower bound on how many elements the selector matches."
+        "`count` and `query`: the inclusive lower bound on how many elements the selector matches."
     ),
     ("Assertion", "at_most"): Doc(
-        "`count`: the inclusive upper bound on how many elements the selector matches."
+        "`count` and `query`: the inclusive upper bound on how many elements the selector matches."
     ),
     ("Assertion", "min_isolated"): Doc(
         "`no-single-point-of-failure`: ignore a candidate that isolates fewer endpoints than "

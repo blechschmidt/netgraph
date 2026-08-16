@@ -169,10 +169,19 @@ only this order, and `cli._build_graph` says why: filtering decides *what exists
 folds *what is left*. Reversed, `--kind switch` could empty a collapsed node of everything it
 claims to stand for.
 
-`FilterSpec` removes: `namespaces`, `vlans`, `kinds`, `names`, `neighbors_of`/`depth`. Values
-within one field are alternatives, different fields are combined with AND, and every field
-selects *elements* — so a derived layer-3 subnet node survives exactly as long as one selected
-element still has an address in it. `AggregateSpec` removes nothing: `collapse` and
+`FilterSpec` removes: `namespaces`, `vlans`, `kinds`, `names`, `neighbors_of`/`depth` and
+`selected`. Values within one field are alternatives, different fields are combined with AND,
+and every field selects *elements* — so a derived layer-3 subnet node survives exactly as long
+as one selected element still has an address in it.
+
+`selected` is the [selector language](query.md), **layered over** this stage rather than
+implemented inside it. A query can traverse the graph and can ask about interfaces, so it must
+see the whole graph and needs a parser and a vocabulary the renderer has no business knowing
+about; what arrives in `selected` is therefore the *answer* — a set of fully-qualified names —
+computed by `netgraph.query` against the unfiltered graph. `query/apply.py` is the eighty lines
+that do the two in the right order, and `filter_graph` raises rather than proceeds if it is
+handed a `select` nobody answered, because rendering the whole inventory for a query that
+selects three devices is a silently wrong picture. `AggregateSpec` removes nothing: `collapse` and
 `collapse_depth` replace a namespace with one node that says which elements it stands for, and
 `bundle` folds parallel links into one edge carrying the count. `aggregate_graph` returns
 `graph` itself when nothing applies, so a pipeline that never aggregates is byte-identical.
@@ -317,6 +326,7 @@ Verified against the tree: every path below exists.
 | `.github/actions/netgraph-validate/` | the composite action that runs `validate` in a workflow |
 | `.pre-commit-hooks.yaml` | the `netgraph-validate` hook, for inventory repositories |
 | `tools/` | doc and schema generators (checked for drift by the tests), the example checker, the icon rasteriser, the pipeline and page benchmarks |
+| `src/netgraph/query/` | the selector language: lexer, parser, vocabulary, evaluator, and the layer over `filter_graph` |
 | `src/netgraph/__init__.py` | public package surface |
 | `src/netgraph/cli.py` | console-script entry point (`netgraph`) |
 | `src/netgraph/completion.py` | shell completion: the scripts, and the value completers |

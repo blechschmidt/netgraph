@@ -59,7 +59,7 @@ from typing import Any, Final
 import networkx as nx
 
 from netgraph.connectivity import Graph
-from netgraph.graph import ELEMENT_TYPE, layers, to_networkx
+from netgraph.graph import ELEMENT_TYPE, NETNS_TYPE, layers, to_networkx
 from netgraph.loader.inventory import Inventory, namespace_of, short_name
 from netgraph.power import FeedKind, PowerPlan, power_plan
 from netgraph.render.graph import Layer, build_graph
@@ -230,21 +230,27 @@ def _routed_view(physical: nx.MultiGraph, routed: nx.MultiGraph) -> LayerView:
     split_from: dict[str, str] = {}
 
     for node, data in routed.nodes(data=True):
-        if _is_element(data):
+        if _is_endpoint(data):
             nodes.append(node)
             endpoints.append(node)
             kinds[node] = str(data.get("kind", ""))
-            namespaces[node] = namespace_of(node)
+            namespaces[node] = namespace_of(_address_of(data, node))
 
     for node, data in routed.nodes(data=True):
-        if _is_element(data):
+        if _is_endpoint(data):
             continue
         # Group this prefix's members by the physical island they sit on. The
         # groups keep the order the members were discovered in, so the ``#2``
         # suffix means the same thing on every run over the same tree.
         groups: dict[Any, list[tuple[str, str]]] = {}
         for neighbour, key in _incident(routed, node):
-            groups.setdefault(component.get(neighbour), []).append((neighbour, key))
+            # By the machine, not by the node: a container's stack is not in the
+            # physical graph at all (§23.1), and grouping every container of
+            # every host under one "unknown island" would keep two tenants
+            # adjacent through a prefix after the cable between their hosts was
+            # cut — the exact failure this splitting exists to prevent.
+            island = _address_of(routed.nodes[neighbour], neighbour)
+            groups.setdefault(component.get(island), []).append((neighbour, key))
         for index, members in enumerate(groups.values(), start=1):
             identity = node if len(groups) == 1 else f"{node}#{index}"
             nodes.append(identity)
@@ -257,7 +263,7 @@ def _routed_view(physical: nx.MultiGraph, routed: nx.MultiGraph) -> LayerView:
                 link_kinds[link] = str(routed.edges[neighbour, node, key].get("kind", ""))
 
     for source, target, key, data in routed.edges(keys=True, data=True):
-        if _is_element(routed.nodes[source]) and _is_element(routed.nodes[target]):
+        if _is_endpoint(routed.nodes[source]) and _is_endpoint(routed.nodes[target]):
             edges.append((str(key), source, target))
             link_kinds[str(key)] = str(data.get("kind", ""))
 
@@ -294,6 +300,23 @@ def _components_of(graph: nx.MultiGraph) -> Mapping[str, int]:
 
 def _is_element(data: Mapping[str, Any]) -> bool:
     return str(data.get("node_type", ELEMENT_TYPE)) == ELEMENT_TYPE
+
+
+def _is_endpoint(data: Mapping[str, Any]) -> bool:
+    """Is this node something traffic can start at, rather than a prefix?
+
+    An element, or — since layer 3 draws one node per network stack (§23.1) —
+    one of the stacks inside one. A container is a place traffic starts and ends
+    and a thing a `--fail` can take away with its host, so leaving it out of the
+    endpoints would have made the routed view treat it as an IP prefix and split
+    it.
+    """
+    return str(data.get("node_type", ELEMENT_TYPE)) in (ELEMENT_TYPE, NETNS_TYPE)
+
+
+def _address_of(data: Mapping[str, Any], node: str) -> str:
+    """The element behind a node: itself, or the machine a stack runs in."""
+    return str(data.get("address") or node)
 
 
 # --------------------------------------------------------------------------- #

@@ -1468,7 +1468,7 @@ var netgraphSession = (function () {
   /** The address of whatever the diagram has focused, or "". */
   function here() {
     var focused = netgraphA11y.focused();
-    return focused ? String(focused.record.id || "") : "";
+    return focused ? window.netgraphSelect.addressOf(focused.record) : "";
   }
 
   /** What a bulk gesture acts on: the selection, or the focused element. */
@@ -1530,19 +1530,28 @@ var netgraphSession = (function () {
   function recordFor(address) {
     var wanted = String(address || "");
     var found = netgraphA11y.elements().filter(function (entry) {
-      return String(entry.record.id || "") === wanted;
+      return window.netgraphSelect.addressOf(entry.record) === wanted;
     })[0];
     return found ? found.record : null;
   }
 
-  /** Every address the diagram is showing, for a prompt's completion list. */
+  /** Every address the diagram is showing, for a prompt's completion list.
+   *
+   * Deduplicated, because one address may be drawn several times: a container
+   * host is its own box plus one per network namespace at layer 3, and all of
+   * them complete to the same machine. */
   function addresses(kind) {
+    var seen = {};
     return netgraphA11y.elements()
       .filter(function (entry) {
         return kind === "edge" ? entry.record.type === "edge" : entry.record.type !== "edge";
       })
-      .map(function (entry) { return String(entry.record.id || ""); })
-      .filter(Boolean);
+      .map(function (entry) { return window.netgraphSelect.addressOf(entry.record); })
+      .filter(function (address) {
+        if (!address || seen[address]) { return false; }
+        seen[address] = true;
+        return true;
+      });
   }
 
   /** The interface names declared on an element, for the connect prompt. */

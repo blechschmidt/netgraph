@@ -88,8 +88,9 @@ GOLDEN = Path(__file__).resolve().parent / "fixtures" / "report"
 #: The examples every property below is asserted over. ``home-lab`` is the small
 #: one with a wireless AP and an adapter; ``patch-room`` has the panels, racks and
 #: PDUs an as-built record is mostly about; ``campus`` is the one with several
-#: sites, VRFs and adjacencies; ``overlay`` is the one with tunnels.
-EXAMPLE_NAMES = ("home-lab", "patch-room", "campus", "overlay")
+#: sites, VRFs and adjacencies; ``overlay`` is the one with tunnels; ``containers``
+#: is the one whose machines run more than one network stack (§23).
+EXAMPLE_NAMES = ("home-lab", "patch-room", "campus", "overlay", "containers")
 
 #: Pinned in every generated report here, so a golden is a function of the
 #: inventory alone. See ``netgraph.report.stamp``.
@@ -449,6 +450,78 @@ def test_a_device_page_carries_its_routing() -> None:
     distribution = bundle.text("devices/sites_north_distribution_sw-north-dist-01.md")
     assert "mgmt" in distribution, "the management VRF is missing"
     assert "65001:99" in distribution, "the route distinguisher is missing"
+
+
+# --------------------------------------------------------------------------- #
+# Network namespaces (§23), follow-up 22
+# --------------------------------------------------------------------------- #
+
+
+def test_a_device_that_declares_namespaces_gets_a_section_for_them() -> None:
+    """The tree, the interfaces homed in each stack, and the addresses they carry."""
+    page = report_of("containers", diagrams=False).text("devices/hosts_srv-host-a.md")
+    assert "## Network namespaces" in page
+    assert '<a id="netns"></a>' in page
+    # The initial namespace is a row of its own: it is the machine, and a table
+    # that started at 'blue' would not say where the uplink went.
+    assert "| (initial) | — | eno1, br-tenants, veth-blue-h, veth-green-h |" in page
+    # Nesting is drawn, and 'blue-web' is one level deeper than 'blue'.
+    assert "| └─ blue | (initial) |" in page
+    assert "| └─ └─ blue-web | blue |" in page
+    assert "| └─ green | (initial) |" in page
+
+
+def test_a_veth_pair_is_named_from_both_of_its_ends() -> None:
+    """One row per end: which is the pair, from either side of the boundary."""
+    page = report_of("containers", diagrams=False).text("devices/hosts_srv-host-a.md")
+    assert "| veth-web-h | blue | veth-web | blue-web |" in page
+    assert "| veth-web | blue-web | veth-web-h | blue |" in page
+
+
+def test_a_route_and_a_rule_inside_a_namespace_are_shown_under_it() -> None:
+    """A stack of its own has a routing table of its own, and the page says so."""
+    page = report_of("containers", diagrams=False).text("devices/hosts_srv-host-b.md")
+    assert "**Routes inside a namespace**" in page
+    assert "10.30.0.0/24 via 10.32.0.1 dev veth-sbx table sandbox-egress" in page
+    assert "**Policy rules inside a namespace**" in page
+    assert "100: from 10.32.0.2/32 oif veth-sbx lookup sandbox-egress" in page
+    # The route in the *initial* namespace is the routing section's alone: the
+    # same fact stated twice is the beginning of two facts.
+    routes = page.partition("**Routes inside a namespace**")[2].partition("\n\n")[2]
+    assert "dev eno1" not in routes.partition("**Policy rules")[0]
+
+
+def test_the_namespace_and_routing_sections_point_at_each_other() -> None:
+    """Neither describes the other's half, so each has to name where it is."""
+    page = report_of("containers", diagrams=False).text("devices/hosts_srv-host-b.md")
+    assert "- [Routing](#routing)" in page
+    assert "- [Network namespaces](#netns)" in page
+
+
+def test_the_interface_table_gains_a_netns_column_only_where_it_says_something() -> None:
+    """A column of dashes on 22 pages is what follow-up 22 refused to ship."""
+    stacked = report_of("containers", diagrams=False)
+    assert "| VLANS | NETNS | VRF |" in stacked.text("devices/hosts_srv-host-a.md")
+    assert "| VLANS | NETNS | VRF |" not in stacked.text("devices/network_sw-lab.md")
+    for name in ("home-lab", "patch-room", "campus", "overlay"):
+        bundle = report_of(name, diagrams=False)
+        for page in bundle.paths:
+            if page.startswith("devices/"):
+                assert "NETNS" not in bundle.text(page), page
+
+
+def test_a_device_without_namespaces_gets_no_namespace_section() -> None:
+    """The other branch, and the one every page of every older inventory takes."""
+    page = report_of("containers", diagrams=False).text("devices/network_sw-lab.md")
+    assert "Network namespaces" not in page
+    assert '<a id="netns"></a>' not in page
+    # And not on a page that routes, either: the routing section must not have
+    # grown a cross-reference to a section that is not there.
+    campus = report_of("campus", diagrams=False).text(
+        "devices/sites_north_core_rtr-north-core-01.md"
+    )
+    assert "## Routing" in campus
+    assert "#netns" not in campus
 
 
 def test_the_wireless_plan_is_the_one_netgraph_list_bss_prints(
@@ -944,6 +1017,7 @@ def transcript(bundle: Bundle) -> str:
         ("home-lab", "markdown"),
         ("home-lab", "json"),
         ("overlay", "markdown"),
+        ("containers", "markdown"),
     ),
 )
 @requires_dot

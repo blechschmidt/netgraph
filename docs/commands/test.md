@@ -190,9 +190,9 @@ the short name, and it is repeatable:
 <!-- run: -->
 ```console
 $ netgraph -i examples/campus test connect*
-ok    connectivity  16 passed  (staff, servers and management reach what they are supposed to)
+ok    connectivity  20 passed  (staff, servers and management reach what they are supposed to)
 
-16 passed in 1 suite
+20 passed in 1 suite
 ```
 
 A glob that matches nothing **fails the run** rather than quietly grading zero

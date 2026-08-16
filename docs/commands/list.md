@@ -274,6 +274,7 @@ answer to everything else, and is usually faster to act on:
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
 | `-F`, `--output-format` | `[table\|json\|yaml]` | `table` | table is for reading; json and yaml are for piping. |
+| `--select` | `QUERY` | — | List only what this query selects, e.g. "label.role = access". A cable or a tunnel is listed when everything it joins was selected. See docs/query.md. |
 <!-- /generated -->
 
 ---

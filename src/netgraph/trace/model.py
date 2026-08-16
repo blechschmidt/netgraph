@@ -28,7 +28,7 @@ from typing import Final
 
 from netgraph.errors import NetgraphError
 from netgraph.loader.inventory import short_name
-from netgraph.render.graph import Layer, PatchView, TunnelView
+from netgraph.render.graph import Layer, PatchView, TunnelView, netns_node_id
 from netgraph.render.highlight import Highlight
 
 __all__ = [
@@ -94,11 +94,28 @@ class Endpoint:
     interface: str | None = None
     #: The address in ``10.0.0.7/24`` form, when the reference was an address.
     address: str | None = None
+    #: The network namespace the reference lands in (§23.1), or ``None`` when it
+    #: did not say. An interface is in exactly one stack, so pinning the
+    #: interface — by naming it or by giving an address — pins this too; naming
+    #: the bare element leaves it ``None``, which the routed search reads as
+    #: "any stack of this machine". ``""`` is not the same as ``None``: it is
+    #: the machine's *initial* namespace, named precisely.
+    netns: str | None = None
 
     @property
     def name(self) -> str:
         """The element's short name."""
         return short_name(self.element)
+
+    @property
+    def stack(self) -> str:
+        """``element (netns blue)`` — the end as a report names it.
+
+        The bare element when the reference named no namespace or the initial
+        one, because that is every inventory that predates §23 and most that do
+        not.
+        """
+        return f"{self.element} (netns {self.netns})" if self.netns else self.element
 
     @property
     def port(self) -> str:
@@ -117,9 +134,16 @@ class Waypoint:
     the traffic originates and terminates there rather than passing through.
     """
 
-    #: Fully-qualified name.
+    #: Fully-qualified name of the *machine*, even where layer 3 drew the
+    #: traffic as passing through one of its network stacks: that is what a
+    #: reader can open and what ``--highlight`` and the editor address.
     element: str
     kind: str
+    #: The network namespace the traffic was in while it was inside that machine
+    #: (§23.1); ``""`` for the initial one, which is every machine that runs no
+    #: containers. Set on a routed path only — a layer-2 walk crosses a machine
+    #: rather than entering a routing table in it.
+    netns: str = ""
     ingress: str | None = None
     egress: str | None = None
     #: Routable addresses on the ingress port, in configuration order.
@@ -133,6 +157,22 @@ class Waypoint:
     @property
     def name(self) -> str:
         return short_name(self.element)
+
+    @property
+    def node(self) -> str:
+        """Identity of the graph node the traffic was actually at.
+
+        The element itself, until the element is a machine running containers
+        and the hop was inside one of them — then it is that stack's id, which
+        is what ``--highlight`` has to emphasise for the picture to agree with
+        the report.
+        """
+        return netns_node_id(self.element, self.netns)
+
+    @property
+    def label(self) -> str:
+        """``hosts/srv-01 (netns blue)`` — the stop as the text report names it."""
+        return f"{self.element} (netns {self.netns})" if self.netns else self.element
 
     @property
     def is_origin(self) -> bool:
@@ -244,18 +284,39 @@ class TracedPath:
 
     @property
     def elements(self) -> tuple[str, ...]:
-        """The fully-qualified names on the route, in order."""
+        """The fully-qualified names on the route, in order.
+
+        A machine appears twice in a row when a routed path left one of its
+        network stacks and came back into another (§23.1) — a container to its
+        host's bridge, say. That is what happened, so it is what this says; use
+        :attr:`nodes` when the stacks have to be told apart.
+        """
         return tuple(waypoint.element for waypoint in self.waypoints)
+
+    @property
+    def nodes(self) -> tuple[str, ...]:
+        """The graph node ids on the route, in order; stacks distinguished."""
+        return tuple(waypoint.node for waypoint in self.waypoints)
+
+    @property
+    def is_split(self) -> bool:
+        """Did this route pass through a network stack other than an initial one?"""
+        return any(waypoint.netns for waypoint in self.waypoints)
 
     @property
     def key(self) -> tuple[str, ...]:
         """Identity of the route, for de-duplication and for a stable order.
 
-        Two cables in a LAG join the same pair of switches, so the *elements*
-        do not identify a path — the links do. Both are included, because two
+        Two cables in a LAG join the same pair of switches, so the *nodes* do
+        not identify a path — the links do. Both are included, because two
         routes may also share their links while differing in the ports.
+
+        The **nodes** rather than the elements, because two containers of one
+        host reaching the same destination through it cross the same two
+        prefixes between the same two machines and are still two routes; keying
+        on the element would report one of them and silently drop the other.
         """
-        return (*self.elements, *(link.id for link in self.links))
+        return (*self.nodes, *(link.id for link in self.links))
 
     @property
     def panels(self) -> tuple[str, ...]:
@@ -290,8 +351,15 @@ class TracedPath:
         return tuple(seen.values())
 
     def highlight(self) -> Highlight:
-        """The nodes and links of this route, for ``--highlight``."""
-        nodes = {waypoint.element for waypoint in self.waypoints}
+        """The nodes and links of this route, for ``--highlight``.
+
+        Keyed by :attr:`Waypoint.node` rather than by the element, so a routed
+        hop through a container emphasises the container's box. On a layer-3
+        drawing the machine and its stacks are different nodes, and emphasising
+        the machine for traffic that never entered it would say the wrong thing;
+        at every other layer the two are the same string.
+        """
+        nodes = {waypoint.node for waypoint in self.waypoints}
         edges: set[str] = set()
         for link in self.links:
             nodes.update(link.graph_nodes)

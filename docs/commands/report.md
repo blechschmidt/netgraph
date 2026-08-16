@@ -16,6 +16,7 @@ disagree with each other or with the diagram above them.
 - [What a bundle looks like](#what-a-bundle-looks-like)
 - [The three formats](#the-three-formats)
 - [What each page carries](#what-each-page-carries)
+- [A machine that runs more than one network stack](#a-machine-that-runs-more-than-one-network-stack)
 - [Sites, and how a namespace becomes one](#sites-and-how-a-namespace-becomes-one)
 - [Scoping a report](#scoping-a-report)
 - [Traceability: the stamp, the version and the revision](#traceability-the-stamp-the-version-and-the-revision)
@@ -99,12 +100,80 @@ anchored to its elements.
 
 **A device page** — identity and metadata; placement (site, room, rack, unit,
 height) and power feeds; interfaces with their addresses, VLANs, MTU, VRF, LAG or
-bridge membership and radios; every cable and tunnel that terminates on it, with
-the far end linked and the panels a run crosses; its VRFs, static routes and BGP
-or OSPF adjacencies; and the diagrams it appears in.
+bridge membership and radios; the network namespaces it runs, when it runs any;
+every cable and tunnel that terminates on it, with the far end linked and the
+panels a run crosses; its VRFs, static routes and BGP or OSPF adjacencies; and the
+diagrams it appears in.
 
 Nothing is silently absent: a table with no rows still appears, saying that the
 inventory declares none of whatever it is about.
+
+## A machine that runs more than one network stack
+
+A device page describes one machine, and since [§23](../schema.md#23-network-namespaces-and-veth-pairs)
+a machine may run several network stacks. Two things on the page say so, and both
+are **conditional** — a report of an inventory that declares no `spec.netns` is
+byte-for-byte what it was before the feature existed:
+
+* a **`NETNS` column** in the interface table, added only when at least one
+  interface on *that page* is in a stack other than the machine's initial one. It
+  sits beside `VRF` because the two compose: a namespace is a whole second stack,
+  a VRF partitions the routing table of one stack, and `netns: blue` with
+  `vrf: red` names the `red` instance of the `blue` one;
+* a **Network namespaces section**, drawn only on a device that declares
+  `spec.netns` or a veth pair.
+
+The section holds the namespace tree — the initial namespace first, every declared
+one indented under the namespace it was created from, with the interfaces homed in
+each and the addresses they carry — then the veth pairs, **one row per end**, so a
+pair is named from both sides of the boundary it crosses. Where a declared
+namespace holds static routes or policy rules of its own, they follow in a table
+each; a route is placed by the interface it leaves by, which is what `dev` says.
+
+<!-- norun: an excerpt of a page the command writes into --out -->
+```markdown
+| NAMESPACE      | PARENT    | INTERFACES         | ADDRESSES                    |
+|:---------------|:----------|:-------------------|:-----------------------------|
+| (initial)      | —         | eno1, br-tenants   | 10.20.0.11/24, 10.30.0.1/24  |
+| └─ blue        | (initial) | veth-blue, veth-…  | 10.30.0.11/24, 10.31.0.1/30  |
+| └─ └─ blue-web | blue      | veth-web           | 10.31.0.2/30                 |
+| └─ green       | (initial) | veth-green         | 10.30.0.12/24                |
+```
+
+The section and the routing section link to each other and neither restates the
+other's half: a VRF is described once, in *Routing*, and the namespace section
+only says which stack holds it.
+
+`examples/containers` is the worked example — two hosts that run namespaces and
+one lab switch that does not, so both branches are in the same report. The `json`
+format is the one that fits in a transcript; the section is a section like any
+other, keyed `netns`:
+
+<!-- run: -->
+```console
+$ netgraph -q -i examples/containers report -f json --generated-at none --revision ''
+...
+          "key": "netns",
+          "title": "Network namespaces",
+          "blurb": "The network stacks this machine runs, and the veth pairs that join them.",
+...
+              "rows": [
+                [
+                  "(initial)",
+                  "—",
+                  "eno1, br-tenants, veth-blue-h, veth-green-h",
+                  "10.20.0.11/24, 10.30.0.1/24",
+                  "The machine itself; the stack every other section on this page is about."
+                ],
+                [
+                  "└─ blue",
+                  "(initial)",
+                  "veth-blue, veth-web-h",
+                  "10.30.0.11/24, 10.31.0.1/30",
+                  "Tenant blue."
+                ],
+...
+```
 
 ## Sites, and how a namespace becomes one
 
@@ -210,6 +279,7 @@ and on the site page of every element they name.
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
+| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netgraph query --explain' prints which. See docs/query.md. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
 <!-- /generated -->

@@ -29,7 +29,7 @@ command settles which.
 
 <!-- generated: synopsis show -->
 ```text
-netgraph [GLOBAL OPTIONS] show [OPTIONS] NAME
+netgraph [GLOBAL OPTIONS] show [OPTIONS] [NAME]
 ```
 <!-- /generated -->
 
@@ -269,7 +269,7 @@ netgraph -i examples/campus show sw-north-acc-03 -F json | jq '.spec.interfaces 
 <!-- generated: arguments show -->
 | Argument | Required | Count | Default |
 |---|---|---|---|
-| `NAME` | yes | 1 | — |
+| `[NAME]` | no | 1 | — |
 <!-- /generated -->
 
 ## Options
@@ -279,6 +279,7 @@ netgraph -i examples/campus show sw-north-acc-03 -F json | jq '.spec.interfaces 
 |---|---|---|---|
 | `-F`, `--output-format` | `[yaml\|json]` | `yaml` | Serialisation of the resolved document. |
 | `--raw`, `--no-expand` | — | off | Print the document as written: ranges unexpanded, 'from' unmerged. |
+| `--select` | `QUERY` | — | Show every element this query selects instead of one named element. See docs/query.md. |
 <!-- /generated -->
 
 ## Exit codes

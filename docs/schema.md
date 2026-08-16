@@ -4307,7 +4307,13 @@ not a silently unchecked bound.
 | `port-count-at-least` | `select`, `ports` | — | Every selected element declares at least `ports` interfaces. |
 | `unique` | `select`, `field` | — | No two selected elements produce the same value for the field expression (§20.4). |
 | `count` | `select`, one of `equals`/`at_least`/`at_most` | the other two | How many elements the selector matches. |
-| `no-single-point-of-failure` | — | `select`, `layer`, `min_isolated` | Nothing, alone, cuts an endpoint off from the designated gateways. |
+| `no-single-point-of-failure` | — | `select`, `query`, `layer`, `min_isolated` | Nothing, alone, cuts an endpoint off from the designated gateways. |
+| `query` | `query` | `equals`, `at_least`, `at_most` | The selector language, graded against how much it matches. With no bound: it matches **nothing**. |
+
+Every assertion that takes `select` also takes `query` — the same question in
+the selector language of [`docs/query.md`](query.md) — and either satisfies the
+requirement. Written together they are ANDed, which is how "the switches, and of
+those the ones with no uplink" is said without one long expression.
 
 Two keys are shared by all of them:
 
@@ -4346,9 +4352,38 @@ access switch reaches the distribution switch", one line instead of twelve; the
 product of the two sides is capped, and an assertion above the cap is refused
 with a message saying to narrow one side.
 
-An empty selection **fails** every assertion except `count`, where `equals: 0` is
-a legitimate claim. A test graded against nothing is a test that reports green
-having checked nothing.
+An empty selection **fails** every assertion except `count` and `query`, where
+`equals: 0` — and, for `query`, no bound at all — is a legitimate claim. A test
+graded against nothing is a test that reports green having checked nothing.
+
+`query` is the other spelling, and the one that can say what the vocabulary
+above cannot. It is the whole selector language: attribute predicates over the
+resolved model, existential scopes over interfaces, links, namespaces and zones,
+and bounded graph traversal, combined with `and` / `or` / `not` and grouping.
+[`docs/query.md`](query.md) is its reference; `netgraph query --explain` prints
+its grammar.
+
+```yaml
+- assert: query
+  name: no switch or router is missing a management address
+  query: kind in (switch, router) and not interface[name ~ 'Vlan*' and has address]
+
+- assert: query
+  name: the campus has three core routers
+  query: kind = router and label.role = core
+  equals: 3
+
+- assert: has-interface
+  name: every access switch has an uplink port
+  query: label.role = access and not neighbors of (label.role = distribution)
+  interface: "TenGigabitEthernet*"
+```
+
+An `assert: query` with no `equals`, `at_least` or `at_most` claims that the
+query matches **nothing**, and reports the matches as the failure detail. That is
+the shape a network invariant actually has: "no device is missing a management
+address" is a search for the counterexamples, and the counterexamples are the
+report.
 
 ### 20.4 Field expressions
 
@@ -4391,7 +4426,7 @@ assertion's own file and line.
 |---|---|---|
 | `NG-K001` | error | Two `testsuite` documents in one namespace do not share a name. The first declaration wins and the second is ignored, which keeps loading deterministic. |
 | `NG-K002` | error | `spec.assertions` holds between one and 1024 entries. |
-| `NG-K003` | error | Every key an assertion carries belongs to the assertion its `assert` names, every key that assertion requires is present, and a `count` compares against a bound it can satisfy. |
+| `NG-K003` | error | Every key an assertion carries belongs to the assertion its `assert` names, every key that assertion requires is present — `query` satisfying a required `select` — and a `count` compares against a bound it can satisfy. |
 
 ---
 
@@ -5508,6 +5543,13 @@ whatever holds one device's interface configuration *completely* — writes a
 what `netgraph import` reads back and what `netgraph drift` compares, so nothing
 of §23 is lost on the round trip.
 
+[`netgraph report`](commands/report.md#a-machine-that-runs-more-than-one-network-stack)
+gives a machine that declares either a *Network namespaces* section on its device
+page — the tree, the interfaces homed in each stack, the veth pairs named from
+both ends, and the routes and policy rules a declared namespace holds — and adds a
+`NETNS` column to its interface table. Both are conditional: a device that
+declares neither gets the page it always got.
+
 **`netplan`, `networkd`, `ifupdown` and `frr` refuse a device that declares
 either, and write nothing.** Not an omission: each of those files configures the
 network stack it is applied *in*, and none of them has syntax for `ip netns` or
@@ -5581,13 +5623,16 @@ in every zone-based firewall there is, and it is what makes `from lan` a
 statement about a packet rather than a question. Two zones claiming one
 interface would leave every rule naming either of them ambiguous.
 
-An interface in *no* zone is not an error — a console port, a namespace-internal
-veth end and a dedicated out-of-band management port all belong in none — but on
-a device that declares zones at all it is worth a second look, which is
-[`W151`](validation-rules.md#w151--interface-in-no-zone). A loopback and a
-member of a LAG or bridge are never counted: a loopback carries no transit
-traffic by construction, and a member is governed by the aggregate above it
-exactly as [§10.6](#106-lag-resolution) has it everywhere else.
+An interface in *no* zone is not an error — a console port and a dedicated
+out-of-band management port both belong in none — but on a device that declares
+zones at all it is worth a second look, which is
+[`W151`](validation-rules.md#w151--interface-in-no-zone). Three kinds are never
+counted: a loopback, which carries no transit traffic by construction; a member
+of a LAG or bridge, which is governed by the aggregate above it exactly as
+[§10.6](#106-lag-resolution) has it everywhere else; and an interface in a
+network namespace ([§23.1](#231-specnetns-and-interfacesnetns)), because
+`spec.zones` partitions the stack this policy is written for and a second stack
+has a netfilter instance of its own that nothing here can see.
 
 #### `local`, the zone nobody declares
 

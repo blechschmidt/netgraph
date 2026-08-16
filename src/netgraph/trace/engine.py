@@ -73,6 +73,7 @@ from netgraph.render.graph import (
     Node,
     TunnelView,
     build_graph,
+    netns_node_id,
     resolve_tunnels,
 )
 from netgraph.trace.endpoints import resolve_endpoint
@@ -144,8 +145,22 @@ def trace(
     physical = build_graph(inventory, layer=Layer.L1)
     notes: list[str] = []
 
-    if src.element == dst.element:
+    if src.element == dst.element and src.netns == dst.netns:
         return _same_element(physical, src, dst, vlan=vlan, max_hops=max_hops)
+
+    if src.element == dst.element:
+        # One machine, two of its network stacks (§23.1). Not "the traffic never
+        # leaves it": it leaves the namespace, and whether it comes back into
+        # the other one is a routing question — which is why the layer-2 walk is
+        # skipped rather than asked. That walk is over cables, and the veth pair
+        # joining two stacks of one machine is inside the box every cable ends
+        # on, so it could only ever answer "no".
+        notes.append(
+            f"both ends are on {src.element} but in different network namespaces "
+            f"({_netns_text(src)} and {_netns_text(dst)}), so the trace looked for a routed "
+            f"path between the two stacks"
+        )
+        return _routed_only(inventory, src, dst, max_hops=max_hops, limit=limit, notes=notes)
 
     l2 = _trace_l2(physical, src, dst, vlan=vlan, max_hops=max_hops, limit=limit)
     if l2.paths or vlan is not None:
@@ -160,17 +175,45 @@ def trace(
         "no layer-2 path: the two elements are in no common broadcast domain, so the trace "
         "looked for a routed one"
     )
+    return _routed_only(
+        inventory, src, dst, max_hops=max_hops, limit=limit, notes=notes, before=(l2,)
+    )
+
+
+def _netns_text(endpoint: Endpoint) -> str:
+    """How a namespace is named in a note: its name, or "the initial namespace"."""
+    return f"'{endpoint.netns}'" if endpoint.netns else "the initial namespace"
+
+
+def _routed_only(
+    inventory: Inventory,
+    source: Endpoint,
+    destination: Endpoint,
+    *,
+    max_hops: int,
+    limit: int,
+    notes: list[str],
+    before: Sequence[_Search] = (),
+) -> TraceResult:
+    """Build the layer-3 graph, search it, and fold the answer in with ``before``.
+
+    Reached from two places — after a layer-2 walk found nothing, and directly
+    when both ends are stacks of one machine — so that "which family, and why
+    not" is decided once and worded once.
+    """
     routed = build_graph(inventory, layer=Layer.L3)
-    family, reason = _common_family(routed, src, dst)
+    family, reason = _common_family(routed, source, destination)
     if family is None:
         # Every ``None`` carries its reason: "there is no routed path" is only
         # useful next to why there cannot be one.
         notes.append(reason)
-        return _result(src, dst, l2, vlan=vlan, max_hops=max_hops, notes=notes)
+        return _result(source, destination, *before, vlan=None, max_hops=max_hops, notes=notes)
 
     tunnels = _tunnel_index(resolve_tunnels(inventory)[0])
-    l3 = _trace_l3(routed, src, dst, family=family, tunnels=tunnels, max_hops=max_hops, limit=limit)
-    return _result(src, dst, l2, l3, vlan=vlan, max_hops=max_hops, notes=notes)
+    l3 = _trace_l3(
+        routed, source, destination, family=family, tunnels=tunnels, max_hops=max_hops, limit=limit
+    )
+    return _result(source, destination, *before, l3, vlan=None, max_hops=max_hops, notes=notes)
 
 
 @dataclass(frozen=True, slots=True)
@@ -554,9 +597,17 @@ def _build_path(
 
 @dataclass(frozen=True, slots=True)
 class _End:
-    """One element's presence in a prefix."""
+    """One network stack's presence in a prefix.
 
+    ``node`` is what the search walks — a stack of a machine (§23.1) — and
+    ``element`` is the machine it is inside. The two differ exactly on a
+    container host, and keeping both is what lets a hop be *found* between two
+    stacks and *reported* as the machine plus the namespace.
+    """
+
+    node: str
     element: str
+    netns: str
     interface: str
     addresses: tuple[str, ...]
     edge_id: str
@@ -578,9 +629,13 @@ def _prefixes(graph: Graph) -> tuple[_Prefix, ...]:
     for edge in graph.edges:
         if edge.kind is not EdgeKind.SUBNET:  # pragma: no cover - l3 holds only these
             continue
+        node = graph.nodes.get(edge.source)
+        view = node.netns if node is not None else None
         members.setdefault(edge.target, []).append(
             _End(
-                element=edge.source,
+                node=edge.source,
+                element=view.element if view is not None else edge.source,
+                netns=view.name if view is not None else "",
                 interface=edge.source_port,
                 addresses=edge.addresses,
                 edge_id=edge.id,
@@ -595,6 +650,33 @@ def _prefixes(graph: Graph) -> tuple[_Prefix, ...]:
             _Prefix(prefix=subnet.prefix, family=subnet.family, node_id=node_id, ends=tuple(ends))
         )
     return tuple(result)
+
+
+def _stacks_of(graph: Graph, endpoint: Endpoint) -> tuple[str, ...]:
+    """The layer-3 nodes an endpoint may start from or arrive at (§23.1).
+
+    An element is one node at layer 3 until it runs containers, at which point
+    it is several and the argument has to say — or be taken to mean any of them:
+
+    * ``10.30.0.11`` and ``srv-01:veth-blue`` pin the interface, and an
+      interface is in exactly one stack, so exactly one node answers;
+    * ``srv-01`` pins nothing below the machine, so every stack of it does. That
+      is the reading that keeps ``netgraph path srv-01 sw-core`` working on a
+      host whose only addresses are inside its containers, and it is the same
+      reading ``sw1`` already had at layer 2 ("by any of its ports").
+
+    Ordered as the graph is, so the initial namespace is tried first and a
+    shortest path from the machine is found before one from a container.
+    """
+    if endpoint.netns is not None:
+        pinned = netns_node_id(endpoint.element, endpoint.netns)
+        return (pinned,) if pinned in graph.nodes else ()
+    return tuple(
+        fqn
+        for fqn, node in graph.nodes.items()
+        if fqn == endpoint.element
+        or (node.netns is not None and node.netns.element == endpoint.element)
+    )
 
 
 def _tunnel_index(views: Iterable[TunnelView]) -> Mapping[tuple[str, str], tuple[TunnelView, ...]]:
@@ -638,7 +720,7 @@ def _common_family(graph: Graph, source: Endpoint, destination: Endpoint) -> tup
         )
 
     available = {
-        role: _families_of(graph.nodes.get(endpoint.element))
+        role: _families_of(graph, _stacks_of(graph, endpoint))
         for role, endpoint in (("source", source), ("destination", destination))
     }
     for role, endpoint in (("source", source), ("destination", destination)):
@@ -675,11 +757,19 @@ def _family_of(address: str) -> str:
     return f"ipv{ipaddress.ip_interface(address).version}"
 
 
-def _families_of(node: Node | None) -> frozenset[str]:
-    """The address families ``node`` holds a routable address in."""
-    if node is None:
-        return frozenset()
-    return frozenset(_family_of(address) for address in node.routable_addresses)
+def _families_of(graph: Graph, stacks: Sequence[str]) -> frozenset[str]:
+    """The address families these stacks of one element hold an address in.
+
+    The union over the stacks, because the question this answers is whether a
+    routed path to the *argument* can exist, and an argument that named the
+    machine may be satisfied by any stack in it.
+    """
+    return frozenset(
+        _family_of(address)
+        for fqn in stacks
+        if (node := graph.nodes.get(fqn)) is not None
+        for address in node.routable_addresses
+    )
 
 
 def _trace_l3(
@@ -692,10 +782,23 @@ def _trace_l3(
     max_hops: int,
     limit: int,
 ) -> _Search:
-    """Walk prefix by prefix, through the elements that forward."""
-    if (  # pragma: no cover - _common_family rejects an unaddressed endpoint first
-        source.element not in graph.nodes or destination.element not in graph.nodes
-    ):
+    """Walk prefix by prefix, through the network stacks that forward.
+
+    The unit of the walk is a **stack**, not an element (§23.1). A container and
+    the host that runs it are two nodes, two routing tables and two hops apart,
+    so a packet that leaves a container by its host's bridge crosses two
+    prefixes and is a two-hop path — where drawing one node per machine made it
+    a path of length zero, which the search then rejected (follow-up 23). On an
+    inventory that declares no ``spec.netns`` every machine is exactly one stack
+    and this is the walk it has always been.
+
+    ``visited`` therefore holds stacks: passing *through* a machine by way of a
+    second stack of it is legitimate and common, and forbidding it — which is
+    what an element-keyed set would do — is precisely the bug.
+    """
+    starts = _stacks_of(graph, source)
+    finishes = frozenset(_stacks_of(graph, destination))
+    if not starts or not finishes:  # pragma: no cover - _common_family rejects these first
         # An element with no routable address is absent from the layer-3 graph,
         # and ``_common_family`` has already turned that into a note. Defensive.
         return _Search(layer=Layer.L3)
@@ -706,12 +809,12 @@ def _trace_l3(
             continue
         for near in prefix.ends:
             for far in prefix.ends:
-                if near.element == far.element:
+                if near.node == far.node:
                     continue
-                adjacency.setdefault(near.element, []).append((prefix, near, far))
+                adjacency.setdefault(near.node, []).append((prefix, near, far))
 
     found: list[TracedPath] = []
-    depths: dict[str, int] = {source.element: 0}
+    depths: dict[str, int] = dict.fromkeys(starts, 0)
     truncated = False
 
     def walk(
@@ -723,10 +826,10 @@ def _trace_l3(
         crossed: set[str],
     ) -> None:
         nonlocal truncated
-        if current == destination.element and ingress is not None:
+        if current in finishes and ingress is not None:
             # ``ingress`` is set from the second waypoint on, and the first is
-            # the source -- which is a different element, because one element at
-            # both ends is answered by ``_same_element``.
+            # the source -- which is a different stack, because one stack at both
+            # ends is answered by ``_same_element``.
             if _matches(destination, ingress):
                 found.append(
                     _build_l3_path(graph, [*route, (current, ingress, None)], links, family)
@@ -736,30 +839,34 @@ def _trace_l3(
             truncated = truncated or len(found) >= limit
             return
         if links and not _forwards(graph.nodes[current], family):
-            # An element that does not forward is a destination, not a via.
+            # A stack that does not forward is a destination, not a via.
             return
 
         origin = not links
         for prefix, near, far in adjacency[current]:
-            if far.element in visited or prefix.prefix in crossed:
+            if far.node in visited or prefix.prefix in crossed:
                 continue
             if origin and not _matches(source, near):
                 continue
 
             depth = len(links) + 1
-            if far.element not in depths or depth < depths[far.element]:
-                depths[far.element] = depth
+            if far.node not in depths or depth < depths[far.node]:
+                depths[far.node] = depth
             route.append((current, ingress, near))
             links.append(_l3_link(prefix, near, far, tunnels))
-            visited.add(far.element)
+            visited.add(far.node)
             crossed.add(prefix.prefix)
-            walk(far.element, far, route, links, visited, crossed)
+            walk(far.node, far, route, links, visited, crossed)
             crossed.discard(prefix.prefix)
-            visited.discard(far.element)
+            visited.discard(far.node)
             links.pop()
             route.pop()
 
-    walk(source.element, None, [], [], {source.element}, set())
+    for start in starts:
+        # Every stack the source argument may have meant. A path found from the
+        # machine's own namespace and one found from a container inside it are
+        # different routes, and ``_ranked`` puts the shorter first.
+        walk(start, None, [], [], {start}, set())
     return _Search(
         layer=Layer.L3,
         paths=_ranked(found),
@@ -782,8 +889,18 @@ def _forwards(node: Node, family: str) -> bool:
     yes by default, a layer-3 switch says so explicitly, and a workstation with
     two NICs says no — which is exactly right, because a host does not route
     between them unless someone configured it to.
+
+    For a **stack** node the answer is the machine's, because that is the only
+    answer the inventory has: ``spec.forwarding`` is one statement per document
+    and §23 gives no way to say "and not in the ``blue`` namespace". So a
+    container of a forwarding host forwards, which is what makes a route out of
+    a nested namespace traceable, and none of the stacks of a host that does not
+    forward do. A per-namespace override, if it is ever wanted, is a change to
+    the model that this reads without further work.
     """
     element = node.element
+    if element is None and node.netns is not None:
+        element = node.netns.device
     if not isinstance(element, Device) or element.spec.forwarding is None:
         return False
     forwarding = element.spec.forwarding
@@ -796,12 +913,18 @@ def _l3_link(
     far: _End,
     tunnels: Mapping[tuple[str, str], tuple[TunnelView, ...]],
 ) -> Link:
-    """One prefix crossing, with the tunnel behind it when there is one."""
+    """One prefix crossing, with the tunnel behind it when there is one.
+
+    ``source`` and ``target`` are the *nodes* the hop runs between, which at
+    layer 3 are stacks and everywhere else are elements — the JSON report has
+    always called them ``node`` — so a hop from a container to its host names
+    both ends distinguishably instead of naming one machine twice.
+    """
     return Link(
         id=prefix.prefix,
         kind=str(EdgeKind.SUBNET),
-        source=near.element,
-        target=far.element,
+        source=near.node,
+        target=far.node,
         source_port=near.interface,
         target_port=far.interface,
         subnet=prefix.prefix,
@@ -823,6 +946,28 @@ def _shared_tunnel(
     return next((view for view in here if view.fqn in there), None)
 
 
+def _l3_waypoint(node: Node, ingress: _End | None, egress: _End | None) -> Waypoint:
+    """One stop on a routed path, named as the machine plus its namespace.
+
+    A waypoint reports the **element**, not the node id, even where the node is
+    a stack: ``hosts/srv-01`` is the thing a reader can open, rename and point
+    at, and ``netns:hosts/srv-01:blue`` is an identity the graph mints. Which
+    stack of it the traffic was in is a fact of its own and is carried as one
+    (:attr:`~netgraph.trace.model.Waypoint.netns`); ``kind`` likewise stays the
+    machine's, so a routed report reads ``server`` and not ``netns``.
+    """
+    view = node.netns
+    return Waypoint(
+        element=view.element if view is not None else node.fqn,
+        kind=view.owner_kind or node.kind if view is not None else node.kind,
+        netns=view.name if view is not None else "",
+        ingress=ingress.interface if ingress is not None else None,
+        egress=egress.interface if egress is not None else None,
+        ingress_addresses=ingress.addresses if ingress is not None else (),
+        egress_addresses=egress.addresses if egress is not None else (),
+    )
+
+
 def _build_l3_path(
     graph: Graph,
     route: Sequence[tuple[str, _End | None, _End | None]],
@@ -830,15 +975,7 @@ def _build_l3_path(
     family: str,
 ) -> TracedPath:
     waypoints = tuple(
-        Waypoint(
-            element=element,
-            kind=graph.nodes[element].kind,
-            ingress=ingress.interface if ingress is not None else None,
-            egress=egress.interface if egress is not None else None,
-            ingress_addresses=ingress.addresses if ingress is not None else (),
-            egress_addresses=egress.addresses if egress is not None else (),
-        )
-        for element, ingress, egress in route
+        _l3_waypoint(graph.nodes[node], ingress, egress) for node, ingress, egress in route
     )
     return TracedPath(waypoints=waypoints, links=tuple(links), layer=Layer.L3, family=family)
 

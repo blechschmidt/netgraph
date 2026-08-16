@@ -1,0 +1,480 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-dock-01
+  description: >-
+    A Docker host with six containers' worth of network stack in it: the default
+    bridge, two user-defined networks (one of them internal), a swarm overlay
+    whose bridge lives in a sandbox namespace of its own, and a
+    Docker-in-Docker container running a second daemon with a third level of
+    namespace under it.
+spec:
+  vendor: Supermicro
+  model: SYS-5019C-MR
+  # Every packet between a container and the world is forwarded by this
+  # machine, so the flag is not decoration: with it off, `docker run` produces
+  # containers that can reach the bridge and nothing beyond it.
+  forwarding:
+    ipv4: true
+    ipv6: false
+
+  # `ip netns list` prints nothing on a Docker host: the runtime bind-mounts its
+  # namespaces under /run/docker/netns instead of /var/run/netns. `lsns -t net`
+  # prints all of them, and this is what it prints here. The names are the ones
+  # a human uses; Docker's own are the container id and, for the overlay, a
+  # sandbox key like `1-4mtsdaz6qe`.
+  netns:
+    - name: c-legacy
+      description: A container on the default bridge, started without --network.
+    - name: c-web
+      description: >-
+        The frontend. Two networks: the user-defined bridge 'app' and the swarm
+        overlay, which is why it has two interfaces and one default gateway.
+    - name: c-api
+      description: >-
+        The API. Also on two networks - 'app' and the internal 'data' - which
+        makes this container, and not the host, the only route between them.
+    - name: c-db
+      description: >-
+        The database, on the internal network alone. It has no default gateway
+        because there is nothing for one to point at.
+    - name: ov-app
+      description: >-
+        The overlay sandbox. Docker calls it 1-4mtsdaz6qe and it belongs to the
+        network rather than to any container: the VXLAN device and the bridge
+        every overlay-attached container is wired into both live here.
+    - name: dind
+      description: >-
+        Docker-in-Docker: a container running a second dockerd, with a docker0
+        of its own.
+    - name: dind-ci
+      parent: dind
+      description: >-
+        A container started by the inner daemon. Three levels down, and reached
+        only through the namespace above it.
+
+  interfaces:
+    # ----------------------------------------------------------------- #
+    # The initial namespace: the machine's own stack.
+    # ----------------------------------------------------------------- #
+    - name: eno1
+      type: ethernet
+      description: Primary uplink. The VXLAN underlay leaves by here.
+      mtu: 1500
+      ipv4:
+        addresses:
+          - ip: 10.20.0.21
+            prefix_length: 24
+        gateway: 10.20.0.1
+    - name: eno2
+      type: ethernet
+      description: >-
+        Second uplink. No gateway on purpose - nothing routes this way by
+        default; the 'app-egress' table below is what sends anything out of it.
+      mtu: 1500
+      ipv4:
+        addresses:
+          - ip: 10.20.1.21
+            prefix_length: 24
+
+    # `docker network ls` prints three of these, and here they are as what they
+    # actually are: bridges in the host's initial namespace with the network's
+    # gateway address on them.
+    - name: docker0
+      type: bridge
+      description: The default bridge - 'docker0', network 'bridge', pool 172.17.0.0/16.
+      ipv4:
+        addresses:
+          - ip: 172.17.0.1
+            prefix_length: 16
+      members: [veth-legacy]
+    - name: br-app
+      type: bridge
+      description: >-
+        Network 'app', a user-defined bridge. Docker names it br- plus the first
+        twelve characters of the network id (br-8f4e2c1d9a0b here); it is
+        written by its purpose because that is what a document is for.
+      ipv4:
+        addresses:
+          - ip: 172.18.0.1
+            prefix_length: 24
+      members: [veth-web, veth-api, veth-dind]
+    - name: br-data
+      type: bridge
+      description: >-
+        Network 'data', created with --internal. The bridge holds the gateway
+        address like any other, and the firewall below is the whole of what
+        makes it internal.
+      members: [veth-apid, veth-db]
+      ipv4:
+        addresses:
+          - ip: 172.19.0.1
+            prefix_length: 24
+
+    # The host halves of every pair. `ip link` shows these as vethf3a91c2@if12;
+    # the suffix is the peer's index in the namespace it was moved into, which
+    # is exactly the pairing 'peer' states below by name.
+    - name: veth-legacy
+      type: ethernet
+      description: Host end of the pair into c-legacy; a port of docker0.
+      peer: legacy-eth0
+    - name: veth-web
+      type: ethernet
+      description: Host end of the pair into c-web; a port of br-app.
+      peer: web-eth0
+    - name: veth-api
+      type: ethernet
+      description: Host end of the pair into c-api on 'app'.
+      peer: api-eth0
+    - name: veth-apid
+      type: ethernet
+      description: Host end of the second pair into c-api, on 'data'.
+      peer: api-eth1
+    - name: veth-db
+      type: ethernet
+      description: Host end of the pair into c-db.
+      peer: db-eth0
+    - name: veth-dind
+      type: ethernet
+      description: Host end of the pair into the Docker-in-Docker container.
+      peer: dind-eth0
+
+    # ----------------------------------------------------------------- #
+    # The containers. Each is a namespace with one or two interfaces in it, and
+    # every one of those interfaces is the far end of a pair above.
+    #
+    # Docker calls all of them eth0 and eth1, and inside their own namespaces
+    # that is what they are called: a namespace is a name space, and two
+    # containers on one host both having an eth0 is the ordinary case rather
+    # than a collision. netgraph needs interface names to be unique within an
+    # element (NG-I001), so they are written here as <container>-eth<n>. See
+    # follow-up 24 in docs/follow-ups.md.
+    # ----------------------------------------------------------------- #
+    - name: legacy-eth0
+      type: ethernet
+      description: eth0 in c-legacy. The default bridge, so an address out of 172.17/16.
+      ipv4:
+        addresses:
+          - ip: 172.17.0.2
+            prefix_length: 16
+        gateway: 172.17.0.1
+
+      netns: c-legacy
+      peer: veth-legacy
+    - name: web-eth0
+      type: ethernet
+      description: eth0 in c-web, on 'app'. The default route leaves by here.
+      ipv4:
+        addresses:
+          - ip: 172.18.0.2
+            prefix_length: 24
+        gateway: 172.18.0.1
+      netns: c-web
+      peer: veth-web
+    - name: web-eth1
+      type: ethernet
+      description: >-
+        eth1 in c-web, on the overlay. No gateway: an overlay carries the
+        service's own prefix and nothing else, and a second default route here
+        would be the bug it is on any multi-homed host.
+      mtu: 1450
+      ipv4:
+        addresses:
+          - ip: 10.0.9.2
+            prefix_length: 24
+
+      netns: c-web
+      peer: ov-veth-web
+    - name: api-eth0
+      type: ethernet
+      description: eth0 in c-api, on 'app'.
+      ipv4:
+        addresses:
+          - ip: 172.18.0.3
+            prefix_length: 24
+        gateway: 172.18.0.1
+      netns: c-api
+      peer: veth-api
+    - name: api-eth1
+      type: ethernet
+      description: >-
+        eth1 in c-api, on the internal 'data' network. This interface and the
+        one above are why the API is the only thing that can reach the database.
+      ipv4:
+        addresses:
+          - ip: 172.19.0.2
+            prefix_length: 24
+
+      netns: c-api
+      peer: veth-apid
+    - name: db-eth0
+      type: ethernet
+      description: eth0 in c-db. One interface, no gateway, no way out.
+      netns: c-db
+      peer: veth-db
+      ipv4:
+        addresses:
+          - ip: 172.19.0.3
+            prefix_length: 24
+
+    # ----------------------------------------------------------------- #
+    # The overlay sandbox. This namespace holds no container: it holds the
+    # network, and every node running a task on that network has one.
+    # ----------------------------------------------------------------- #
+    - name: ov-br0
+      type: bridge
+      description: >-
+        br0 in the sandbox, holding the overlay's gateway address. Docker gives
+        *every* node's br0 the same .1, which is a distributed gateway to a
+        swarm and one address claimed twice to an inventory; this example gives
+        the second node a different one. See follow-up 25.
+      mtu: 1450
+      ipv4:
+        addresses:
+          - ip: 10.0.9.1
+            prefix_length: 24
+      members: [ov-vxlan0, ov-veth-web]
+      netns: ov-app
+    - name: ov-vxlan0
+      type: tunnel
+      description: >-
+        The VXLAN device, in the sandbox namespace but with 'parent: eno1' - the
+        underlay port its outer packets leave by, which is in the *initial*
+        namespace. That is not a mistake in the document: a VXLAN device created
+        in one namespace and moved into another keeps sending from the namespace
+        it was created in, which is exactly how the sandbox reaches the other
+        node without having an uplink of its own.
+      mtu: 1450
+      parent: eno1
+      netns: ov-app
+    - name: ov-veth-web
+      type: ethernet
+      description: The sandbox end of the pair into c-web; a port of ov-br0.
+      netns: ov-app
+      peer: web-eth1
+
+    # ----------------------------------------------------------------- #
+    # Docker-in-Docker: a second daemon, one level down, and a container under
+    # that one.
+    # ----------------------------------------------------------------- #
+    - name: dind-eth0
+      type: ethernet
+      description: eth0 in the dind container, on 'app' like any other container.
+      ipv4:
+        addresses:
+          - ip: 172.18.0.4
+            prefix_length: 24
+        gateway: 172.18.0.1
+      netns: dind
+      peer: veth-dind
+    - name: dind-docker0
+      type: bridge
+      description: >-
+        The inner daemon's docker0. It picks 172.17.0.1/16 out of the default
+        pool exactly as the outer one did, and both are written here: two
+        namespaces are two address spaces, so this is not a clash and netgraph
+        does not report one. It is also why the inner daemon must not be given
+        --network host.
+      ipv4:
+        addresses:
+          - ip: 172.17.0.1
+            prefix_length: 16
+      members: [dind-veth-ci]
+      netns: dind
+    - name: dind-veth-ci
+      type: ethernet
+      description: The inner daemon's host end of the pair into its own container.
+      netns: dind
+      peer: ci-eth0
+    - name: ci-eth0
+      type: ethernet
+      description: >-
+        eth0 in a container of the inner daemon, three levels below the machine.
+        Its packets are NATed by the inner daemon, NATed again by this host, and
+        arrive on the lab LAN as 10.20.0.21.
+      netns: dind-ci
+      peer: dind-veth-ci
+      ipv4:
+        addresses:
+          - ip: 172.17.0.2
+            prefix_length: 16
+        gateway: 172.17.0.1
+
+  # ------------------------------------------------------------------- #
+  # A second way out, for one network's traffic only. The mark is written by
+  # the firewall below; this is the half that reads it.
+  # ------------------------------------------------------------------- #
+  route_tables:
+    - name: app-egress
+      id: 100
+      description: What the 'app' network's marked traffic is routed by.
+  routes:
+    # The second uplink's default route. It is in a table nothing looks up
+    # unless the policy rule below sends it there, which is why the main table
+    # is untouched and every other packet still leaves by eno1.
+    - prefix: 0.0.0.0/0
+      via: 10.20.1.1
+      dev: eno2
+      table: app-egress
+  routing_policy:
+    - priority: 110
+      fwmark: '0x1'
+      action: lookup
+      table: app-egress
+      description: Marked packets are routed by app-egress rather than by main.
+
+  # ------------------------------------------------------------------- #
+  # What `iptables -S` prints on a Docker host, written as zones and policy.
+  # Every network is a zone, because that is what Docker's own isolation rules
+  # are about: which bridge the packet arrived on.
+  # ------------------------------------------------------------------- #
+  zones:
+    - name: wan
+      interfaces: [eno1]
+      description: The lab LAN, which is 'outside' from a container's point of view.
+    - name: wan-b
+      interfaces: [eno2]
+      description: The second way out.
+    - name: net-default
+      interfaces: [docker0]
+      description: Network 'bridge' - what a container gets when nobody chose.
+    - name: net-app
+      interfaces: [br-app]
+      description: Network 'app'.
+    - name: net-data
+      interfaces: [br-data]
+      description: Network 'data', the internal one.
+    # The veth ends are in no zone and need none: a bridge port is governed by
+    # the bridge above it, and an interface inside a container's namespace is
+    # not in this stack at all - the container has a netfilter instance of its
+    # own, and nothing written here can see it.
+
+  firewall:
+    description: |
+      Docker's own chains, said once. DOCKER-USER and DOCKER-ISOLATION-STAGE-1
+      are the two the operator is expected to edit, and both of them are
+      statements about zone pairs: which network may reach the outside, and
+      which networks may reach each other.
+    default_input: drop
+    default_forward: drop
+    default_output: accept
+    rules:
+      - priority: 10
+        ct_state: [established, related]
+        action: accept
+        description: The return path of everything below, in one line.
+      - priority: 20
+        src_zone: wan
+        dst_zone: local
+        protocol: tcp
+        dst_ports: ['22']
+        action: accept
+        description: SSH to the host itself.
+
+      # Non-terminal, so it does not shadow the accept at 110: the packet is
+      # marked and the walk carries on. It names no destination zone because
+      # nothing has been routed yet when the mark is written - which is the
+      # reason the routing policy above exists at all.
+      - priority: 30
+        src_zone: net-app
+        protocol: tcp
+        dst_ports: ['443']
+        action: mark
+        mark: '0x1'
+        description: The 'app' network's HTTPS egress, marked for the second uplink.
+
+      - priority: 100
+        src_zone: net-default
+        dst_zone: wan
+        action: accept
+        description: The default bridge reaches the world.
+      - priority: 110
+        src_zone: net-app
+        dst_zone: wan
+        action: accept
+      - priority: 120
+        src_zone: net-app
+        dst_zone: wan-b
+        action: accept
+        description: The other half of the marked path; without it the mark drops traffic.
+
+      - priority: 200
+        src_zone: wan
+        dst_zone: net-app
+        dst: 172.18.0.2/32
+        protocol: tcp
+        dst_ports: ['8443']
+        action: accept
+        description: >-
+          The published port, seen after translation. -p 443:8443 is two rules,
+          and this is the second: the DNAT below rewrites the destination, and
+          this is what lets the rewritten packet be forwarded.
+
+      # DOCKER-ISOLATION-STAGE-2, which is what makes two user-defined networks
+      # two networks. c-api is on 'app' and on 'data' and still reaches both,
+      # because it does so from inside itself rather than through this host.
+      - priority: 300
+        src_zone: net-app
+        dst_zone: net-default
+        action: drop
+      - priority: 310
+        src_zone: net-default
+        dst_zone: net-app
+        action: drop
+      - priority: 320
+        src_zone: net-app
+        dst_zone: net-data
+        action: drop
+      - priority: 330
+        src_zone: net-data
+        dst_zone: net-app
+        action: drop
+
+      # --internal, in the only place it is ever really written down.
+      - priority: 400
+        src_zone: net-data
+        dst_zone: wan
+        action: reject
+        description: An internal network has no way out, and says so rather than hanging.
+      - priority: 410
+        src_zone: net-data
+        dst_zone: wan-b
+        action: reject
+
+    nat:
+      - name: masq-default
+        type: masquerade
+        dst_zone: wan
+        src: 172.17.0.0/16
+        description: >-
+          The rule dockerd installs per network. It is a masquerade and not an
+          snat because the address it rewrites to is the uplink's, which the
+          daemon does not know and must not cache.
+      - name: masq-app
+        type: masquerade
+        dst_zone: wan
+        src: 172.18.0.0/24
+      - name: masq-app-b
+        type: masquerade
+        dst_zone: wan-b
+        src: 172.18.0.0/24
+        description: The same network leaving by the second uplink, which is a second rule.
+      - name: hairpin-app
+        type: masquerade
+        dst_zone: net-app
+        src: 172.18.0.0/24
+        dst: 172.18.0.0/24
+        description: >-
+          The hairpin rule, and the answer to why a container reaching a
+          published port on its own host sees the gateway as the source.
+      - name: publish-web
+        type: dnat
+        src_zone: wan
+        dst_zone: local
+        protocol: tcp
+        dst_ports: ['443']
+        to_address: 172.18.0.2
+        to_port: 8443
+        description: -p 443:8443 on c-web. The other half is the filter rule at 200.
+      # Network 'data' appears in neither list: --internal is exactly the
+      # absence of a masquerade plus the presence of the two rejects above.

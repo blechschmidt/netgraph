@@ -39,6 +39,9 @@ from netgraph.errors import NetgraphError
 from netgraph.layout.geometry import Geometry
 from netgraph.loader import Inventory, load_stream
 from netgraph.plan import Plan
+from netgraph.query import QueryError
+from netgraph.query import parse as parse_query
+from netgraph.query.apply import narrow as narrow_graph
 from netgraph.render import (
     DETAIL_OPTIONS,
     FilterSpec,
@@ -48,7 +51,6 @@ from netgraph.render import (
     RenderOptions,
     build_details,
     build_graph,
-    filter_graph,
 )
 from netgraph.render.aggregate import (
     AGGREGATE_ID_PREFIX,
@@ -163,6 +165,13 @@ class ViewOptions:
     vlans: frozenset[int] = frozenset()
     #: Keep only these element kinds; empty keeps everything.
     kinds: tuple[str, ...] = ()
+    #: A selector query (:mod:`netgraph.query`) the drawing is narrowed to, or
+    #: ``None``. The browser's, like ``collapse``: the search box can *filter*
+    #: as well as highlight, and filtering is the same narrowing ``render
+    #: --select`` does — so it goes through the same
+    #: :class:`~netgraph.render.graph.FilterSpec` rather than the browser
+    #: hiding shapes it was sent.
+    select: str | None = None
     title: str | None = None
     #: Promote surviving warnings to errors, as ``--strict`` does elsewhere.
     strict: bool = False
@@ -204,6 +213,8 @@ class ViewOptions:
             values["vlans"] = _vlans(payload["vlans"])
         if "kinds" in payload:
             values["kinds"] = _strings(payload["kinds"], "kinds")
+        if payload.get("select"):
+            values["select"] = _query(payload["select"])
         if "collapse" in payload:
             values["collapse"] = _namespaces(payload["collapse"])
         if payload.get("title"):
@@ -252,11 +263,13 @@ class ViewOptions:
             payload["collapse"] = [
                 item for value in query["collapse"] for item in value.split(",") if item
             ]
+        if query.get("select"):
+            payload["select"] = query["select"][-1]
         return cls.from_request(payload, icons=icons, theme=theme)
 
     @property
     def filter_spec(self) -> FilterSpec:
-        return FilterSpec(vlans=self.vlans, kinds=self.kinds)
+        return FilterSpec(vlans=self.vlans, kinds=self.kinds, select=self.select)
 
     @property
     def render_options(self) -> RenderOptions:
@@ -524,7 +537,7 @@ def render_inventory(
     rejected = bool(inventory.errors) or any(finding.severity.is_fatal for finding in findings)
 
     try:
-        whole = filter_graph(build_graph(inventory, layer=options.layer), options.filter_spec)
+        whole = narrow_graph(build_graph(inventory, layer=options.layer), options.filter_spec)
         # Folding is applied *after* the filters and before anything is drawn or
         # fingerprinted, so a folded container is a different picture and gets a
         # different hash. ``whole`` is kept: the container payload is built from
@@ -739,8 +752,8 @@ def render_diff(
     try:
         drawing = draw(
             plan,
-            filter_graph(build_graph(before, layer=options.layer), options.filter_spec),
-            filter_graph(build_graph(after, layer=options.layer), options.filter_spec),
+            narrow_graph(build_graph(before, layer=options.layer), options.filter_spec),
+            narrow_graph(build_graph(after, layer=options.layer), options.filter_spec),
         )
         graph = drawing.graph
         marked = replace(options.render_options, diff=drawing.overlay)
@@ -956,6 +969,22 @@ def _strings(value: Any, field_name: str) -> tuple[str, ...]:
     if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
         raise RequestError(f"{field_name!r} must be a list of strings")
     return tuple(value)
+
+
+def _query(value: Any) -> str:
+    """``select`` as a query, checked here so a bad one is a 400 and not a 500.
+
+    Parsed and thrown away, exactly as ``--select``'s Click callback does: the
+    answer depends on a graph that has not been built yet, and a malformed
+    expression should be refused before an inventory is read. The parse error
+    carries its caret block, and the browser puts it under the search box.
+    """
+    text = _text(value, "select")
+    try:
+        parse_query(text, source="select")
+    except QueryError as exc:
+        raise RequestError(str(exc)) from exc
+    return text
 
 
 def _text(value: Any, field_name: str) -> str:

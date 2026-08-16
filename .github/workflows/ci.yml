@@ -118,6 +118,34 @@ jobs:
           sudo apt-get install --no-install-recommends --yes graphviz
           dot -V
 
+      # ``nft --check`` parses a ruleset without committing it, and is the only
+      # gate on the generated ``etc/nftables.conf`` that is not netgraph reading
+      # its own writing. It still opens a netlink socket before it reads the
+      # file, though, and that needs CAP_NET_ADMIN -- so on an unprivileged
+      # runner every check failed with "cache initialization failed: Operation
+      # not permitted", which is a verdict about this job and was reported as
+      # though the ruleset were malformed.
+      #
+      # tests/platform_marks.py measures whether nft can parse here and skips if
+      # it cannot, so the suite is honest either way. This step is what keeps the
+      # gate *running* rather than skipping: it grants the binary the capability
+      # and then checks an empty ruleset, so a grant that did not take fails the
+      # job here rather than quietly turning the check off.
+      #
+      # It relies on the ``apt-get update`` above, which is Linux-only too and
+      # runs immediately before it.
+      - name: Let nft syntax-check a ruleset (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get install --no-install-recommends --yes nftables libcap2-bin
+          sudo setcap cap_net_admin+ep "$(command -v nft)"
+          # An empty ruleset, in a real file: nft refuses /dev/null as "not a
+          # regular file", and the point here is the netlink socket it opens
+          # before reading, not what is in the file.
+          : > "${RUNNER_TEMP:-/tmp}/probe.nft"
+          nft --check -f "${RUNNER_TEMP:-/tmp}/probe.nft"
+
       - name: Install Graphviz (macOS)
         if: runner.os == 'macOS'
         run: |

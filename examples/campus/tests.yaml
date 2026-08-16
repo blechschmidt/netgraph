@@ -110,3 +110,33 @@ spec:
       name: every site has at least two access switches
       select: kind=switch, name=*-acc-*
       at_least: 6
+
+    # The same vocabulary, written as queries (docs/query.md). An `assert:
+    # query` with no bound claims the query matches *nothing*, which is how a
+    # network invariant reads: it is a search for the counterexamples, and the
+    # counterexamples are the failure report.
+    - assert: query
+      name: no switch or router is missing an address
+      description: |
+        A device with no address is a device nothing can reach to configure it.
+        The three assertions below are the ones a substring match or a
+        key=value selector could not have expressed at all.
+      query: kind in (switch, router) and not has address
+
+    - assert: query
+      name: every access switch reaches the distribution layer in one hop
+      query: label.role = access and not neighbors of (label.role = distribution)
+
+    - assert: query
+      name: every campus address is inside the site's own /16
+      query: >-
+        namespace under sites and
+        interface[has address and not address in 10.0.0.0/8
+        and not address in 192.0.2.0/24 and not address in 198.51.100.0/24
+        and not address in 2001:db8::/32 and not address in 127.0.0.0/8
+        and not address in ::1/128]
+
+    - assert: query
+      name: the campus has exactly three core routers
+      query: kind = router and label.role = core
+      equals: 3

@@ -116,7 +116,10 @@ def _path_lines(path: TracedPath, *, index: int, total: int) -> Iterator[str]:
     yield " · ".join(summary)
 
     for step, waypoint in enumerate(path.waypoints):
-        yield f"  {step + 1:>2}  {waypoint.element}  [{waypoint.kind}]"
+        # ``label`` and not ``element``: on a routed path through a container
+        # host the same machine is two stops, and two identical lines would read
+        # as a bug in the report rather than as the two routing tables it is.
+        yield f"  {step + 1:>2}  {waypoint.label}  [{waypoint.kind}]"
         yield from _port_lines(waypoint, internal=path.hops == 0)
         if step < len(path.links):
             yield f"      ->  {_link_text(path.links[step])}"
@@ -210,13 +213,15 @@ def _no_path(result: TraceResult) -> Iterator[str]:
     still have got to, so the break is between it and whatever should have come
     next — which is a far more useful answer than "unreachable".
     """
-    if result.source.element == result.destination.element:
-        # Both ends are one element; the notes above already said why nothing
-        # crosses it, and there is no topology to have reached.
+    if result.source.element == result.destination.element and Layer.L3 not in result.attempted:
+        # Both ends are one element *and* one network stack; the notes above
+        # already said why nothing crosses it, and there is no topology to have
+        # reached. Two stacks of one machine are a routed question and get the
+        # ordinary answer below, frontier and all.
         yield f"nothing crosses {result.source.element} between those two ports."
         return
     yield (
-        f"no path from {result.source.element} to {result.destination.element} "
+        f"no path from {result.source.stack} to {result.destination.stack} "
         f"within {_plural(result.max_hops, 'hop')}."
     )
     for frontier in result.frontiers:
@@ -286,6 +291,8 @@ def _endpoint(endpoint: Endpoint) -> dict[str, Any]:
         payload["interface"] = endpoint.interface
     if endpoint.address is not None:
         payload["address"] = endpoint.address
+    if endpoint.netns:
+        payload["netns"] = endpoint.netns
     return payload
 
 
@@ -298,6 +305,13 @@ def _path(path: TracedPath) -> dict[str, Any]:
         "waypoints": [_waypoint(waypoint) for waypoint in path.waypoints],
         "links": [_link(link) for link in path.links],
     }
+    if path.is_split:
+        # Only when the route actually passed through a container (§23.1).
+        # ``elements`` names the machine at every stop, so on a split route it
+        # names one twice and a consumer needs the node ids to tell the two
+        # routing tables apart; on every other route the two lists are equal and
+        # emitting both would be noise in every document ever produced.
+        payload["nodes"] = list(path.nodes)
     if path.family is not None:
         payload["family"] = path.family
     if path.tunnels:
@@ -313,6 +327,9 @@ def _waypoint(waypoint: Waypoint) -> dict[str, Any]:
         "name": waypoint.name,
         "kind": waypoint.kind,
     }
+    if waypoint.netns:
+        payload["netns"] = waypoint.netns
+        payload["node"] = waypoint.node
     if waypoint.ingress is not None:
         payload["ingress"] = {
             "interface": waypoint.ingress,

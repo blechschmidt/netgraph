@@ -140,9 +140,19 @@ var netgraphKeys = (function () {
     handlers[id] = { run: spec.run, enabled: spec.enabled || null };
   }
 
-  /** Register a source of palette entries: elements, files, layers. */
-  function provide(name, fn) {
+  /** Register a source of palette entries: elements, files, layers.
+   *
+   * `options.live` marks a provider whose entries depend on what has been
+   * *typed*, not only on what the page holds — a selector query is the case it
+   * exists for. A live provider is called with the current needle on every
+   * refresh and with a `redraw` callback it may call later, and its entries
+   * skip the scorer: it has already decided what matches, and running a
+   * subsequence match over "42 elements match this query" would rank it by the
+   * wrong string.
+   */
+  function provide(name, fn, options) {
     providers[name] = fn;
+    fn.live = !!(options && options.live);
   }
 
   /** Why `id` cannot run now, or "" when it can. */
@@ -298,7 +308,7 @@ var netgraphKeys = (function () {
    * `scope` narrows it to one provider, which is what Ctrl-G ("go to element")
    * and Ctrl-O ("open file") are: the same widget with a smaller universe.
    */
-  function entries(scope) {
+  function entries(scope, needle, redraw) {
     var found = [];
     if (!scope) {
       table.bindings.forEach(function (binding) {
@@ -316,7 +326,8 @@ var netgraphKeys = (function () {
     }
     Object.keys(providers).forEach(function (name) {
       if (scope && scope !== name) { return; }
-      var offered = providers[name]() || [];
+      var provider = providers[name];
+      var offered = (provider.live ? provider(needle || "", redraw) : provider()) || [];
       offered.forEach(function (entry) {
         found.push({
           key: name + ":" + entry.id,
@@ -325,7 +336,8 @@ var netgraphKeys = (function () {
           group: entry.group || name,
           chord: entry.chord || "",
           why: entry.why || "",
-          run: entry.run
+          run: entry.run,
+          always: !!provider.live
         });
       });
     });
@@ -408,14 +420,24 @@ var netgraphKeys = (function () {
     box.appendChild(status);
     node.appendChild(box);
 
-    var universe = entries(scope);
     var shown = [];
     var cursor = 0;
 
     function refresh() {
       var needle = input.value.trim();
+      // Recomputed per keystroke rather than once at open, because a live
+      // provider's entries *are* a function of the needle. The static
+      // providers rebuild a few hundred cheap objects, which is nothing beside
+      // the scoring pass that follows.
+      var universe = entries(scope, needle, function () {
+        if (palette && palette.entry === entry) { refresh(); }
+      });
       shown = universe
-        .map(function (entry) { return { entry: entry, score: score(needle, entry) }; })
+        .map(function (one) {
+          // A live provider has already decided; scoring it again would rank a
+          // sentence about the query above the query's own result.
+          return { entry: one, score: one.always ? Infinity : score(needle, one) };
+        })
         .filter(function (hit) { return hit.score > 0; })
         .sort(function (a, b) { return b.score - a.score; })
         .slice(0, MAX_RESULTS)

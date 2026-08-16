@@ -555,10 +555,10 @@ class DeviceSpec(NetgraphModel):
         """Every interface that could be in a zone and is not, in order (``W151``).
 
         Not an error: an interface carrying no transit traffic — a console port,
-        a namespace-internal veth end — belongs in no zone, and a device that
-        declares no zone at all has all of them here.
+        for instance — belongs in no zone, and a device that declares no zone at
+        all has all of them here.
 
-        Two kinds of interface are left out, because for them "in no zone" is
+        Three kinds of interface are left out, because for them "in no zone" is
         not an omission but the truth:
 
         * a **loopback**, which carries no transit traffic by construction.
@@ -567,7 +567,15 @@ class DeviceSpec(NetgraphModel):
         * a **member of an aggregate**, which is governed by the LAG or bridge
           above it exactly as §10.6 has it everywhere else. Putting ``bond0`` in
           a zone puts its lanes there; demanding each lane separately would be
-          asking for the one statement the aggregate exists to avoid repeating.
+          asking for the one statement the aggregate exists to avoid repeating;
+        * an interface **in a network namespace** (§23.1). ``spec.zones``
+          partitions the stack the policy above it is written for, and that is
+          the machine's initial namespace: a container's ``eth0`` is in a second
+          stack with a netfilter instance of its own, which nothing written here
+          can see and nothing written here can reach. Without this, every
+          container on a host that declares zones at all would be reported, and
+          the only edit that silenced it would be a lie about which firewall
+          filters that interface.
         """
         aggregated = {
             member for interface in self.interfaces for member in (interface.members or ())
@@ -576,6 +584,7 @@ class DeviceSpec(NetgraphModel):
             interface
             for interface in self.interfaces
             if interface.type is not InterfaceType.LOOPBACK
+            and not interface.netns_name
             and interface.name not in aggregated
             and self.zone_of(interface.name) is None
         )

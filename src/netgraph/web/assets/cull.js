@@ -454,9 +454,22 @@ window.netgraphCull = (function () {
     return { active: active, coarse: coarse, drawn: drawn, total: count() };
   }
 
+  /** Every element id the current drawing holds, as a set.
+   *
+   * The index rather than the DOM, for the reason `boxOf` is the index rather
+   * than `getBBox`: a parked element is still an element, and search.js has to
+   * be able to mark one whether or not it is on screen.
+   */
+  function ids() {
+    var found = {};
+    Object.keys(boxes).forEach(function (id) { found[id] = true; });
+    return found;
+  }
+
   return {
     attach: attach,
     index: index,
+    ids: ids,
     reset: reset,
     update: update,
     schedule: schedule,

@@ -126,7 +126,10 @@ from netgraph.loader.tree import InventoryFile, iter_inventory_files
 from netgraph.plan import PlanSourceError
 from netgraph.plan import diff as diff_states
 from netgraph.plan.sources import git_ref
+from netgraph.query import QueryError
+from netgraph.query import select as run_query
 from netgraph.render import IconTheme
+from netgraph.render.graph import Layer, build_graph
 from netgraph.render.routes import RouteCache
 from netgraph.validate import Finding, validate
 from netgraph.watch.pipeline import Problem, Status, flatten_problems
@@ -1675,6 +1678,77 @@ class EditingSession:
             "takes_more": plan.takes_more,
             "message": describe_cascade(plan).removeprefix(", and "),
             **plan.to_dict(),
+        }
+
+    def search(self, expression: str, *, layer: str = "l1") -> dict[str, Any]:
+        """Answer a selector query against the tree as it stands. Reads only.
+
+        The editor's search box and its command palette both post here. A query
+        is cheap — the graph is already built for the drawing, and answering ten
+        terms over a thousand devices is single-digit milliseconds — so this is
+        called on a keystroke debounce rather than on Enter, which is what lets
+        the matches highlight as the expression is typed.
+
+        Nothing here changes a file, a revision or the undo stack.
+
+        Args:
+            expression: The query, in the language of :mod:`netgraph.query`.
+            layer: Which view to answer it against, so a search made while
+                looking at layer 3 finds the subnets the reader can see.
+
+        Returns:
+            ``addresses`` — the elements matched, in the spelling the canvas
+            selects with, so the result posts straight back to ``/api/ops`` as a
+            bulk edit — plus the ``nodes`` as the graph names them, the
+            ``witnesses`` a scope matched, the ``count``, and the ``revision``
+            the answer was computed at. A malformed query comes back as
+            ``error`` with the caret block in it rather than as a refusal: a
+            half-typed expression is the normal state of a search box, and a
+            toast on every keystroke would be unusable.
+        """
+        with self._lock:
+            inventory = self.inventory()
+            revision = self._revision
+        try:
+            wanted = Layer(layer)
+        except ValueError:
+            raise SessionError(
+                f"unknown layer {layer!r}; expected {', '.join(one.value for one in Layer)}"
+            ) from None
+        graph = build_graph(inventory, layer=wanted)
+        try:
+            result = run_query(expression, graph, source="search")
+        except QueryError as exc:
+            return {
+                "revision": revision,
+                "query": expression,
+                "error": str(exc),
+                "column": exc.column,
+                "count": 0,
+                "addresses": [],
+                "nodes": [],
+                "witnesses": [],
+            }
+        addresses: list[str] = []
+        for fqn in result.nodes:
+            node = graph.nodes.get(fqn)
+            # ``Node.address`` is what a click on the node acts on, which is the
+            # machine rather than the container for a stack node (§23.4). That is
+            # what a bulk edit can be posted for, and a search feeding a bulk
+            # edit is the whole point of returning it.
+            address = node.address if node is not None else fqn
+            if address not in addresses:
+                addresses.append(address)
+        return {
+            "revision": revision,
+            "query": expression,
+            "count": len(result.nodes),
+            "addresses": addresses,
+            "nodes": list(result.nodes),
+            "witnesses": [
+                {"domain": one.domain, "element": one.element, "name": one.name}
+                for one in result.witnesses
+            ],
         }
 
     def baselines(self) -> tuple[str, ...]:
