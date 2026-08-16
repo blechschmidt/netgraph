@@ -4764,6 +4764,62 @@ def test_a_link_is_offered_no_shape_and_no_icon(open_editor: OpenEditor) -> None
     expect_style(editor, A_CABLE, {"stroke": "#ff0000"})
 
 
+def test_the_inspector_survives_a_drawing_that_came_out_of_the_cache(
+    open_editor: OpenEditor,
+) -> None:
+    """A view switched away from and back to must not empty the panel.
+
+    The regression this pins: an ``unchanged`` answer carries no ``styles``,
+    for exactly the reason it carries no SVG — the page already holds them —
+    and the page was taking the absence literally and throwing away the map it
+    had. Every selection then read as an element the drawing does not hold, so
+    the panel emptied itself on the first view switch and stayed empty.
+    """
+    editor = arranged(open_editor)
+    press_on(editor, editor.shape("switches/sw-home"))
+    open_style(editor)
+    expect(editor.page.locator(".style-row")).to_have_count(9)
+
+    # Away and back. A cable is drawn at l1 and not at l3, so the band is the
+    # signal that each of the two renderings has actually landed — and it is
+    # rebuilt immediately before the styles are, so once it is back the panel
+    # has seen whatever that pass had to say.
+    editor.page.select_option("#layer", "l3")
+    expect(band(editor)).to_have_count(0)
+    editor.page.select_option("#layer", ARRANGED_LAYER)
+    expect(band(editor)).to_have_count(1)
+
+    expect(editor.page.locator("#style-subject")).to_have_text("switches/sw-home")
+    expect(editor.page.locator(".style-row")).to_have_count(9)
+    expect(style_from(editor, "fill")).to_have_text("the built-in palette")
+
+
+def test_the_inspector_works_while_a_diff_is_on_screen(open_editor: OpenEditor) -> None:
+    """The changes drawer redraws the canvas as a diff; the panel must survive it.
+
+    A diff comes back from a different route, and that route published no
+    resolved styles at all — so opening the drawer emptied the inspector for as
+    long as it stayed open. It is the same editable drawing either way, and the
+    one thing that *is* different is that the colours on screen are the
+    changeset's marks, which the panel now says out loud.
+    """
+    editor = arranged(open_editor)
+    press_on(editor, editor.shape("switches/sw-home"))
+    open_style(editor)
+    set_style(editor, "fill", "#123456")
+    expect_style(editor, "switches/sw-home", {"fill": "#123456"})
+
+    editor.page.locator("#changes-toggle").click()
+    expect(editor.page.locator("#style-body")).to_contain_text("a diff is on screen")
+    expect(editor.page.locator("#style-subject")).to_have_text("switches/sw-home")
+    expect(style_from(editor, "fill")).to_have_text("this element")
+
+    # And it is still a write path: a diff is a way of looking at the tree, not
+    # a reason to stop editing it.
+    set_style(editor, "stroke", "#ff0000")
+    expect_style(editor, "switches/sw-home", {"fill": "#123456", "stroke": "#ff0000"})
+
+
 # --------------------------------------------------------------------------- #
 # The clipboard
 # --------------------------------------------------------------------------- #

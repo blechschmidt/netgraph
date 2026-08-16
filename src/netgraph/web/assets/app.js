@@ -158,6 +158,10 @@
    *  whether it is folded. What makes a drop into one a `netgraph edit move`:
    *  see containers.js. Empty unless the drawing is grouped by namespace. */
   var containers = [];
+  /** The resolved appearance of everything on screen (§22), or null: what each
+   *  element ended up drawn with and which rung of the ladder chose it. What
+   *  makes the style inspector more than a colour picker: see style.js. */
+  var styles = null;
   var pending = null;
   var inFlight = false;
   var queued = false;
@@ -350,6 +354,11 @@
     geometry = reuse ? held.geometry : (result.geometry || null);
     annotations = reuse ? held.annotations : (result.annotations || null);
     containers = reuse ? held.containers : (result.containers || []);
+    // The resolved appearance belongs to the drawing, so it is cached with it.
+    // An `unchanged` answer carries no styles for the same reason it carries no
+    // SVG -- we already have them -- and taking that literally would leave the
+    // inspector with an empty map and every selection reading as undrawable.
+    styles = reuse ? held.styles : (result.styles || null);
     // A diff is drawn by the same renderer into the same canvas; what marks the
     // page as showing one is the legend, which is furniture without it.
     el.canvas.classList.toggle("diffing", !!result.diff);
@@ -373,7 +382,7 @@
       el.placeholder.hidden = true;
       if (key) {
         remember(key, result.graphHash || held.hash, svg, details, geometry, annotations,
-          containers);
+          containers, styles);
       }
       currentView = key;
       paintRemote();
@@ -409,7 +418,7 @@
     // one thing the inspector cannot read off the SVG: by the time a colour is
     // an attribute, the element, the theme, the icon set and the palette have
     // all collapsed into one hex literal.
-    netgraphStyle.annotate(result.styles);
+    netgraphStyle.annotate(styles);
     // A frame of the history carries facts the canvas has nowhere to put: which
     // commit it is, and what that commit did. The scrubber puts them beside
     // itself; app.js only has to say that a drawing arrived.
@@ -433,7 +442,7 @@
   }
 
   /** Keep this view's drawing, dropping the least recently drawn if need be. */
-  function remember(key, hash, svg, records, arrangement, commentary, boxes) {
+  function remember(key, hash, svg, records, arrangement, commentary, boxes, appearance) {
     if (!hash) { return; }
     views[key] = {
       hash: hash,
@@ -441,7 +450,8 @@
       details: records,
       geometry: arrangement,
       annotations: commentary,
-      containers: boxes
+      containers: boxes,
+      styles: appearance
     };
     viewOrder = viewOrder.filter(function (other) { return other !== key; });
     viewOrder.unshift(key);

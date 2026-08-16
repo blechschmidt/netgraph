@@ -678,7 +678,7 @@ def _levels(namespace: str) -> tuple[str, ...]:
     return tuple("/".join(parts[: index + 1]) for index in range(len(parts)))
 
 
-def _styles(graph: Graph, options: RenderOptions) -> Mapping[str, Any]:
+def _styles(graph: Graph, options: RenderOptions, *, diff: bool = False) -> Mapping[str, Any]:
     """The resolved appearance of one drawing, keyed by address.
 
     Resolved a second time rather than read back out of the renderer: the
@@ -687,6 +687,12 @@ def _styles(graph: Graph, options: RenderOptions) -> Mapping[str, Any]:
     goes through Graphviz and returns bytes — would be a channel that exists
     only for this. The cost is one pass over the nodes and links, next to a
     subprocess.
+
+    ``diff`` says the pass this belongs to painted a changeset over the drawing.
+    The resolution below is still the truth about the *documents* — which is
+    what the inspector exists to show — but the overlay is what is on screen,
+    so the flag travels with the answer and the panel says which of the two the
+    user is looking at rather than letting them read the mismatch as a bug.
     """
     resolved = StyleMap.build(
         graph, theme=options.theme, icons=options.icons, output="svg", styling=options.styling
@@ -698,6 +704,7 @@ def _styles(graph: Graph, options: RenderOptions) -> Mapping[str, Any]:
         },
         "theme": resolved.theme.name if resolved.theme is not None else None,
         "enabled": resolved.enabled,
+        "diff": diff,
     }
 
 
@@ -794,6 +801,13 @@ def render_diff(
         dangling=tuple(graph.dangling),
         geometry=_geometry(graph, options.render_options),
         annotations=annotations_payload(graph, marked),
+        # A diff is still a drawing of documents, and the inspector is still
+        # allowed to edit them: the changes drawer being open is not a reason
+        # for "how is this drawn" to stop having an answer. Resolved off the
+        # union graph rather than off ``after`` alone, so a *removed* element —
+        # drawn from the state being compared against, and still selectable —
+        # reports the appearance it is drawn with instead of nothing at all.
+        styles=_styles(graph, marked, diff=True),
         duration=time.monotonic() - started,
         diff=drawing.overlay.to_dict() | {"changeset": plan.to_dict()},
         graph_hash=digest,

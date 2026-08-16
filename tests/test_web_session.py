@@ -1231,6 +1231,66 @@ def test_the_ordinary_graph_route_carries_no_diff(served: str) -> None:
     status, body = call(served, "/api/graph?view=l1")
     assert status == 200
     assert body["diff"] is None
+    assert body["styles"]["diff"] is False
+
+
+@requires_dot
+def test_a_diff_carries_the_resolved_styles_too(served: str) -> None:
+    """The changes drawer must not empty the style inspector.
+
+    A diff is drawn by the same renderer into the same canvas and stays
+    editable, so "how is this drawn, and which rung chose it" has an answer
+    while one is on screen. It went unanswered for as long as the drawer was
+    open, because this route published no ``styles`` at all and the page took
+    that literally: every selection read as an element the drawing does not
+    hold.
+    """
+    status, _ = call(
+        served,
+        "/api/ops",
+        "POST",
+        {"ops": [{"op": "set", "address": "pc-desk", "path": "spec.model", "value": "X"}]},
+    )
+    assert status == 200
+
+    status, drawn = call(served, "/api/diff?view=l1&against=session")
+    assert status == 200
+    styles = drawn["styles"]
+    assert styles is not None
+    assert "hosts/pc-desk" in styles["nodes"]
+    assert styles["nodes"]["hosts/pc-desk"]["fill"]
+    # And it says it is a diff, so the panel can say that the colours on screen
+    # are the changeset's marks rather than any of the values it is showing.
+    assert styles["diff"] is True
+
+
+@requires_dot
+@pytest.mark.parametrize(
+    "query",
+    [
+        "view=physical",
+        "view=l1&group_by_namespace=1",
+        "view=l1&group_by_namespace=1&collapse=hosts",
+        "view=l2&show_vlans=1",
+        "view=l3&show_ips=1",
+    ],
+)
+def test_everything_selectable_has_a_resolved_style(served: str, query: str) -> None:
+    """The invariant the style inspector rests on, asserted per view.
+
+    The panel is a view of the ``styles`` map keyed by the same addresses the
+    ``details`` records carry, and a selection is made of those addresses — so
+    an address the drawing publishes and the map does not is an element a user
+    can select and then be told nothing about. Folding is in the list because a
+    collapsed namespace is drawn as one node that is in neither of the two maps
+    unless both are built from the *folded* graph.
+    """
+    status, body = call(served, "/api/graph?" + query)
+    assert status == 200
+    drawn = {record["id"] for record in body["details"].values() if record.get("id")}
+    assert drawn, "the view drew nothing, so it proves nothing"
+    styled = set(body["styles"]["nodes"]) | set(body["styles"]["edges"])
+    assert drawn <= styled
 
 
 # --------------------------------------------------------------------------- #

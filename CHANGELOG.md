@@ -1223,6 +1223,32 @@ publish a version whose section is missing or empty — see
 
 ### Fixed
 
+- **The editor's style inspector emptied itself, and would not fill up again.** Selecting a
+  device and opening the panel showed nine rows once — and then, after the first view
+  switch or the first time the changes drawer was opened, showed *select an element or a
+  link to see how it is drawn* with an element plainly selected. Two causes, both of them
+  the same mistake made twice: treating "this answer carries no resolved styles" as "this
+  drawing has no resolved styles".
+
+  A render whose fingerprint the page already holds comes back `unchanged` — no SVG, and no
+  `styles` either, for the same reason. The page cached the SVG, the details, the geometry
+  and the namespace boxes across such an answer and threw the style map away, so every
+  address in the selection resolved to nothing and the panel drew its empty state. It is
+  now cached with the drawing it belongs to, like the other four. And `/api/diff` — the
+  route the changes drawer and the history scrubber render through — published no `styles`
+  at all, so the panel went blank for as long as either was open; it now resolves them off
+  the union graph, which is also what makes a *removed* element still report the appearance
+  it is drawn with.
+
+  Two smaller things fall out of it. A diff on screen is called out in the panel, because
+  the colours a changeset paints are not the values the rows show and a panel that let
+  those be confused would be worse than one that said nothing. And an element that is
+  selected but not in the drawing now says so — *`hosts/laptop` (not drawn here)* — rather
+  than *nothing selected*, which is the sentence that made a bug look like an empty panel
+  rather than a broken one. Regression tests cover both routes in the browser, and the
+  invariant underneath — everything a drawing publishes as selectable has a resolved style,
+  including a folded namespace's aggregate node — is asserted per view.
+
 - **The documented way to pull the container did not work.** `README.md` and
   `docs/docker.md` both opened with `docker run … ghcr.io/blechschmidt/netgraph:latest`, and
   that tag has never existed: `latest` is set only by `release.yml`, only for a

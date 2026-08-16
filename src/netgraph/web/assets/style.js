@@ -71,8 +71,11 @@ window.netgraphStyle = (function () {
 
   var host = null;
   var el = null;
-  /** The last `styles` payload a render carried: nodes and edges by address. */
-  var resolved = { nodes: {}, edges: {}, theme: null, enabled: true };
+  /** The last `styles` payload a render carried: nodes and edges by address.
+   *  `carried` is false when the drawing on screen came with none at all, which
+   *  is a different thing from a drawing whose elements have no styles: the
+   *  first has nothing to say and the second says "the palette chose it". */
+  var resolved = { nodes: {}, edges: {}, theme: null, enabled: true, diff: false, carried: false };
   var open = false;
 
   /** Wire the panel to the page. `host` answers the four things this file
@@ -100,9 +103,11 @@ window.netgraphStyle = (function () {
         nodes: payload.nodes || {},
         edges: payload.edges || {},
         theme: payload.theme || null,
-        enabled: payload.enabled !== false
+        enabled: payload.enabled !== false,
+        diff: !!payload.diff,
+        carried: true
       }
-      : { nodes: {}, edges: {}, theme: null, enabled: true };
+      : { nodes: {}, edges: {}, theme: null, enabled: true, diff: false, carried: false };
     if (open) { paint(); }
   }
 
@@ -188,11 +193,24 @@ window.netgraphStyle = (function () {
 
   function paint() {
     if (!el || !el.styleBody) { return; }
+    var picked = window.netgraphSelect.targets();
     var chosen = subjects();
     el.styleBody.replaceChildren();
-    el.styleSubject.textContent = summary(chosen);
-    if (!chosen.length) {
+    el.styleSubject.textContent = summary(picked, chosen);
+    if (!picked.length) {
       el.styleBody.appendChild(note("select an element or a link to see how it is drawn"));
+      return;
+    }
+    // Something *is* selected and none of it resolved. Two different causes,
+    // and telling them apart is the difference between a panel that explains
+    // itself and one that reads as broken: either this drawing published no
+    // appearances at all, or the selection is not in the picture on screen.
+    if (!chosen.length) {
+      el.styleBody.appendChild(note(resolved.carried
+        ? "the selection is not in this drawing, so it has no appearance here to "
+          + "show. Switch to a view that draws it."
+        : "this drawing arrived without the resolved appearances the panel reads. "
+          + "Re-render, or reload the page."));
       return;
     }
     if (!resolved.enabled) {
@@ -217,12 +235,35 @@ window.netgraphStyle = (function () {
     if (resolved.theme) {
       el.styleBody.appendChild(note("theme in force: " + resolved.theme));
     }
+    if (resolved.diff) {
+      // The changes drawer paints its own colours over the drawing. What is
+      // below is still what the documents say -- and still editable -- but the
+      // shape on screen is green, red or amber for a reason that has nothing to
+      // do with any of it, and a panel that did not say so would look wrong.
+      el.styleBody.appendChild(note(
+        "a diff is on screen: the colours you can see are the changeset's marks, "
+        + "not these values."
+      ));
+    }
   }
 
-  function summary(chosen) {
-    if (!chosen.length) { return "nothing selected"; }
-    if (chosen.length === 1) { return chosen[0].address; }
-    return chosen.length + " selected";
+  /** The line above the rows: what is selected, and how much of it is drawn.
+   *
+   * `picked` is the selection and `chosen` the part of it this drawing holds.
+   * They differ after a view switch, and the count that matters is the second
+   * one -- it is what an edit here would act on -- so a selection only half of
+   * which is on screen says both numbers rather than quietly acting on fewer
+   * elements than the user is looking at.
+   */
+  function summary(picked, chosen) {
+    if (!picked.length) { return "nothing selected"; }
+    if (!chosen.length) {
+      return picked.length === 1 ? picked[0] + " (not drawn here)" : picked.length + " not drawn";
+    }
+    if (chosen.length === 1 && picked.length === 1) { return chosen[0].address; }
+    return chosen.length < picked.length
+      ? chosen.length + " of " + picked.length + " selected"
+      : chosen.length + " selected";
   }
 
   function note(text) {
