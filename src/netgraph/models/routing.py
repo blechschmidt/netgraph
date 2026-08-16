@@ -275,7 +275,7 @@ OspfArea = Annotated[str, BeforeValidator(normalise_area), Field(pattern=AREA_PA
 
 
 # --------------------------------------------------------------------------- #
-# Routing tables and the policy database (§16.3, §16.6)
+# Routing tables and the policy database (§16.3, §16.4)
 # --------------------------------------------------------------------------- #
 
 #: The tables a stack has before anybody declares one, and the numbers they are
@@ -470,7 +470,7 @@ class RouteTable(NetgraphModel):
 
     A table is a name and a number and nothing else, because that is all a table
     is: a container routes are placed in. What makes it *do* anything is a policy
-    rule that looks it up (§16.6) — a table nothing selects holds routes nothing
+    rule that looks it up (§16.4) — a table nothing selects holds routes nothing
     consults, which is ``NG-F023``.
 
     The three tables every stack already has — ``main``, ``local`` and
@@ -507,7 +507,7 @@ class StaticRoute(NetgraphModel):
     dev: IfName | None = None
     #: The routing instance the route belongs to; the global one when unset.
     vrf: ElementName | None = None
-    #: The table the route is placed in, for policy-based routing (§16.6);
+    #: The table the route is placed in, for policy-based routing (§16.4);
     #: ``main`` when unset. Names an entry of ``spec.route_tables``, or one of
     #: the reserved tables (``NG-F019``). A VRF is a table of its own, so naming
     #: both is a contradiction rather than a refinement (``NG-F018``).
@@ -597,7 +597,7 @@ class StaticRoute(NetgraphModel):
 
 
 class PolicyRule(NetgraphModel):
-    """One entry of ``spec.routing_policy`` — a rule of the policy database (§16.6).
+    """One entry of ``spec.routing_policy`` — a rule of the policy database (§16.4).
 
     Read it as a sentence, which is how every implementation writes it: *at
     priority 100, a packet from 10.20.0.0/16 is routed by the table called

@@ -146,6 +146,11 @@ W146  warning   NG-N026           A declared network namespace holds no interfac
 W147  warning   NG-F022           A policy rule looks up a declared routing table that holds no route.
 W148  warning   NG-F023           A declared routing table that no policy rule ever looks up.
 W149  warning   NG-F024           A policy rule is shadowed by an earlier rule that matches every packet.
+W150  warning   NG-B010           A declared security zone holds no interface.
+W151  warning   NG-B011           An interface is in no zone, on a device that divides its interfaces into zones.
+W152  warning   NG-B012           The firewall writes a mark no routing policy rule ever matches.
+W153  warning   NG-B013           A routing policy rule matches a mark the device's firewall never writes.
+W154  warning   NG-B014           A firewall rule is shadowed by an earlier rule that matches every packet.
 I001  info      NG-I010           A MAC address is locally administered rather than vendor-assigned.
 I002  info      NG-C015           An interface is enabled but terminates no cable.
 I003  info      NG-T015           A tunnel listens on a port other than the registered one for its type.

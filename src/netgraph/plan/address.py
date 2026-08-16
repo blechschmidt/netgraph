@@ -79,6 +79,7 @@ SIDECAR_TYPES: Final[frozenset[str]] = frozenset((LAYOUT_TYPE, *ANNOTATION_TYPES
 TYPE_OF_KIND: Final[dict[str, str]] = {
     "switch": DEVICE_TYPE,
     "router": DEVICE_TYPE,
+    "firewall": DEVICE_TYPE,
     "hub": DEVICE_TYPE,
     "computer": DEVICE_TYPE,
     "server": DEVICE_TYPE,

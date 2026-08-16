@@ -7,7 +7,7 @@ hand-edited last year. The banner therefore answers one more question than
 shadow of* — and it answers it in a form both a person and netgraph can read.
 
 The ``netgraph-*`` keys are the machine-readable half. ``netgraph drift`` reads
-the same six dialects back (:mod:`netgraph.importer`), and a file that says which
+the same seven dialects back (:mod:`netgraph.importer`), and a file that says which
 dialect it is and which element it describes needs neither ``--from`` nor
 ``--host``::
 

@@ -232,7 +232,7 @@ netgraph [GLOBAL OPTIONS] edit unset [OPTIONS] ADDRESS PATH
 
 <!-- generated: synopsis edit create -->
 ```text
-netgraph [GLOBAL OPTIONS] edit create [OPTIONS] {switch|router|hub|computer|server|cable|adapter|tunnel|patchpanel|pdu|user|group} NAME
+netgraph [GLOBAL OPTIONS] edit create [OPTIONS] {switch|router|firewall|hub|computer|server|cable|adapter|tunnel|patchpanel|pdu|user|group} NAME
 ```
 <!-- /generated -->
 
@@ -271,7 +271,7 @@ netgraph [GLOBAL OPTIONS] edit copy [OPTIONS] ADDRESS
 | `--name` | `TEXT` | — | metadata.name of the copy. Derived from the original's when absent; only meaningful when copying one element. |
 | `--suffix` | `TEXT` | `copy` | What a derived name gets before its counter: sw1 -> sw1-copy -> sw1-copy-2. |
 | `--keep-unique` | — | off | Keep the MAC addresses, fixed IP addresses, serials and outlets a copy normally drops. The result usually fails validation; use it when the copy is a starting point you are about to edit. |
-| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns]` | — | Place the copies in this view's stored geometry, offset from the originals. Nothing is written to a layout document when absent. |
+| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | — | Place the copies in this view's stored geometry, offset from the originals. Nothing is written to a layout document when absent. |
 | `-n`, `--dry-run` | — | off | Write nothing; print the unified diff the edit would apply. |
 | `--json` | — | off | Print the applied operations and their inverses as JSON, so a caller can keep an undo stack. |
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
@@ -295,7 +295,7 @@ netgraph [GLOBAL OPTIONS] edit duplicate [OPTIONS] ADDRESS
 | `--name` | `TEXT` | — | metadata.name of the copy. Derived from the original's when absent; only meaningful when copying one element. |
 | `--suffix` | `TEXT` | `copy` | What a derived name gets before its counter: sw1 -> sw1-copy -> sw1-copy-2. |
 | `--keep-unique` | — | off | Keep the MAC addresses, fixed IP addresses, serials and outlets a copy normally drops. The result usually fails validation; use it when the copy is a starting point you are about to edit. |
-| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns]` | — | Place the copies in this view's stored geometry, offset from the originals. Nothing is written to a layout document when absent. |
+| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | — | Place the copies in this view's stored geometry, offset from the originals. Nothing is written to a layout document when absent. |
 | `-n`, `--dry-run` | — | off | Write nothing; print the unified diff the edit would apply. |
 | `--json` | — | off | Print the applied operations and their inverses as JSON, so a caller can keep an undo stack. |
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |

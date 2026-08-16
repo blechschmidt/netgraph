@@ -23,7 +23,7 @@ frr         no          no     no         no       nothing at all
 wireguard   no          no     no         no       nothing at all
 ==========  ==========  =====  =========  =======  =========================
 
-The six configuration dialects are the ones :mod:`netgraph.export.config` writes,
+The seven configuration dialects are the ones :mod:`netgraph.export.config` writes,
 read back (:mod:`netgraph.importer.config`), and they split into two groups for
 one reason: **does this file describe the whole device, or a part of it?**
 
@@ -130,6 +130,10 @@ CAPABILITIES: Final[dict[str, Capability]] = {
     # same answer by accident, and the point is that it is a decision.
     "frr": Capability(interfaces=False, links=False, addresses=False, members=False),
     "wireguard": Capability(interfaces=False, links=False, addresses=False, members=False),
+    # And the one that is partial in a third way: an nftables ruleset is about
+    # what a device *refuses*, which is not one of the four things drift
+    # compares. It sees a great deal and none of it is here.
+    "nftables": Capability(interfaces=False, links=False, addresses=False, members=False),
 }
 
 #: A device no capability was found for: it sees nothing, so nothing about it is

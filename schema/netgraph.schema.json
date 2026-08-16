@@ -16,6 +16,7 @@
       "area": "#/$defs/Area",
       "cable": "#/$defs/Cable",
       "computer": "#/$defs/Computer",
+      "firewall": "#/$defs/Firewall",
       "group": "#/$defs/Group",
       "hub": "#/$defs/Hub",
       "layout": "#/$defs/Layout",
@@ -40,6 +41,9 @@
     },
     {
       "$ref": "#/$defs/Router"
+    },
+    {
+      "$ref": "#/$defs/Firewall"
     },
     {
       "$ref": "#/$defs/Hub"
@@ -1171,6 +1175,17 @@
       "title": "Computer",
       "type": "object"
     },
+    "ConnState": {
+      "description": "A connection-tracking state (`ct state` / `conntrack --ctstate`).\n\nThe reason a modern ruleset is short: one rule accepting `established` and\n`related` replaces the return path of every other rule in the file, and a\ndocument that could not say so would have to describe both directions of\nevery flow.",
+      "enum": [
+        "new",
+        "established",
+        "related",
+        "invalid"
+      ],
+      "title": "ConnState",
+      "type": "string"
+    },
     "DeviceSpec": {
       "additionalProperties": false,
       "description": "`spec` of every device kind (§6.1).",
@@ -1292,7 +1307,7 @@
           },
           "title": "route_tables",
           "type": "array",
-          "description": "The routing tables this device holds beyond `main`, `local` and `default`. A table on its own changes nothing; what reaches it is a rule in `routing_policy` (§16.6)."
+          "description": "The routing tables this device holds beyond `main`, `local` and `default`. A table on its own changes nothing; what reaches it is a rule in `routing_policy` (§16.4)."
         },
         "routes": {
           "items": {
@@ -1308,7 +1323,7 @@
           },
           "title": "routing_policy",
           "type": "array",
-          "description": "The routing policy database: the ordered rules deciding which *table* a packet is routed by, from its source, its firewall mark, its ingress interface or its DSCP. This is policy-based routing (§16.6)."
+          "description": "The routing policy database: the ordered rules deciding which *table* a packet is routed by, from its source, its firewall mark, its ingress interface or its DSCP. This is policy-based routing (§16.4)."
         },
         "routing": {
           "anyOf": [
@@ -1322,6 +1337,27 @@
           "default": null,
           "title": "routing",
           "description": "The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both.\n\nYANG: `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol`"
+        },
+        "zones": {
+          "items": {
+            "$ref": "#/$defs/Zone"
+          },
+          "title": "zones",
+          "type": "array",
+          "description": "The security zones the device divides its interfaces into (§24.1). Policy is written *between* zones rather than between interfaces, so a rule survives a port being renamed, doubled or moved to a LAG. An interface is in at most one zone (`NG-B003`)."
+        },
+        "firewall": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FirewallConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "firewall",
+          "description": "What the device does to the packets it sees: the filter policy and the address translations (§24.2). Absent records nothing about its filtering, which is not the same as saying it filters nothing."
         },
         "power": {
           "anyOf": [
@@ -1448,6 +1484,345 @@
         }
       },
       "title": "EdgeGeometry",
+      "type": "object"
+    },
+    "Firewall": {
+      "additionalProperties": false,
+      "description": "A layer-3 forwarder that filters. Forwards by default (§6.1.1).\n\nStructurally a router, and deliberately so: the `spec` is the same one,\nbecause the difference between a firewall and a router is a policy either of\nthem may carry rather than a shape only one of them has. `spec.zones` and\n`spec.firewall` are available on every layer-3 kind (§24), so a router with\nthree rules on it is describable — which it has to be, since that is what\nmost networks actually run.\n\nWhat the kind buys is the picture and the vocabulary. An operator who bought\na box whose whole job is filtering writes `kind: firewall` and gets a brick\nwall on the diagram rather than a router's diamond, and every reader of the\ninventory learns at a glance which boxes the policy is expected to be on.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "firewall",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. A router that filters. Forwards by default; drawn as a wall. Structurally identical to `router` — `zones` and `firewall` are available on every layer-3 kind."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/DeviceSpec",
+          "title": "spec",
+          "description": "The body of a `firewall` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Firewall",
+      "type": "object"
+    },
+    "FirewallAction": {
+      "description": "What happens to a packet a filter rule matches.\n\nThree of the five *decide* the packet's fate and end the walk; two of them\ndo something to it and let the walk continue. That split is the whole reason\nthe list is not simply \"accept or drop\": a rule that logs and a rule that\nmarks are useful precisely because the packet carries on to the rule that\ndecides, and a schema in which every action terminated could express neither.",
+      "enum": [
+        "accept",
+        "drop",
+        "reject",
+        "mark",
+        "log"
+      ],
+      "title": "FirewallAction",
+      "type": "string"
+    },
+    "FirewallConfig": {
+      "additionalProperties": false,
+      "description": "`spec.firewall` — what the device does to the packets it sees (§24.2).\n\nThe three defaults are what happens to a packet no rule decided, one per\nhook, and they are stated rather than left implicit because they are the most\nconsequential three words in any ruleset. They default to *deny inbound,\ndeny transit, permit outbound*: the shape every firewall guide has recommended\nfor thirty years, and the one whose failure mode is a service that does not\nwork rather than a network that is open.",
+      "properties": {
+        "default_input": {
+          "$ref": "#/$defs/FirewallAction",
+          "default": "drop",
+          "title": "default_input",
+          "description": "What a packet *for this machine* gets when no rule decides. One of `accept`, `drop` and `reject` — a default has to decide (`NG-B007`). Defaults to `drop`."
+        },
+        "default_forward": {
+          "$ref": "#/$defs/FirewallAction",
+          "default": "drop",
+          "title": "default_forward",
+          "description": "What a packet *through* this machine gets when no rule decides, on the same terms. Defaults to `drop`."
+        },
+        "default_output": {
+          "$ref": "#/$defs/FirewallAction",
+          "default": "accept",
+          "title": "default_output",
+          "description": "What a packet *from* this machine gets when no rule decides, on the same terms. Defaults to `accept`: a machine that cannot answer a DNS query cannot be administered either."
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/FirewallRule"
+          },
+          "title": "rules",
+          "type": "array",
+          "description": "The filter policy, in declaration order. What the device walks is this list in *priority* order, lowest first, first terminal match deciding (§24.2)."
+        },
+        "nat": {
+          "items": {
+            "$ref": "#/$defs/NatRule"
+          },
+          "title": "nat",
+          "type": "array",
+          "description": "The address translations, in the order they are tried (§24.4). Apart from `rules` because a packet is translated *and* filtered, in different hooks."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text: what the policy as a whole is for."
+        }
+      },
+      "title": "FirewallConfig",
+      "type": "object"
+    },
+    "FirewallRule": {
+      "additionalProperties": false,
+      "description": "One entry of `spec.firewall.rules` — a filter rule (§24.2).\n\nRead it as a sentence: *at priority 100, a TCP packet from the lan zone to\nthis machine's port 22 is accepted*. The zones and the selectors are the\nsubject, the action is the verb, and `priority` is where in the queue the\nsentence is read — lowest first, first terminal match wins.\n\nA rule that names no zone and no selector matches every packet, which is not\na mistake: it is how a chain is terminated. It is also how a chain is broken,\nby numbering a rule above the terminator instead of below it, which is\n`W154`.",
+      "properties": {
+        "priority": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "title": "priority",
+          "type": "integer",
+          "description": "Unique within the device, per family (`NG-B008`). The chain is walked from the lowest priority upwards; the first rule whose action is terminal decides, and nothing after it is consulted."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "name",
+          "description": "Optional label, for the diagram and for a diagnostic to name the rule by."
+        },
+        "src_zone": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "src_zone",
+          "description": "The zone the packet came from: a declared zone, or `local` for traffic this machine generated (`NG-B004`). Unset matches any zone."
+        },
+        "dst_zone": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "dst_zone",
+          "description": "The zone the packet is going to, on the same terms (`NG-B004`). Together with `src_zone` this decides the hook: `to: local` is input, `from: local` is output, two real zones are forward."
+        },
+        "family": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AddressFamily"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "family",
+          "description": "Which family's chain the rule is in. Omit to install in both, and derive from `src`, `dst` or `protocol` when possible (`NG-B005`); `ipv4` and `ipv6` are explicit."
+        },
+        "src": {
+          "anyOf": [
+            {
+              "format": "ipv4network",
+              "type": "string"
+            },
+            {
+              "format": "ipv6network",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "src",
+          "description": "Source prefix selector. Either family; optional."
+        },
+        "dst": {
+          "anyOf": [
+            {
+              "format": "ipv4network",
+              "type": "string"
+            },
+            {
+              "format": "ipv6network",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "dst",
+          "description": "Destination prefix selector, on the same terms."
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Protocol"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "protocol",
+          "description": "The IP protocol. Required by `src_ports` and `dst_ports`, which only `tcp`, `udp` and `sctp` have (`NG-B005`). `icmp` is IPv4 and `icmpv6` is IPv6, and stating one against the other family is refused."
+        },
+        "src_ports": {
+          "items": {
+            "type": "string"
+          },
+          "title": "src_ports",
+          "type": "array",
+          "description": "Source ports: single ports and closed ranges (`443`, `30000-32767`), matched as a set."
+        },
+        "dst_ports": {
+          "items": {
+            "type": "string"
+          },
+          "title": "dst_ports",
+          "type": "array",
+          "description": "Destination ports, on the same terms. The usual selector, since it is the one that names the service."
+        },
+        "ct_state": {
+          "items": {
+            "$ref": "#/$defs/ConnState"
+          },
+          "title": "ct_state",
+          "type": "array",
+          "description": "Connection-tracking states, matched as a set. Empty matches any state; one rule accepting `established` and `related` replaces the return path of every other rule."
+        },
+        "iif": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._/-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "iif",
+          "description": "Ingress interface selector (`NG-B009`), for when a zone is too coarse. Rare: the point of a zone is not needing this."
+        },
+        "oif": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._/-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "oif",
+          "description": "Egress interface selector, on the same terms (`NG-B009`)."
+        },
+        "invert": {
+          "default": false,
+          "title": "invert",
+          "type": "boolean",
+          "description": "Match everything the selectors do not. Meaningless without a selector to invert (`NG-B005`)."
+        },
+        "action": {
+          "$ref": "#/$defs/FirewallAction",
+          "title": "action",
+          "description": "`accept`, `drop` and `reject` decide the packet and end the walk; `mark` writes a firewall mark and `log` records it, and both carry on to the next rule. Stated, never defaulted."
+        },
+        "mark": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "mark",
+          "description": "The mark to write, hexadecimal, optionally masked. Required by `action: mark` and refused by everything else (`NG-B005`). This is what `spec.routing_policy[].fwmark` reads — see §16.9 and §24.3."
+        },
+        "log_prefix": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "log_prefix",
+          "description": "The tag put in front of a logged packet. For `action: log` only (`NG-B005`)."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text: what the rule is for."
+        }
+      },
+      "required": [
+        "priority",
+        "action"
+      ],
+      "title": "FirewallRule",
       "type": "object"
     },
     "Forwarding": {
@@ -2375,6 +2750,197 @@
       "title": "Metadata",
       "type": "object"
     },
+    "NatRule": {
+      "additionalProperties": false,
+      "description": "One entry of `spec.firewall.nat` — an address translation (§24.4).\n\nApart from the filter rules because it happens apart from them: a packet is\ntranslated *and* filtered, in different hooks, and a list that mixed the two\nwould have to answer which happened first for every pair of entries in it.\n\nOrder within the list is the order the translations are tried, first match\nwinning, which is what every implementation does. There is no `priority`:\na NAT list is short enough that its own order is readable, and a number that\nonly ever repeated the position would be one more thing to keep in step.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "name",
+          "description": "Optional label, for a diagnostic to name the translation by."
+        },
+        "type": {
+          "$ref": "#/$defs/NatType",
+          "title": "type",
+          "description": "`snat` and `masquerade` rewrite the source on the way out; `dnat` and `redirect` rewrite the destination on the way in. Which of the two fields below are required follows from this (`NG-B006`)."
+        },
+        "src_zone": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "src_zone",
+          "description": "The zone the packet came from (`NG-B004`)."
+        },
+        "dst_zone": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "dst_zone",
+          "description": "The zone it is going to (`NG-B004`). The usual selector for a source translation: *everything leaving towards the wan is masqueraded*."
+        },
+        "family": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AddressFamily"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "family",
+          "description": "Which family the translation is in. Derived from any address it names (`NG-B006`)."
+        },
+        "src": {
+          "anyOf": [
+            {
+              "format": "ipv4network",
+              "type": "string"
+            },
+            {
+              "format": "ipv6network",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "src",
+          "description": "Source prefix selector."
+        },
+        "dst": {
+          "anyOf": [
+            {
+              "format": "ipv4network",
+              "type": "string"
+            },
+            {
+              "format": "ipv6network",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "dst",
+          "description": "Destination prefix selector."
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Protocol"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "protocol",
+          "description": "The IP protocol. Required by `dst_ports` (`NG-B006`)."
+        },
+        "dst_ports": {
+          "items": {
+            "type": "string"
+          },
+          "title": "dst_ports",
+          "type": "array",
+          "description": "Destination ports: the *published* port, not the internal one, which is `to_port`."
+        },
+        "to_address": {
+          "anyOf": [
+            {
+              "format": "ipv4",
+              "type": "string"
+            },
+            {
+              "format": "ipv6",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "to_address",
+          "description": "What the address becomes. Required by `snat` and `dnat`; refused by `masquerade` (whose address is the egress interface's, unknown here) and by `redirect` (whose address is this machine) — `NG-B006`."
+        },
+        "to_port": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "to_port",
+          "description": "What the port becomes. Required by `redirect`, which translates the port and nothing else; on a source translation it needs a `dst_ports` to be about (`NG-B006`)."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text: what the translation is for."
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "NatRule",
+      "type": "object"
+    },
+    "NatType": {
+      "description": "Which address a NAT rule rewrites, and on which side of the machine.",
+      "enum": [
+        "snat",
+        "masquerade",
+        "dnat",
+        "redirect"
+      ],
+      "title": "NatType",
+      "type": "string"
+    },
     "NetnsDefinition": {
       "additionalProperties": false,
       "description": "One entry of `spec.netns` — a network namespace on the device (§23.1).\n\nThree fields and no configuration: everything a namespace *contains* is\ndeclared by the things that name it. Interfaces move into one with\n`interfaces[].netns`, and that is also what gives the namespace its\naddresses and its routes, because those hang off the interfaces.\n\n`NG-N020` (names are unique per device), `NG-N021` (`parent` resolves\nand does not loop) and `NG-N022` (`interfaces[].netns` resolves) are all\nchecked by the device spec, where the whole table is in view.",
@@ -3279,7 +3845,7 @@
     },
     "PolicyRule": {
       "additionalProperties": false,
-      "description": "One entry of `spec.routing_policy` — a rule of the policy database (§16.6).\n\nRead it as a sentence, which is how every implementation writes it: *at\npriority 100, a packet from 10.20.0.0/16 is routed by the table called\nuplink-b*. The selectors are the subject, the action is the verb, and the\n`priority` is where in the queue the sentence is read — lowest first, first\nmatch wins, and nothing after a matching `lookup` is consulted.\n\nThe selectors are all layer 3 or below on purpose (see the module docstring):\nwhere the packet came from, where it is going, which interface it arrived on\nor would leave by, what the firewall marked it with, and what it asked for in\nits DSCP. A rule that names none of them matches everything, which is not a\nmistake — it is how the database is terminated.",
+      "description": "One entry of `spec.routing_policy` — a rule of the policy database (§16.4).\n\nRead it as a sentence, which is how every implementation writes it: *at\npriority 100, a packet from 10.20.0.0/16 is routed by the table called\nuplink-b*. The selectors are the subject, the action is the verb, and the\n`priority` is where in the queue the sentence is read — lowest first, first\nmatch wins, and nothing after a matching `lookup` is consulted.\n\nThe selectors are all layer 3 or below on purpose (see the module docstring):\nwhere the packet came from, where it is going, which interface it arrived on\nor would leave by, what the firewall marked it with, and what it asked for in\nits DSCP. A rule that names none of them matches everything, which is not a\nmistake — it is how the database is terminated.",
       "properties": {
         "priority": {
           "maximum": 4294967295,
@@ -3619,6 +4185,21 @@
       "title": "PowerSource",
       "type": "string"
     },
+    "Protocol": {
+      "description": "The IP protocol a rule selects on.\n\nA closed set rather than a number, because the eight here are the ones a\npolicy is ever written about and a bare protocol number in a firewall rule is\nalmost always a typo for one of them. `icmp` and `icmpv6` are separate\nprotocols carried by separate families, which is a fact the schema can check\n(`NG-B005`) only because they are not one entry called \"icmp\".",
+      "enum": [
+        "tcp",
+        "udp",
+        "icmp",
+        "icmpv6",
+        "sctp",
+        "esp",
+        "ah",
+        "gre"
+      ],
+      "title": "Protocol",
+      "type": "string"
+    },
     "RadioRole": {
       "description": "§6.2.6 — which side of an association a radio is on.\n\n`ap` beacons, so it is the end that owns the SSIDs; `station` and\n`mesh` associate to one. A mesh node's backhaul radio is a station of the\nnode above it, spelled separately because it is a relay rather than a client\nand a diagram should not draw it as a laptop.",
       "enum": [
@@ -3631,7 +4212,7 @@
     },
     "RouteTable": {
       "additionalProperties": false,
-      "description": "One entry of `spec.route_tables` — a routing table of its own (§16.3).\n\nA table is a name and a number and nothing else, because that is all a table\nis: a container routes are placed in. What makes it *do* anything is a policy\nrule that looks it up (§16.6) — a table nothing selects holds routes nothing\nconsults, which is `NG-F023`.\n\nThe three tables every stack already has — `main`, `local` and\n`default` — are never declared here and always nameable anyway; declaring\neither their name or their number is `NG-F015`, because a second `main`\nis not a second table, it is a document that has stopped describing the\ndevice.",
+      "description": "One entry of `spec.route_tables` — a routing table of its own (§16.3).\n\nA table is a name and a number and nothing else, because that is all a table\nis: a container routes are placed in. What makes it *do* anything is a policy\nrule that looks it up (§16.4) — a table nothing selects holds routes nothing\nconsults, which is `NG-F023`.\n\nThe three tables every stack already has — `main`, `local` and\n`default` — are never declared here and always nameable anyway; declaring\neither their name or their number is `NG-F015`, because a second `main`\nis not a second table, it is a document that has stopped describing the\ndevice.",
       "properties": {
         "name": {
           "maxLength": 253,
@@ -4383,7 +4964,7 @@
           },
           "title": "route_tables",
           "type": "array",
-          "description": "The routing tables this device holds beyond `main`, `local` and `default`. A table on its own changes nothing; what reaches it is a rule in `routing_policy` (§16.6)."
+          "description": "The routing tables this device holds beyond `main`, `local` and `default`. A table on its own changes nothing; what reaches it is a rule in `routing_policy` (§16.4)."
         },
         "routes": {
           "items": {
@@ -4399,7 +4980,7 @@
           },
           "title": "routing_policy",
           "type": "array",
-          "description": "The routing policy database: the ordered rules deciding which *table* a packet is routed by, from its source, its firewall mark, its ingress interface or its DSCP. This is policy-based routing (§16.6)."
+          "description": "The routing policy database: the ordered rules deciding which *table* a packet is routed by, from its source, its firewall mark, its ingress interface or its DSCP. This is policy-based routing (§16.4)."
         },
         "routing": {
           "anyOf": [
@@ -4413,6 +4994,27 @@
           "default": null,
           "title": "routing",
           "description": "The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both.\n\nYANG: `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol`"
+        },
+        "zones": {
+          "items": {
+            "$ref": "#/$defs/Zone"
+          },
+          "title": "zones",
+          "type": "array",
+          "description": "The security zones the device divides its interfaces into (§24.1). Policy is written *between* zones rather than between interfaces, so a rule survives a port being renamed, doubled or moved to a LAG. An interface is in at most one zone (`NG-B003`)."
+        },
+        "firewall": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FirewallConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "firewall",
+          "description": "What the device does to the packets it sees: the filter policy and the address translations (§24.2). Absent records nothing about its filtering, which is not the same as saying it filters nothing."
         },
         "power": {
           "anyOf": [
@@ -5489,6 +6091,49 @@
         "role"
       ],
       "title": "WirelessConfig",
+      "type": "object"
+    },
+    "Zone": {
+      "additionalProperties": false,
+      "description": "One entry of `spec.zones` — a security zone (§24.1).\n\nA name and the interfaces in it. The interfaces are what make the zone a\nfact about the device rather than a label: policy is written between zones,\nand which zone a packet is in is decided by the interface it crossed.\n\nAn interface belongs to at most one zone (`NG-B003`), and a zone holding no\ninterface at all is inert (`W150`) — nothing can be in it, so no rule\nnaming it can ever match.",
+      "properties": {
+        "name": {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+          "title": "name",
+          "type": "string",
+          "description": "Name of the zone. Unique within the device, and not `local`, which is the machine itself and is nameable in a rule without being declared (`NG-B001`)."
+        },
+        "interfaces": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._/-]+$",
+            "type": "string"
+          },
+          "title": "interfaces",
+          "type": "array",
+          "description": "The interfaces in this zone. Each names an interface of this device (`NG-B002`), and no interface is in two zones (`NG-B003`). A zone holding none is inert (`W150`)."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text: what the zone is for."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Zone",
       "type": "object"
     }
   }

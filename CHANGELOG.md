@@ -18,6 +18,68 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **Firewalls and firewall policy: `kind: firewall`, `spec.zones` and `spec.firewall`
+  (§24).** Everywhere else in the schema a device *forwards*, and every answer it could
+  produce was some version of "and then the packet goes there". A firewall is the box whose
+  answer is often "and then it does not", and there was nowhere to write that down —
+  including in §16.7, which told the reader in as many words to mark a packet in the
+  firewall and match `fwmark`, an instruction to use a thing the schema could not describe.
+
+  `spec.zones[]` divides a device's interfaces into named regions, and policy is written
+  between *zones* rather than between interfaces so that a rule survives a port being
+  renamed or moved to a LAG. An interface is in at most one zone (`NG-B003`), which is the
+  defining property of a zone in every implementation and what makes `from lan` a statement
+  about a packet rather than a question. `local` — the traffic that terminates on the
+  machine — is nameable without being declared and cannot be declared (`NG-B001`), and it is
+  also what turns the two zone fields into a hook: `to: local` is input, `from: local` is
+  output, two real zones are forward. The schema never asks which chain a rule is in.
+
+  `spec.firewall.rules[]` is the filter policy: walked from the lowest `priority` upwards,
+  first *terminal* match deciding. `accept`, `drop` and `reject` decide the packet; `mark`
+  and `log` do something to it and let the walk continue, which is the whole reason those
+  two exist. Selectors are `src`, `dst`, `protocol`, `src_ports`, `dst_ports`, `ct_state`,
+  `iif` and `oif`, optionally inverted. The three chain defaults are stated rather than
+  implied and are deny/deny/permit — the failure mode is a service that does not work rather
+  than a network that is open. `spec.firewall.nat[]` carries `snat`, `masquerade`, `dnat`
+  and `redirect`, apart from the filter rules because a packet is translated *and* filtered.
+
+  `action: mark` closes §16.7's loop, and the two halves are checked against each other. A
+  mark is local to the machine — metadata inside one kernel, gone when the packet leaves —
+  so the box that routes by a mark is the box that has to set it. A mark written that
+  nothing reads is `W152`; one read that nothing writes is `W153`. Each is silent on its own
+  and wrong only together. Three more: `W150`, a zone holding no interface, counting the
+  rules that can therefore never match; `W151`, an interface outside a partition the device
+  does declare; `W154`, a rule numbered above the one that closes its chain — which reads the
+  zone pair too, so `lan -> wan accept` closes only what crosses between those two.
+
+  `kind: firewall` is the thirteenth element kind, structurally a `router` and deliberately
+  so: filtering is a function, not a box, so `spec.zones` and `spec.firewall` are available
+  on every layer-3 kind. What the kind buys is the picture and the vocabulary — a trapezium
+  in red, a brick wall in the cisco icon theme, and a reader who can see at a glance which
+  boxes the policy is expected to be on.
+
+- **`netgraph render --layer security`.** The one view whose edges are *decisions* rather
+  than paths. Nodes are zones, framed by the device that declares them, with `local` and
+  `any` minted where the policy names them. Edges are zone pairs, **directed**, because *lan
+  to wan* is a different statement from *wan to lan* and a picture that merged them would
+  have merged the one distinction a firewall exists to make. Green where the pair is open,
+  red where it is closed, dashed amber where it is conditional. The rules are on the label
+  up to three of them and on the tooltip in full, in the order the device walks them.
+  `--name`, `--namespace` and `--kind` reach a zone through the device it is on, since
+  nothing at this layer stands for the box, so `--name fw-edge` draws one firewall's policy.
+
+- **`netgraph export nftables`.** The seventh configuration dialect, and the first that
+  writes what a device *refuses* rather than how it is wired. One `etc/nftables.conf`: a
+  `table inet netgraph` with a `set` per zone, the three base chains carrying their stated
+  policies, and NAT chains only where a translation needs them. `destroy table` precedes it,
+  so applying the file replaces netgraph's table and leaves everything else on the box
+  exactly as it was. Nothing is inferred — no connection-tracking rule the document did not
+  ask for, no loopback exemption, no rate limit — and `invert` is refused rather than
+  written matching the opposite of what the inventory states. `netgraph drift` reads the
+  dialect back, and grants it no coverage: what a ruleset sees is not what drift compares.
+  The generated file is checked by a real `nft --check` in the suite, which is the one gate
+  here that is not netgraph reading its own output.
+
 - **Policy-based routing: `spec.route_tables`, `spec.routes[].table` and `spec.routing_policy`
   (§16.2, §16.4).** Everywhere else in §16 a device answers one question about a packet —
   which route in *the* table matches its destination. That is right for most boxes and wrong

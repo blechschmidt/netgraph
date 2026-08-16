@@ -2378,6 +2378,126 @@ because the rule is perfectly valid and simply never consulted.
 
 **Suppress with** `W149` / `NG-F024`, or an annotation on the device.
 
+#### `W150` — security zone with no interface
+
+*Alias: `NG-B010`. Severity: warning.*
+
+A zone is declared in `spec.zones` and holds no interface (§24.1). A zone is a
+*partition of the device's interfaces*, so one holding none is empty in the
+strongest sense available: no packet can ever be in it, and every rule naming
+it — however carefully written — matches nothing. The finding counts those rules.
+
+**Why it matters.** The count is the whole point. A zone with no interfaces and
+no rules is a placeholder somebody has not filled in yet; a zone with no
+interfaces and four rules is a policy that used to work and stopped when the last
+interface moved out of it, and nothing else says so.
+
+**Suppress with** `W150` / `NG-B010`, or an annotation on the device. Worth
+suppressing for a zone whose interfaces are created at runtime — a container
+bridge, a VPN interface a daemon brings up — which the inventory has no
+interface to list.
+
+#### `W151` — interface in no zone
+
+*Alias: `NG-B011`. Severity: warning.*
+
+A device divides its interfaces into zones and at least one interface is in none
+of them (§24.1). Reported once per device, naming every interface outside the
+partition: a 48-port switch with two zones would otherwise fill the report with
+one identical line per port, and the answer to all of them is the same edit.
+
+A device that declares *no* zones never triggers this. Having no partition at all
+is the ordinary case and says nothing; it is once a partition exists that a gap
+in it is a statement.
+
+**Why it matters.** Traffic on an unzoned interface cannot be named by policy. A
+rule saying `from lan` does not reach it, so what it gets is whichever chain
+default applies — which on a default-deny firewall means it silently stops
+working, and on a default-permit one means it silently is not filtered.
+
+**Suppress with** `W151` / `NG-B011`, or an annotation on the device. A console
+port, a namespace-internal veth end and a dedicated out-of-band management
+interface are all legitimately outside every zone.
+
+#### `W152` — firewall mark nothing reads
+
+*Alias: `NG-B012`. Severity: warning.*
+
+A rule in `spec.firewall.rules` writes a mark with `action: mark`, and no rule in
+`spec.routing_policy` matches it (§24.3). This is one half of the plan §16.9
+describes: policy-based routing has no layer-4 selector, so the portable way to
+route by port, by user or by application is to mark the packet in the firewall
+and match `fwmark` in the policy database. This is the marking half, built
+without the reading half.
+
+A mark is *local to the machine*. It is metadata attached to a packet inside one
+kernel and it is gone the moment the packet leaves, so there is nowhere else the
+reader could be and the finding does not have to look anywhere else to be sure.
+
+**Why it matters.** Nothing fails. The rule applies, `nft list ruleset` shows the
+mark being set, and the traffic goes out the default uplink exactly as it would
+have without any of it. The other direction is
+[`W153`](#w153--firewall-mark-nothing-writes).
+
+**Suppress with** `W152` / `NG-B012`, or an annotation on the device. A mark read
+by something outside the inventory — a traffic-shaping class, a `tc` filter, a
+socket that reads `SO_MARK` — is the case worth suppressing, and worth a
+`description` on the rule saying which.
+
+#### `W153` — firewall mark nothing writes
+
+*Alias: `NG-B013`. Severity: warning.*
+
+A rule in `spec.routing_policy` matches on `fwmark` and the device's
+`spec.firewall` never writes that mark (§24.3). The mirror of
+[`W152`](#w152--firewall-mark-nothing-reads), and the more common shape: the
+table is declared, the routes are in it, the policy rule is written, and the
+firewall rule that would have marked the traffic is the line that never got
+typed.
+
+Only on a device that declares `spec.firewall` at all. A device whose filtering
+nobody has written down may well be marking, and saying otherwise would be a
+claim about a file that does not exist.
+
+**Why it matters.** The rule never matches, so the packet falls through to the
+next one and is routed by whatever comes after — the failure that looks like it
+works, since `ip rule show` lists the rule and every command applied cleanly.
+
+**Suppress with** `W153` / `NG-B013`, or an annotation on the device. Worth
+suppressing when the mark is set by something the inventory does not describe: a
+`tc` action, a VPN client's own rules, a container runtime.
+
+#### `W154` — unreachable firewall rule
+
+*Alias: `NG-B014`. Severity: warning.*
+
+A rule sits below one that already decided the traffic it is about (§24.2). The
+chain is walked from the lowest priority upwards and the first *terminal* match
+wins, so a rule with no selector and an action of `accept`, `drop` or `reject`
+closes the chain for everything it covers.
+
+**Covers**, not "matches everything". A rule with no selector is still about the
+zone pair it names, and `lan -> wan accept` says nothing about a packet from
+`wan` to `dmz`. So an earlier rule shadows a later one only when its zone pair is
+at least as broad: each half is either unstated — which is every zone — or the
+same zone the later rule names. The error in the other direction would be the
+worse one, since a finding telling somebody a working rule is dead is a finding
+that gets the rule deleted.
+
+Closing a chain is also how a chain is *meant* to end, so the finding names both
+rules. Per hook and per family, because those are separate chains: a closer in
+`input` shadows nothing in `forward`, and an IPv4 one shadows nothing in IPv6. A
+`mark` or `log` rule shadows nothing either — it does something to the packet and
+the walk carries on, which is the whole reason those two actions exist.
+
+**Why it matters.** Numbering, the same way
+[`W149`](#w149--unreachable-policy-rule) is about numbering. A hole is opened in
+a default-deny policy with a priority above the closing rule instead of below it,
+and the service it was for does not work — with no error anywhere, because the
+rule is perfectly valid and simply never consulted.
+
+**Suppress with** `W154` / `NG-B014`, or an annotation on the device.
+
 #### `I001` — locally administered MAC address
 
 *Alias: `NG-I010`. Severity: info.*
@@ -2563,7 +2683,7 @@ schema rule is a usage error:
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

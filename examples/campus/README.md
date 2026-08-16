@@ -140,10 +140,20 @@ One IGP, one AS, and one VRF (§16):
   allowed to share the campus default: `spec.route_tables` declares
   `lab-egress` (table 100), two default routes of the two families are placed in
   it, and `spec.routing_policy` is what sends anything from `10.3.20.0/24` —
-  and anything the edge firewall marked `0x1` — to that table instead of to
+  and anything `spec.firewall` marked `0x1` — to that table instead of to
   `main`. The refusal above it, `prohibit` from the lab to the management
   prefix, is numbered *below* the diversion for the reason the walk demands: the
   first matching rule decides, so a rule after a `lookup` never runs.
+* **A firewall** on the same router (§24), and it is there because the policy
+  database above needs it. A firewall mark does not survive the wire — it is
+  metadata inside one kernel, gone the moment the packet leaves — so the box
+  that *routes* by `0x1` is the box that has to *set* it. `spec.zones` divides
+  the router into `campus` and `backbone` (`lo0` is in neither: traffic to a
+  loopback terminates on the machine, and the zone for that is `local`), and
+  `spec.firewall` states a default-deny input chain with the three things that
+  reach the router — an established-connection rule, iBGP from the backbone,
+  SSH from the management VLAN — plus the `mark` rule the routing policy reads.
+  `W152` and `W153` are what would have caught the two halves drifting apart.
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```bash

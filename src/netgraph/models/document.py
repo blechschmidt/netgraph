@@ -19,7 +19,7 @@ from netgraph.errors import SchemaError, SchemaIssue, echo_value
 from netgraph.models.adapter import Adapter
 from netgraph.models.annotation import Annotation, AnnotationBase, Area, Legend, Note
 from netgraph.models.cable import Cable
-from netgraph.models.device import Computer, Hub, Router, Server, Switch
+from netgraph.models.device import Computer, Firewall, Hub, Router, Server, Switch
 from netgraph.models.diagnostics import decode_field_error
 from netgraph.models.element import ANNOTATION_DOCUMENT_KINDS, DOCUMENT_KINDS, KINDS, ElementBase
 from netgraph.models.identity import Group, User
@@ -49,6 +49,7 @@ __all__ = [
 ELEMENT_MODELS: Final[tuple[type[ElementBase], ...]] = (
     Switch,
     Router,
+    Firewall,
     Hub,
     Computer,
     Server,
@@ -65,6 +66,7 @@ ELEMENT_MODELS: Final[tuple[type[ElementBase], ...]] = (
 Element = Annotated[
     Switch
     | Router
+    | Firewall
     | Hub
     | Computer
     | Server

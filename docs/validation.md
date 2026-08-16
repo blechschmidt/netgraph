@@ -79,7 +79,7 @@ collision in pass 1:
 ```console
 $ netgraph -i tests/fixtures/invalid validate
 ...
-  e002-double-termination.yaml#0:4               NG-N002  metadata.name: duplicate element name 'pc-a' (first declared at e001-unknown-endpoint.yaml#0:7); this document is ignored
+  e002-double-termination.yaml#0:4                NG-N002  metadata.name: duplicate element name 'pc-a' (first declared at e001-unknown-endpoint.yaml#0:7); this document is ignored
 ...
   e005-vlan-mismatch.yaml#1:18                   I002  interface 'sw-b:GigabitEthernet0/1' is enabled but terminates no cable; mark it 'enabled: false' if the port is spare
 ...
@@ -262,7 +262,7 @@ to nothing, and the message lists what you could have meant:
 <!-- run: rc=2 -->
 ```console
 $ netgraph -i examples/quickstart validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 An unknown id in an *annotation* is ignored rather than fatal — inventory data
@@ -438,6 +438,11 @@ says why the rule exists, what it deliberately exempts, and how to suppress it.
 | [`W147`](validation-rules.md#w147--policy-rule-looks-up-an-empty-table) | `NG-F022` | warning | policy rule looks up an empty table |
 | [`W148`](validation-rules.md#w148--routing-table-nothing-selects) | `NG-F023` | warning | routing table nothing selects |
 | [`W149`](validation-rules.md#w149--unreachable-policy-rule) | `NG-F024` | warning | unreachable policy rule |
+| [`W150`](validation-rules.md#w150--security-zone-with-no-interface) | `NG-B010` | warning | security zone with no interface |
+| [`W151`](validation-rules.md#w151--interface-in-no-zone) | `NG-B011` | warning | interface in no zone |
+| [`W152`](validation-rules.md#w152--firewall-mark-nothing-reads) | `NG-B012` | warning | firewall mark nothing reads |
+| [`W153`](validation-rules.md#w153--firewall-mark-nothing-writes) | `NG-B013` | warning | firewall mark nothing writes |
+| [`W154`](validation-rules.md#w154--unreachable-firewall-rule) | `NG-B014` | warning | unreachable firewall rule |
 | [`I001`](validation-rules.md#i001--locally-administered-mac-address) | `NG-I010` | info | locally administered MAC address |
 | [`I002`](validation-rules.md#i002--enabled-interface-terminates-no-cable) | `NG-C015` | info | enabled interface terminates no cable |
 | [`I003`](validation-rules.md#i003--tunnel-on-a-non-standard-port) | `NG-T015` | info | tunnel on a non-standard port |

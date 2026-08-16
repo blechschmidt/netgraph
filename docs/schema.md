@@ -59,6 +59,7 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
 21. [Diagram annotations: notes, areas and legends](#21-diagram-annotations-notes-areas-and-legends)
 22. [Per-element styling and themes](#22-per-element-styling-and-themes)
 23. [Network namespaces and veth pairs](#23-network-namespaces-and-veth-pairs)
+24. [Firewalls: zones and policy](#24-firewalls-zones-and-policy)
 
 ---
 
@@ -3286,8 +3287,10 @@ Deferred, and listed so nobody designs around the absence:
 * **Layer-4 selectors in a policy rule**: no `sport`, no `dport`, no protocol.
   `ip rule` grew them late, no two implementations agree on them, and the
   portable way to route by port, by user or by application is to mark the packet
-  where marking belongs and match `fwmark` (§16.4). Modelling the marking itself
-  is the firewall's business, not routing's.
+  where marking belongs and match `fwmark` (§16.4). The marking itself is the
+  firewall's business rather than routing's, and it is
+  [§24.3](#243-the-mark-and-where-it-goes) — which also checks the two halves
+  against each other, since each is silent alone and wrong only together.
 * **Table numbers for a VRF**: §16.1 records a route distinguisher, which
   identifies the instance in BGP and says nothing about which table an
   implementation gave it. A rule may look a VRF up by name; an emitter that
@@ -5513,3 +5516,330 @@ put the container's address on the host — and on a machine running two
 containers out of one image, the two addresses would collide where the inventory
 says they do not. The refusal names every field and points at `export
 interfaces`, which is where the whole of it is written.
+
+---
+
+## 24. Firewalls: zones and policy
+
+Everywhere else in this document a device *forwards*. §6 gives it interfaces,
+§16 gives it a routing table and a policy database, and every answer the schema
+can produce is some version of "and then the packet goes there". A firewall is
+the one box whose answer is often "and then it does not", and until this section
+there was nowhere to write that down.
+
+The gap was not cosmetic. [§16.7](#167-what-routing-does-not-hold) says in as many words
+that the portable way to route by port is to *mark the packet in the firewall*
+and match `fwmark` in the policy database — an instruction to use a thing the
+schema could not describe. This section is the other half of that sentence.
+
+Three blocks, all on a device's `spec`, and all available on every layer-3 kind:
+
+* **`spec.zones[]`** (§24.1) — the security zones the device divides its
+  interfaces into. Policy is written *between zones*, not between interfaces.
+* **`spec.firewall.rules[]`** (§24.2) — the filter policy: an ordered list
+  walked from the lowest `priority` upwards, first terminal match deciding.
+* **`spec.firewall.nat[]`** (§24.4) — address translation, kept apart from the
+  filter rules because it happens apart from them.
+
+There is also a **`kind: firewall`** (§6), and it is worth being clear about
+what it is and is not. Structurally it is a `router`: the same `spec`, the same
+`forwarding` default of true/true. What it buys is the picture and the
+vocabulary — an operator who bought a box whose whole job is filtering writes
+`kind: firewall` and gets a wall on the diagram rather than a router's diamond.
+What it deliberately does *not* buy is exclusivity. **Filtering is a function,
+not a box.** `spec.zones` and `spec.firewall` are available on a `router`, a
+`server` and a `computer` too, because a router with three rules on it filters
+just as truly as a Palo Alto does, and a schema that could only describe the
+appliance would be unable to describe most networks. A `hub` refuses both
+(`NG-H003`): it has no IP stack, so it has nothing to filter with.
+
+### 24.1 Zones
+
+A zone is a name and a set of interfaces:
+
+```yaml
+spec:
+  zones:
+    - name: wan
+      interfaces: [eth0]
+      description: The ISP hand-off
+    - name: lan
+      interfaces: [eth1, eth2]
+    - name: dmz
+      interfaces: [eth3]
+```
+
+| Field | Type | Required | Default | Meaning |
+|---|---|---|---|---|
+| `name` | element name | yes | — | Unique within the device, and not `local` (`NG-B001`). |
+| `interfaces` | list of interface names | no | `[]` | Each names an interface of this device (`NG-B002`). |
+| `description` | string | no | *unset* | Free text. |
+
+**Every interface is in at most one zone** (`NG-B003`). That is not a
+simplification for netgraph's convenience: it is the defining property of a zone
+in every zone-based firewall there is, and it is what makes `from lan` a
+statement about a packet rather than a question. Two zones claiming one
+interface would leave every rule naming either of them ambiguous.
+
+An interface in *no* zone is not an error — a console port, a namespace-internal
+veth end and a dedicated out-of-band management port all belong in none — but on
+a device that declares zones at all it is worth a second look, which is
+[`W151`](validation-rules.md#w151--interface-in-no-zone). A loopback and a
+member of a LAG or bridge are never counted: a loopback carries no transit
+traffic by construction, and a member is governed by the aggregate above it
+exactly as [§10.6](#106-lag-resolution) has it everywhere else.
+
+#### `local`, the zone nobody declares
+
+`local` is the device itself — the traffic that terminates on the box rather
+than passing through it. It is nameable in `src_zone` and `dst_zone` without
+being declared, and declaring it is `NG-B001`: the machine is not one of the
+parts the machine's interfaces are divided into.
+
+It is also what turns the two zone fields into a *hook*. `to: local` is the
+input path, `from: local` is output, and two real zones are forward. So the
+schema never asks which chain a rule is in — the zones already said, and a
+document that could state both would be able to say the packet terminates here
+*and* passes through.
+
+A zone that holds no interface is inert: nothing can be in it, so no rule naming
+it can ever match. That is
+[`W150`](validation-rules.md#w150--security-zone-with-no-interface), and it
+counts the rules, because the number is the difference between a placeholder
+somebody has not filled in and a policy that has quietly stopped working.
+
+### 24.2 The filter policy
+
+```yaml
+spec:
+  firewall:
+    default_input: drop
+    default_forward: drop
+    default_output: accept
+    rules:
+      - priority: 10
+        ct_state: [established, related]
+        action: accept
+      - priority: 100
+        src_zone: lan
+        dst_zone: local
+        protocol: tcp
+        dst_ports: ['22']
+        action: accept
+        description: SSH from the LAN
+      - priority: 200
+        src_zone: lan
+        dst_zone: wan
+        action: accept
+```
+
+Read a rule as a sentence: *at priority 100, TCP from the lan zone to this
+machine's port 22 is accepted*. The zones and the selectors are the subject, the
+action is the verb, and `priority` is where in the queue the sentence is read.
+
+**The chain is walked from the lowest `priority` upwards and the first
+*terminal* match decides.** `priority` is therefore the rule's position and its
+identity: unique within the device, per family (`NG-B008`). A tie would leave
+the document unable to say which of two rules decides, which is the one thing a
+firewall document must never be unable to say.
+
+| Field | Type | Required | Default | Meaning |
+|---|---|---|---|---|
+| `priority` | integer 0–4294967295 | yes | — | Position in the walk, and the rule's identity (`NG-B008`). |
+| `name` | element name | no | *unset* | Label, for the diagram and for a diagnostic. |
+| `src_zone` | element name | no | any | The zone the packet came from, or `local` (`NG-B004`). |
+| `dst_zone` | element name | no | any | The zone it is going to, on the same terms (`NG-B004`). |
+| `family` | `ipv4` \| `ipv6` | no | derived | Which chain the rule is in. Omitted installs in both. |
+| `src` | IP prefix | no | any | Source prefix selector. |
+| `dst` | IP prefix | no | any | Destination prefix selector. |
+| `protocol` | see below | no | any | The IP protocol. Required by the port selectors. |
+| `src_ports` | list of port selectors | no | `[]` | `443`, `30000-32767`; matched as a set. |
+| `dst_ports` | list of port selectors | no | `[]` | The same; the usual selector, since it names the service. |
+| `ct_state` | list of `new`/`established`/`related`/`invalid` | no | `[]` | Connection-tracking states, matched as a set. |
+| `iif` | interface name | no | any | Ingress interface, for when a zone is too coarse (`NG-B009`). |
+| `oif` | interface name | no | any | Egress interface, on the same terms (`NG-B009`). |
+| `invert` | boolean | no | `false` | Match everything the selectors do not. |
+| `action` | see below | **yes** | — | What happens to the packet. |
+| `mark` | firewall mark | conditional | — | Required by `action: mark`, refused otherwise (`NG-B005`). |
+| `log_prefix` | string ≤ 64 | no | *unset* | The tag on a logged packet, for `action: log` only. |
+| `description` | string | no | *unset* | Free text. |
+
+`action` is stated and never defaulted. A rule whose action nobody wrote down is
+a rule nobody finished writing, and guessing at it would be guessing about
+whether traffic flows.
+
+| `action` | Terminal | What it does |
+|---|---|---|
+| `accept` | yes | Let the packet through. |
+| `drop` | yes | Discard it silently. |
+| `reject` | yes | Discard it and say so — ICMP unreachable, or a TCP reset. |
+| `mark` | **no** | Write `mark` on the packet and carry on walking (§24.3). |
+| `log` | **no** | Record it and carry on walking. |
+
+The split is the whole reason the list is not simply "accept or drop". A rule
+that logs and a rule that marks are useful *precisely because* the packet
+carries on to the rule that decides, and a schema in which every action
+terminated could express neither.
+
+`protocol` is a closed set — `tcp`, `udp`, `icmp`, `icmpv6`, `sctp`, `esp`,
+`ah`, `gre` — rather than a number, because those eight are the ones a policy is
+ever written about and a bare protocol number in a firewall rule is almost
+always a typo for one of them. Only `tcp`, `udp` and `sctp` have ports to select
+on (`NG-B005`). `icmp` and `icmpv6` are separate protocols carried by separate
+families, which is a fact the schema can check — `protocol: icmp` with
+`family: ipv6` is refused — only because they are not one entry called "icmp".
+
+A rule with no selector at all matches every packet reaching the hooks it is in,
+*within the zone pair it names*. That is not a mistake: it is how a chain is
+closed. It is also how a chain is broken, by numbering a new rule *above* the
+closer instead of below it, which is
+[`W154`](validation-rules.md#w154--unreachable-firewall-rule) — and `W154` reads
+the zones too, so `lan -> wan accept` closes only what crosses between those two
+and a rule naming neither zone closes the whole chain.
+
+#### The three defaults
+
+`default_input`, `default_forward` and `default_output` are what a packet no
+rule decided gets, one per hook. Each must decide the packet, so `mark` and
+`log` are refused there (`NG-B007`): the walk would carry on past the end of the
+chain, and there is nothing there.
+
+They default to **deny inbound, deny transit, permit outbound** — the shape every
+firewall guide has recommended for thirty years, and the one whose failure mode
+is a service that does not work rather than a network that is open. `output`
+permits because a machine that cannot answer a DNS query cannot be administered
+either.
+
+### 24.3 The mark, and where it goes
+
+`action: mark` is the join between this section and
+[§16.4](#164-routing_policy--policy-based-routing). Policy-based routing deliberately has no
+layer-4 selector; the portable way to route by port, by user or by application
+is to mark the packet in the firewall and match `fwmark` in the policy database.
+This is the half that marks:
+
+```yaml
+spec:
+  firewall:
+    rules:
+      - priority: 100
+        src_zone: lan
+        dst_zone: wan
+        protocol: tcp
+        dst_ports: ['1194']
+        action: mark
+        mark: '0x1'
+  routing_policy:
+    - priority: 110
+      fwmark: '0x1'
+      table: uplink-b
+```
+
+**A mark is local to the machine.** It is metadata attached to a packet inside
+one kernel and it is gone the moment the packet leaves. So the box that routes
+by a mark is the box that has to set it, and the two halves are checked against
+each other: a mark written that nothing reads is
+[`W152`](validation-rules.md#w152--firewall-mark-nothing-reads), and a mark read
+that nothing writes is
+[`W153`](validation-rules.md#w153--firewall-mark-nothing-writes). Each is silent
+on its own and wrong only together, which is exactly the kind of mistake a
+document beside the network cannot catch.
+
+### 24.4 NAT
+
+```yaml
+spec:
+  firewall:
+    nat:
+      - name: masq-out
+        type: masquerade
+        dst_zone: wan
+      - name: web
+        type: dnat
+        src_zone: wan
+        dst_zone: local
+        protocol: tcp
+        dst_ports: ['443']
+        to_address: 10.0.0.5
+        to_port: 8443
+```
+
+Kept apart from the filter rules because it *is* apart: a packet is translated
+**and** filtered, in different hooks, at different times. A list that mixed the
+two would have to answer which happened first for every pair of entries in it.
+
+| `type` | Rewrites | Direction | `to_address` | `to_port` |
+|---|---|---|---|---|
+| `snat` | source | out | **required** | needs a `dst_ports` to be about |
+| `masquerade` | source | out | **refused** — it is the egress interface's, unknown until the packet leaves | as above |
+| `dnat` | destination | in | **required** | optional |
+| `redirect` | destination | in | **refused** — it is this machine | **required** |
+
+All four are `NG-B006`. Order in the list is the order the translations are
+tried, first match winning. There is no `priority`: a NAT list is short enough
+that its own order is readable, and a number that only ever repeated the
+position would be one more thing to keep in step.
+
+### 24.5 What it draws
+
+`netgraph render --layer security` draws the policy, and it is the one view
+whose edges are *decisions* rather than paths. Everywhere else an edge means
+"these two can reach each other"; here it means "and this is what is allowed to
+cross".
+
+* **Nodes are zones**, one per zone of every filtering device, clustered by the
+  device that declares them. `local` and `any` are minted when the policy names
+  them — `any` standing for a rule that left a zone unset — and a reader can
+  tell them from a declared zone in the tooltip and in the JSON, which carry
+  `declared: false`.
+* **Edges are zone pairs**, directed from source to destination, because policy
+  is asymmetric: *lan to wan* is a different statement from *wan to lan*, and a
+  picture that drew them as one line would have merged the one distinction a
+  firewall exists to make. The label is the rules themselves up to three, and a
+  count past that.
+* **Colour is the verdict.** Green where every terminal rule of the pair
+  accepts, red where every one denies, and dashed amber for *conditional* — a
+  pair holding both, or holding nothing terminal at all. The dash is what
+  survives a greyscale print, and conditional is the case worth opening the
+  tooltip for.
+
+None of the topology survives the layer, and none of it should: a cable between
+two hosts says nothing about whether the firewall between them lets anything
+through, and the diagram a reader needs in order to argue about policy is one in
+which the boxes are the zones.
+
+The filters reach a zone through the device it is on — `--name`, `--namespace`
+and `--kind` are all answered from that device, since nothing here stands for the
+box itself — so `--name fw-edge` draws one firewall's policy and nothing else.
+`--vlan` is the exception and is answered from the zone, which carries the ports
+in it.
+
+### 24.6 What validates it
+
+`NG-B001` to `NG-B009` are structural — a zone table, its references and the
+rules over them — and every one of them is resolvable from inside a single
+document, because a zone cannot reach outside one. They are therefore reported
+by the schema pass. `NG-B010` to `NG-B014` need the whole device in view and are
+the semantic validator's, as `W150` to `W154`. §10.11 says how to suppress any
+of them.
+
+### 24.7 What generates from it
+
+`netgraph export nftables` writes `etc/nftables.conf`: one `table inet netgraph`
+with a `set` per zone, the three base chains carrying their stated policies, and
+whatever NAT chains the translations need. A `destroy table` of the same name
+precedes it, so applying the file replaces netgraph's table and leaves anything
+else on the box exactly as it was.
+
+Two properties are worth stating, because both are places a generator could
+plausibly have written more than the inventory says. **Nothing is inferred:**
+there is no `ct state established,related accept` the document did not ask for,
+no loopback exemption and no rate limit. A generated file that quietly opens a
+hole is worse than one that quietly closes one — the second is noticed the same
+afternoon. And **what it will not write, it refuses:** `invert` is the one
+selector nftables has no single spelling for, so a rule using it is a refusal
+rather than a rule matching the opposite of what the document states.
+
+The other six dialects write nothing for `spec.firewall`, and say so: netplan,
+networkd and ifupdown configure interfaces, FRR configures routing, and none of
+them has a filter table to put a rule in.

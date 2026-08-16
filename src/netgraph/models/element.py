@@ -28,11 +28,12 @@ __all__ = [
 #: Re-exported for callers that build documents programmatically.
 DEFAULT_API_VERSION = API_VERSION
 
-#: The twelve *element* kinds defined by ``netgraph.dev/v1alpha1`` (§3). Each one
-#: becomes a node or an edge of the graph.
+#: The thirteen *element* kinds defined by ``netgraph.dev/v1alpha1`` (§3). Each
+#: one becomes a node or an edge of the graph.
 KINDS: tuple[str, ...] = (
     "switch",
     "router",
+    "firewall",
     "hub",
     "computer",
     "server",

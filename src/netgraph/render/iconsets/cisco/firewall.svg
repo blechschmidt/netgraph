@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="Firewall">
+  <title>Firewall</title>
+  <g stroke="#dc2626" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M4 33 H68 V43 A2 2 0 0 1 66 45 H6 A2 2 0 0 1 4 43 Z" fill="#f7c7c7"/>
+    <path d="M17 11 H55 L68 33 H4 Z" fill="#fde8e8"/>
+  </g>
+  <g stroke="#dc2626" stroke-width="1.6" stroke-linecap="round" fill="none">
+    <path d="M8.5 25.5 H63.5"/>
+    <path d="M12.5 18 H59.5"/>
+    <path d="M24 25.5 V18"/>
+    <path d="M48 25.5 V18"/>
+    <path d="M17 33 V25.5"/>
+    <path d="M36 33 V25.5"/>
+    <path d="M55 33 V25.5"/>
+    <path d="M36 18 V11.5"/>
+  </g>
+</svg>

@@ -92,6 +92,7 @@ from __future__ import annotations
 import itertools
 from collections import deque
 from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from fnmatch import fnmatchcase
@@ -106,6 +107,7 @@ from netgraph.layout.resolve import resolve_geometry
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of, short_name
 from netgraph.models import (
     GROUP_KIND,
+    LOCAL_ZONE,
     PATCHPANEL_KIND,
     PDU_KIND,
     ROOT_NETNS,
@@ -113,9 +115,11 @@ from netgraph.models import (
     Adapter,
     Cable,
     Device,
+    FirewallRule,
     Group,
     Interface,
     Medium,
+    NatRule,
     PatchPanel,
     Pdu,
     Style,
@@ -156,6 +160,8 @@ __all__ = [
     "TUNNEL_ID_PREFIX",
     "TUNNEL_KIND",
     "USER_KIND",
+    "ZONE_ID_PREFIX",
+    "ZONE_KIND",
     "AdjacencyView",
     "Edge",
     "EdgeKind",
@@ -167,10 +173,12 @@ __all__ = [
     "NodeType",
     "PatchHop",
     "PatchView",
+    "PolicyView",
     "PortView",
     "RackSlot",
     "RackView",
     "RoutingView",
+    "SecurityView",
     "Subnet",
     "TunnelEnd",
     "TunnelView",
@@ -182,6 +190,7 @@ __all__ = [
     "rack_elevations",
     "resolve_tunnels",
     "splice_patch_panels",
+    "zone_node_id",
 ]
 
 
@@ -217,6 +226,12 @@ class Layer(str, Enum):
     #: box, and a container host drawn as one box says nothing about the dozen
     #: stacks it is actually running.
     NETNS = "netns"
+    #: Policy: the security zones every filtering device divides itself into,
+    #: joined by the traffic its firewall permits between them (§24.5). The one
+    #: view that draws a *decision* rather than a path — everywhere else an edge
+    #: means "these two can reach each other", and here it means "and this is
+    #: what is allowed to cross".
+    SECURITY = "security"
 
     def __str__(self) -> str:
         return self.value
@@ -230,13 +245,13 @@ class Layer(str, Enum):
     def builds_own_nodes(self) -> bool:
         """Does this layer replace the topology's node set with one of its own?
 
-        ``rack``, ``power`` and ``identity`` all do. The first two need the panels
+        ``rack``, ``power``, ``identity`` and ``security`` all do. The first two need the panels
         left in the map they are built from: a panel occupies rack units, and a
         run to a PoE device crosses one. Splicing panels out of a graph nobody
         draws would cost nothing but the walk that finds the switch at the far
         end. ``identity`` draws no hardware whatsoever.
         """
-        return self in (Layer.RACK, Layer.POWER, Layer.IDENTITY)
+        return self in (Layer.RACK, Layer.POWER, Layer.IDENTITY, Layer.SECURITY)
 
 
 class NodeType(str, Enum):
@@ -267,6 +282,10 @@ class NodeType(str, Enum):
     #: declares it, but the node standing for it is minted by the netns view,
     #: which is the only layer that draws below the machine.
     NETNS = "netns"
+    #: One security zone of one device (§24.5). Derived in the same sense a
+    #: netns node is: the device declares the zone, and the node standing for it
+    #: is minted by the security view.
+    ZONE = "zone"
 
     def __str__(self) -> str:
         return self.value
@@ -316,6 +335,32 @@ def netns_node_id(element: str, namespace: str) -> str:
     return f"{NETNS_ID_PREFIX}{element}:{namespace}" if namespace else element
 
 
+#: ``kind`` reported for a security-zone node, and the prefix of its identity.
+#: The same shape as :data:`NETNS_KIND` and for the same reason: a zone belongs
+#: to one device, so both halves have to be recoverable from the identity, and
+#: ``zone:sites/hq/fw-edge:dmz`` is the zone ``dmz`` on ``sites/hq/fw-edge``.
+ZONE_KIND: Final = "zone"
+ZONE_ID_PREFIX: Final = "zone:"
+
+#: The zone a rule is in when it names none. Not a value any document may write
+#: -- ``src_zone`` is simply absent -- so it lives here rather than in the model:
+#: it is a *drawing* of the absence, and the drawing needs somewhere to put the
+#: line. Chosen so it cannot collide with a declared zone, which ``ElementName``
+#: keeps to the same grammar ``local`` is in and ``NG-B001`` keeps off ``local``.
+ANY_ZONE: Final = "any"
+
+
+def zone_node_id(element: str, zone: str) -> str:
+    """Identity of the node standing for ``zone`` on ``element`` (§24.5).
+
+    Unlike :func:`netns_node_id` there is no case that answers the element's own
+    fqn. A device is not one of its zones — ``local`` is the traffic that
+    terminates on it, which is a fourth thing beside the zones and the box — so
+    every zone node is minted, including the two nobody declares.
+    """
+    return f"{ZONE_ID_PREFIX}{element}:{zone}"
+
+
 class EdgeKind(str, Enum):
     """Why two nodes are joined."""
 
@@ -353,6 +398,11 @@ class EdgeKind(str, Enum):
     #: (§23.1). Directed in the only sense an undirected edge can be — source is
     #: the containing namespace — because nesting is what the edge says.
     NESTING = "nesting"
+    #: What a device's firewall does to traffic from one zone to another (§24.5).
+    #: Directed, and meant that way: policy is asymmetric — *lan to wan* is a
+    #: different statement from *wan to lan*, and a firewall that treated them as
+    #: one would not be a firewall.
+    POLICY = "policy"
 
     def __str__(self) -> str:
         return self.value
@@ -655,7 +705,7 @@ class RoutingView:
 
     @property
     def routes_by_policy(self) -> bool:
-        """Does the element route by anything other than the destination (§16.6)?"""
+        """Does the element route by anything other than the destination (§16.4)?"""
         return bool(self.policy)
 
     @property
@@ -689,6 +739,117 @@ class RoutingView:
             # them is looking.
             lines.append(count_text(len(self.policy), "policy rule"))
         return tuple(lines)
+
+
+@dataclass(frozen=True, slots=True)
+class SecurityView:
+    """One security zone of one device, flattened for the renderers (§24.5).
+
+    Built once, here, so that the DOT, Mermaid, JSON and HTML drawings of one
+    inventory cannot disagree about which interfaces are in a zone or how many
+    rules mention it.
+
+    The two zones nobody declares get a view like any other. ``local`` is the
+    machine itself — the traffic that terminates on it rather than crossing it —
+    and ``any`` stands for a rule that left a zone unset, which means "wherever
+    the packet came from". Both are minted only when the policy names them, so a
+    device whose every rule states both zones draws neither.
+    """
+
+    #: The device this zone belongs to. A zone never spans two.
+    element: str
+    #: The zone's name, as a rule spells it.
+    name: str
+    #: The kind of that device — ``firewall``, ``router``, ``server``. Carried
+    #: rather than looked up, because the device is not a node of this graph and
+    #: ``--kind`` still has to be able to reach the zones on one.
+    owner_kind: str = ""
+    #: The interfaces in it, in declaration order. Empty for ``local``, for
+    #: ``any``, and for a declared zone nothing has been put in yet (``W150``).
+    interfaces: tuple[str, ...] = ()
+    #: What the device declares about it, when it declares anything.
+    description: str | None = None
+    #: How many filter rules mention this zone, in either direction.
+    rules: int = 0
+    #: How many address translations do.
+    translations: int = 0
+
+    @property
+    def id(self) -> str:
+        return zone_node_id(self.element, self.name)
+
+    @property
+    def is_declared(self) -> bool:
+        """Is this a zone of ``spec.zones``, rather than ``local`` or ``any``?"""
+        return self.name not in (LOCAL_ZONE, ANY_ZONE)
+
+    @property
+    def is_empty(self) -> bool:
+        """A declared zone with nothing in it — the shape ``W150`` reports."""
+        return self.is_declared and not self.interfaces
+
+    def describe(self) -> tuple[str, ...]:
+        """The lines a node label carries under the zone's name."""
+        if not self.is_declared:
+            return ()
+        if not self.interfaces:
+            return ("no interface",)
+        return (", ".join(self.interfaces),)
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyView:
+    """What one device's firewall does to traffic between two of its zones (§24.5).
+
+    One per *zone pair* rather than one per rule, because that is the question
+    the picture answers: an edge on this diagram is "traffic may cross from here
+    to there, on these terms", and a diagram with one edge per rule would draw
+    twelve lines between two boxes and answer nothing.
+
+    :attr:`verdict` is the summary the edge is coloured by, and it is deliberately
+    coarse. A pair whose rules all accept is open; one whose rules all deny is
+    closed; one holding both is *conditional*, which is the interesting case and
+    the one whose rules are worth reading in full.
+    """
+
+    element: str
+    source: str
+    target: str
+    #: Every rule of the pair, already rendered, in priority order.
+    rules: tuple[str, ...] = ()
+    #: Every translation of the pair, already rendered, in declaration order.
+    translations: tuple[str, ...] = ()
+    #: ``open``, ``closed`` or ``conditional``.
+    verdict: str = "conditional"
+
+    @property
+    def id(self) -> str:
+        return f"{self.element}#policy:{self.source}>{self.target}"
+
+    @property
+    def permits(self) -> bool:
+        return self.verdict != "closed"
+
+    def label(self) -> tuple[str, ...]:
+        """The edge label, one line per element: the rules, or a count of them.
+
+        Three is the cut-off for the same reason
+        :meth:`RoutingView.describe` counts rather than lists: an edge label is
+        not a policy document, and the rules themselves are on the tooltip and in
+        the JSON, which is where a reader who wants them is looking.
+
+        Lines rather than one joined string, because each renderer joins them its
+        own way — DOT after escaping each line, Mermaid onto the single line its
+        link labels read well in — and a newline baked in here would be escaped
+        into a literal ``\\n`` by the first of the two.
+        """
+        if len(self.rules) <= _POLICY_LABEL_RULES:
+            return self.rules
+        return (count_text(len(self.rules), "rule"),)
+
+
+#: How many rules an edge of the security view spells out before it counts them.
+_POLICY_LABEL_RULES: Final = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -960,6 +1121,9 @@ class Node:
     #: only (§23.3), on the derived nodes *and* on the element node, which
     #: stands for the machine's initial namespace.
     netns: NetnsView | None = None
+    #: The security zone this node stands for; set at :attr:`Layer.SECURITY`
+    #: only (§24.5), where it is the whole reason the node is drawn.
+    security: SecurityView | None = None
     #: The box this node is drawn inside when the *layer* groups the nodes rather
     #: than the reader: the VRF at :attr:`Layer.ROUTING`. Distinct from
     #: :attr:`namespace`, which is where the document lives — a router holds any
@@ -1019,6 +1183,30 @@ class Node:
             kind=element.kind,
             namespace=namespace_of(fqn),
             element=element,
+        )
+
+    @classmethod
+    def for_zone(cls, view: SecurityView, node: Node) -> Node:
+        """The node standing for one security zone (§24.5).
+
+        ``node`` is the device's own node, and the zone borrows two things from
+        it. The namespace, so ``--group-by-namespace`` draws the zone inside the
+        directory that declared the device — a zone has no document of its own,
+        so the only honest answer is its device's. And the ports, narrowed to
+        the interfaces actually in the zone, so ``--vlan`` still selects a
+        broadcast domain here and a tooltip can say what is behind the box.
+        """
+        ports = tuple(port for port in node.ports if port.name in view.interfaces)
+        return cls(
+            fqn=view.id,
+            name=view.name,
+            kind=ZONE_KIND,
+            namespace=node.namespace,
+            ports=ports,
+            vlans=frozenset().union(*(port.vlans for port in ports)) if ports else frozenset(),
+            type=NodeType.ZONE,
+            security=view,
+            cluster=view.element,
         )
 
     @classmethod
@@ -1201,6 +1389,9 @@ class Edge:
     #: The power feed this edge is; set on ``outlet`` and ``poe`` edges, which
     #: exist only at :attr:`Layer.POWER` (§17.5).
     feed: Feed | None = None
+    #: What the firewall does between two zones; set on ``policy`` edges, which
+    #: exist only at :attr:`Layer.SECURITY` (§24.5).
+    policy: PolicyView | None = None
 
     @property
     def name(self) -> str:
@@ -1540,6 +1731,8 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         nodes, edges = _identity_view(inventory)
     elif layer is Layer.NETNS:
         nodes, edges = _netns_view(nodes, edges)
+    elif layer is Layer.SECURITY:
+        nodes, edges = _security_view(nodes)
     geometry = resolve_geometry(inventory, layer.value)
     annotations = annotations_for_view(inventory, layer.value)
     return Graph(
@@ -1963,6 +2156,166 @@ def _identity_view(inventory: Inventory) -> tuple[dict[str, Node], tuple[Edge, .
     return nodes, edges
 
 
+def _security_view(nodes: Mapping[str, Node]) -> tuple[dict[str, Node], tuple[Edge, ...]]:
+    """The policy graph: the zones, joined by what may cross between them (§24.5).
+
+    None of the topology survives, and none of it should. A cable between two
+    hosts says nothing about whether the firewall between them lets anything
+    through, and the whole point of a zone is that it is *not* an interface: the
+    diagram a reader needs in order to argue about policy is one in which the
+    boxes are the zones and the lines are the decisions.
+
+    One node per zone, clustered by the device that declares it, so a reader
+    sees which machine each partition belongs to. One edge per **zone pair the
+    policy mentions**, directed from source to destination — because policy is
+    asymmetric, and a picture that drew *lan to wan* and *wan to lan* as one line
+    would have drawn the one thing a firewall exists to distinguish as the same
+    thing.
+
+    A device whose ``spec.firewall`` names a zone it does not declare cannot
+    exist (``NG-B004``), so every edge here has both ends. What the view does
+    mint is the two zones nobody declares: ``local`` for a rule about traffic
+    terminating on the machine, and ``any`` for a rule that left a zone unset.
+    Both appear only when the policy names them.
+
+    A device with zones and no policy is drawn as its zones and no edges: it has
+    a partition and nothing written over it yet, and that is worth seeing.
+    """
+    kept: dict[str, Node] = {}
+    edges: list[Edge] = []
+    for fqn, node in nodes.items():
+        device = node.element if isinstance(node.element, Device) else None
+        if device is None:
+            continue
+        views = _security_views(fqn, device)
+        if not views:
+            continue
+        for view in views:
+            kept[view.id] = Node.for_zone(view, node)
+        edges.extend(_policy_edge(policy) for policy in _policies_of(fqn, device))
+    return kept, tuple(edges)
+
+
+def _security_views(fqn: str, device: Device) -> tuple[SecurityView, ...]:
+    """Every zone of one device, declared ones first, or ``()`` for a device with none.
+
+    Declared first and in declaration order, then ``local`` and ``any`` if the
+    policy reaches for them, because that is the order a reader builds the
+    picture in: here is how the machine is divided, and here are the two places
+    traffic goes that are not one of the divisions.
+    """
+    spec = device.spec
+    if not spec.zones and spec.firewall is None:
+        return ()
+    policy = spec.firewall
+    rules = policy.rules if policy is not None else ()
+    nat = policy.nat if policy is not None else ()
+
+    def counted(name: str) -> tuple[int, int]:
+        return (
+            sum(1 for rule in rules if name in _zone_pair(rule)),
+            sum(1 for entry in nat if name in _zone_pair(entry)),
+        )
+
+    views = [
+        SecurityView(
+            element=fqn,
+            name=zone.name,
+            owner_kind=device.kind,
+            interfaces=tuple(zone.interfaces),
+            description=zone.description,
+            rules=counted(zone.name)[0],
+            translations=counted(zone.name)[1],
+        )
+        for zone in spec.zones
+    ]
+    declared = {zone.name for zone in spec.zones}
+    for name in (LOCAL_ZONE, ANY_ZONE):
+        if name in declared:  # pragma: no cover - NG-B001 refuses both
+            continue
+        count, translations = counted(name)
+        if count or translations:
+            views.append(
+                SecurityView(
+                    element=fqn,
+                    name=name,
+                    owner_kind=device.kind,
+                    rules=count,
+                    translations=translations,
+                )
+            )
+    return tuple(views)
+
+
+def _zone_pair(rule: FirewallRule | NatRule) -> tuple[str, str]:
+    """``(source, destination)`` with :data:`ANY_ZONE` for whichever is unset."""
+    return (rule.src_zone or ANY_ZONE, rule.dst_zone or ANY_ZONE)
+
+
+def _policies_of(fqn: str, device: Device) -> tuple[PolicyView, ...]:
+    """One view per zone pair the device's policy mentions, in walk order.
+
+    Grouped by pair and ordered by the *lowest priority in each group*, which is
+    the order the chain reaches the pairs in. Two pairs that never interact are
+    in an arbitrary order either way; two that do are drawn in the order the
+    device would consider them, and that is the order worth having.
+    """
+    policy = device.spec.firewall
+    if policy is None:
+        return ()
+    grouped: dict[tuple[str, str], list[str]] = {}
+    verdicts: dict[tuple[str, str], set[bool]] = {}
+    for rule in policy.rules_in():
+        pair = _zone_pair(rule)
+        grouped.setdefault(pair, []).append(rule.describe())
+        if rule.action.is_terminal:
+            verdicts.setdefault(pair, set()).add(rule.action.permits)
+    translations: dict[tuple[str, str], list[str]] = {}
+    for entry in policy.nat:
+        pair = _zone_pair(entry)
+        grouped.setdefault(pair, [])
+        translations.setdefault(pair, []).append(entry.describe())
+
+    return tuple(
+        PolicyView(
+            element=fqn,
+            source=pair[0],
+            target=pair[1],
+            rules=tuple(grouped[pair]),
+            translations=tuple(translations.get(pair, ())),
+            verdict=_verdict(verdicts.get(pair, set())),
+        )
+        for pair in grouped
+    )
+
+
+def _verdict(permits: AbstractSet[bool]) -> str:
+    """``open``, ``closed`` or ``conditional``, from what a pair's rules decide.
+
+    A pair with no terminal rule at all is *conditional* rather than open or
+    closed: everything in it marks or logs and carries on, so what happens to
+    the traffic is decided somewhere further down the chain and this edge is not
+    the place that says. The chain default is on the device, not on the pair.
+    """
+    if permits == {True}:
+        return "open"
+    if permits == {False}:
+        return "closed"
+    return "conditional"
+
+
+def _policy_edge(policy: PolicyView) -> Edge:
+    """One drawn zone pair (§24.5)."""
+    return Edge(
+        id=policy.id,
+        kind=EdgeKind.POLICY,
+        source=zone_node_id(policy.element, policy.source),
+        target=zone_node_id(policy.element, policy.target),
+        medium="",
+        policy=policy,
+    )
+
+
 def _routed_view(
     nodes: Mapping[str, Node], subnets: Sequence[Subnet]
 ) -> tuple[dict[str, Node], tuple[Edge, ...]]:
@@ -2252,7 +2605,7 @@ def _routing_of(fqn: str, device: Device) -> RoutingView:
 
 
 def _policy_of(device: Device) -> tuple[str, ...]:
-    """The policy database, rendered, in the order the device walks it (§16.6).
+    """The policy database, rendered, in the order the device walks it (§16.4).
 
     Sorted by priority rather than kept in declaration order, because the
     diagram's job here is to answer "what happens to this packet", and that is
@@ -2888,6 +3241,7 @@ def _propagate_through_adapters(membership: dict[str, set[int]], edges: Sequence
 NODE_KINDS: Final[tuple[str, ...]] = (
     "switch",
     "router",
+    "firewall",
     "hub",
     "computer",
     "server",
@@ -3078,7 +3432,39 @@ def _kept_derived(
             if node.netns.element not in elements and fqn != seed:
                 continue
             surviving[fqn] = node
+        elif node.security is not None:
+            # A zone's one member is its device, and unlike a namespace's the
+            # device is *not* a node of this graph — nothing at
+            # :attr:`Layer.SECURITY` stands for the box. So the predicates are
+            # applied to it directly, exactly as a rack applies them to its
+            # slots, and ``--name fw-edge`` selects that firewall's zones.
+            if not _zone_selected(node, spec) and fqn != seed:
+                continue
+            surviving[fqn] = node
     return surviving
+
+
+def _zone_selected(node: Node, spec: FilterSpec) -> bool:
+    """Does ``spec`` select the device whose zone this node is?
+
+    Namespace, kind and name are answered from the device the zone belongs to,
+    since selecting "the firewall" has to select its zones. A VLAN filter is the
+    one that is answered from the node: a zone carries the ports in it, so the
+    VLANs it is in are a fact about the zone rather than about the box.
+    """
+    view = node.security
+    if view is None:  # pragma: no cover - the caller checked
+        return False
+    if spec.namespaces and not _in_namespaces(namespace_of(view.element), spec.namespaces):
+        return False
+    if spec.kinds and view.owner_kind not in spec.kinds:
+        return False
+    if spec.vlans and not (node.vlans & spec.vlans):
+        return False
+    return not spec.names or any(
+        fnmatchcase(view.element, pattern) or fnmatchcase(short_name(view.element), pattern)
+        for pattern in spec.names
+    )
 
 
 def _slot_selected(slot: RackSlot, spec: FilterSpec) -> bool:

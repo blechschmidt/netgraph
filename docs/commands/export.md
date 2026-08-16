@@ -58,16 +58,16 @@ which way is the thing to know before you pick one.
 paths the device keeps them at, and a dialect that cannot express something the
 inventory declares writes nothing at all rather than a device that is almost
 right —
-[Device configuration: the six dialects](../export.md#device-configuration-the-six-dialects):
+[Device configuration: the seven dialects](../export.md#device-configuration-the-seven-dialects):
 
 | `FORMAT` | Artefact | What it refuses |
 |---|---|---|
-| [`netplan`](../export.md#device-configuration-the-six-dialects) | `etc/netplan/10-netgraph.yaml` for a `computer`, `server` or `router` | The 802.1Q configuration of a bridge port, and a VRF: netplan's `vrfs` section needs a numeric routing table and an inventory states a route distinguisher |
-| [`networkd`](../export.md#device-configuration-the-six-dialects) | `etc/systemd/network/*.network` and `*.netdev`, one pair per link the host builds | A VRF, for the same missing table number — `[BridgeVLAN]` covers what netplan cannot |
-| [`ifupdown`](../export.md#device-configuration-the-six-dialects) | `etc/network/interfaces`, the Debian original, with routes as `up`/`down` hooks | A bridge port's 802.1Q, a VRF, and an `ap` radio, which is hostapd's job rather than a station's `wpa-ssid` |
-| [`frr`](../export.md#device-configuration-the-six-dialects) | `etc/frr/frr.conf`: VRFs, static routes, OSPF areas, BGP neighbours | Nothing — FRR's grammar is a superset of what the schema states about routing. It creates no interfaces, so those come from a host dialect |
-| [`wireguard`](../export.md#device-configuration-the-six-dialects) | `etc/wireguard/<interface>.conf`, one file per tunnel, keys written as `REPLACE-ME` | A `cipher` or an `auth` that is not WireGuard's own, which is the part deciding whether the two ends can speak |
-| [`interfaces`](../export.md#device-configuration-the-six-dialects) | `interfaces.conf` — netgraph's own vendor-neutral grammar, for **every** device | Nothing, ever. What it cannot do is be applied: no system reads it |
+| [`netplan`](../export.md#device-configuration-the-seven-dialects) | `etc/netplan/10-netgraph.yaml` for a `computer`, `server` or `router` | The 802.1Q configuration of a bridge port, and a VRF: netplan's `vrfs` section needs a numeric routing table and an inventory states a route distinguisher |
+| [`networkd`](../export.md#device-configuration-the-seven-dialects) | `etc/systemd/network/*.network` and `*.netdev`, one pair per link the host builds | A VRF, for the same missing table number — `[BridgeVLAN]` covers what netplan cannot |
+| [`ifupdown`](../export.md#device-configuration-the-seven-dialects) | `etc/network/interfaces`, the Debian original, with routes as `up`/`down` hooks | A bridge port's 802.1Q, a VRF, and an `ap` radio, which is hostapd's job rather than a station's `wpa-ssid` |
+| [`frr`](../export.md#device-configuration-the-seven-dialects) | `etc/frr/frr.conf`: VRFs, static routes, OSPF areas, BGP neighbours | Nothing — FRR's grammar is a superset of what the schema states about routing. It creates no interfaces, so those come from a host dialect |
+| [`wireguard`](../export.md#device-configuration-the-seven-dialects) | `etc/wireguard/<interface>.conf`, one file per tunnel, keys written as `REPLACE-ME` | A `cipher` or an `auth` that is not WireGuard's own, which is the part deciding whether the two ends can speak |
+| [`interfaces`](../export.md#device-configuration-the-seven-dialects) | `interfaces.conf` — netgraph's own vendor-neutral grammar, for **every** device | Nothing, ever. What it cannot do is be applied: no system reads it |
 
 What they have in common — a generated-by header, stable ordering, and no clock
 or hostname anywhere in the output, so re-exporting an unchanged inventory
@@ -215,7 +215,7 @@ Error: --port applies to 'prometheus-sd', not to 'hosts'
 **Every format**: `-o/--output`, `--manifest`, the filters above, `--strict` and
 `--force`.
 
-**The six configuration dialects**: `--out DIR` writes the tree instead of one
+**The seven configuration dialects**: `--out DIR` writes the tree instead of one
 artefact, and `--force` additionally means "overwrite files netgraph did not
 generate" there. `--out` is one of the format-specific options above, so giving
 it to a description format is a usage error rather than a flag that quietly did
@@ -227,7 +227,7 @@ $ netgraph -i examples/home-lab export hosts --out build/config
 Usage: netgraph export [OPTIONS] FORMAT
 Try 'netgraph export --help' for help.
 
-Error: --out applies to 'netplan', 'networkd', 'ifupdown', 'frr', 'wireguard' or 'interfaces', not to 'hosts'
+Error: --out applies to 'netplan', 'networkd', 'ifupdown', 'frr', 'nftables', 'wireguard' or 'interfaces', not to 'hosts'
 ```
 
 **`dns-zone`**: `--origin NAME` is *required* — a zone file has no meaning without
@@ -285,7 +285,7 @@ host variables are set are [Groups](../export.md#groups),
 | `--manifest` | `FILE` | — | Write the JSON record of what was skipped to this file. It goes to stderr when no file is named. |
 | `--namespace` | `NS` | — | Keep only elements in this namespace or below it. Repeatable. |
 | `--vlan` | `VID` | — | Keep only elements participating in this VLAN. Repeatable. |
-| `--kind` | `[switch\|router\|hub\|computer\|server\|adapter\|patchpanel\|pdu\|user\|group]` | — | Keep only elements of this kind. Repeatable. |
+| `--kind` | `[switch\|router\|firewall\|hub\|computer\|server\|adapter\|patchpanel\|pdu\|user\|group]` | — | Keep only elements of this kind. Repeatable. |
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
@@ -304,7 +304,7 @@ host variables are set are [Groups](../export.md#groups),
 | `--label` | `KEY=VALUE` | — | Static label merged into every prometheus-sd target. Repeatable. |
 | `--table-format` | `[csv\|markdown]` | `csv` | How cable-list is laid out. The rows and columns are the same either way. |
 | `--schedule-format` | `[csv\|json]` | `csv` | How the power load schedule is laid out. json adds the per-PDU and per-PSE totals; the feed rows are the same either way. |
-| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns]` | `l1` | Which view the drawio diagram draws. Unlike the other formats this one is a picture, and the arrangement it opens with is the one stored for that view. |
+| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | `l1` | Which view the drawio diagram draws. Unlike the other formats this one is a picture, and the arrangement it opens with is the one stored for that view. |
 | `--icons` | `THEME\|DIR` | `cisco` | Icon theme inlined into the drawio file as data URIs, so the file needs nothing beside it. Built in: cisco, none. 'none' draws coloured boxes. |
 | `--theme` | `NAME\|PATH` | — | Apply a stylesheet to the exported diagram (§22). mxGraph spells netgraph's style vocabulary almost one for one, so a colour chosen here opens in draw.io as that colour and survives a round-trip. Built in: blueprint, mono, none. |
 | `--style`, `--no-style` | — | `--style` | Honour the styles the inventory and the theme declare. --no-style exports plain. |

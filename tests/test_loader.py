@@ -557,7 +557,7 @@ def test_unknown_kind_is_reported_once(tmp_path: Path) -> None:
     write(
         root,
         "alien.yaml",
-        f"apiVersion: {API_VERSION}\nkind: firewall\nmetadata: {{}}\nspec: {{}}\n",
+        f"apiVersion: {API_VERSION}\nkind: loadbalancer\nmetadata: {{}}\nspec: {{}}\n",
     )
 
     (error,) = load_tree(root).errors

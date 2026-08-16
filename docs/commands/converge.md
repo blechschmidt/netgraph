@@ -1,7 +1,7 @@
 # `netgraph converge`
 
 [`netgraph drift`](drift.md) says how the live network differs from the declared
-inventory. [`netgraph export`](../export.md#device-configuration-the-six-dialects)
+inventory. [`netgraph export`](../export.md#device-configuration-the-seven-dialects)
 says what a device would run if it agreed. Nothing joined them: an operator read
 a list of differences and typed the fix, and typing the fix is where the network
 and the inventory started disagreeing in the first place.
@@ -327,7 +327,7 @@ emitters rather than a second rendering that could disagree with them.
 ### `interfaces` — the imperative one
 
 The vocabulary is not invented: it is the
-[`interfaces` dialect](../export.md#device-configuration-the-six-dialects) with a
+[`interfaces` dialect](../export.md#device-configuration-the-seven-dialects) with a
 verb in front. Somebody who has read one of those files can read one of these
 scripts, and somebody reading a script knows which field of which document they
 are looking at.
@@ -533,7 +533,7 @@ a consumer does not have to parse a here-document out of a script.
 <!-- generated: options converge plan -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|wireguard\|interfaces]` | `auto` | Input dialect, exactly as 'netgraph drift --from' takes it. |
+| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect, exactly as 'netgraph drift --from' takes it. |
 | `--host` | `NAME` | — | Device every input was captured on, when the input does not name it. |
 | `--dialect` | `[interfaces\|netplan\|networkd\|ifupdown\|frr\|wireguard]` | `interfaces` | Which configuration dialect the commands are written in. 'interfaces' is netgraph's own imperative grammar and covers every device kind; the other five are declarative, so their remediation is the generated file plus a reload. |
 | `--only` | `GLOB` | — | Converge only elements whose name matches this glob. Repeatable. |
@@ -569,7 +569,7 @@ get wrong.
 
 * [`netgraph drift`](drift.md) — the differences this plan closes, and what each
   capture dialect can and cannot see.
-* [`netgraph export`](../export.md#device-configuration-the-six-dialects) — the six
+* [`netgraph export`](../export.md#device-configuration-the-seven-dialects) — the seven
   configuration dialects, and what each one is lossy about.
 * [`netgraph impact`](impact.md) — the blast-radius engine the batches use.
 * [`netgraph plan`](plan.md) and [`netgraph apply`](apply.md) — the same

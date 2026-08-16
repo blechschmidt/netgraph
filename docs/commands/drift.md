@@ -403,7 +403,7 @@ from `NAME=PATH`, from `--host`, or from the file name, in that order.
 <!-- generated: options drift -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|wireguard\|interfaces]` | `auto` | Input dialect, as for 'netgraph import'. 'auto' sniffs each input on its own: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, frr, wireguard and interfaces are the running configuration in the same dialects 'netgraph export' writes. |
+| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect, as for 'netgraph import'. 'auto' sniffs each input on its own: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, frr, nftables, wireguard and interfaces are the running configuration in the same dialects 'netgraph export' writes. |
 | `--host` | `NAME` | — | Device every input was captured on. An lldp or iproute capture never names its own host. Without this the name comes from the file name, or from a 'NAME=path' argument. |
 | `--only` | `GLOB` | — | Compare only elements whose fully-qualified or short name matches this glob. Repeatable. |
 | `--exclude` | `GLOB` | — | Leave elements whose name matches this glob out of the comparison. Repeatable. |

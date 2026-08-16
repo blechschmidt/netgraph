@@ -81,6 +81,9 @@ from netgraph.models import (
     Device,
     Duplex,
     Element,
+    FirewallConfig,
+    FirewallHook,
+    FirewallRule,
     Hub,
     Interface,
     InterfaceRef,
@@ -88,6 +91,7 @@ from netgraph.models import (
     IPv4Address,
     IPv6Address,
     Medium,
+    NatRule,
     Note,
     PanelSide,
     PatchPanel,
@@ -106,6 +110,7 @@ from netgraph.models import (
     VlanMode,
     VrfDefinition,
     WirelessConfig,
+    Zone,
     split_panel_port,
 )
 from netgraph.models.metadata import Location
@@ -563,7 +568,7 @@ class _Vrf:
 
 @dataclass(frozen=True, slots=True)
 class _PolicyDatabase:
-    """One device's policy-based routing: its tables and the rules over them (§16.6).
+    """One device's policy-based routing: its tables and the rules over them (§16.4).
 
     Held per device rather than flattened per rule, unlike :class:`_RouteEntry`,
     because every question worth asking about a policy database is about the
@@ -592,6 +597,48 @@ class _PolicyDatabase:
         and the document order is what a field path has to name.
         """
         return ("spec", "routing_policy", self.rules.index(rule), *suffix)
+
+
+@dataclass(frozen=True, slots=True)
+class _Firewall:
+    """One device's filtering: its zones and the policy over them (§24).
+
+    Held per device for the same reason :class:`_PolicyDatabase` is: every
+    question worth asking here is about the whole of it. Whether a zone holds an
+    interface, whether an interface is in a zone, whether a rule can be reached
+    at all, and whether the marks the filter writes are the marks the routing
+    policy reads — none of them can be answered from one rule.
+
+    A device with ``spec.zones`` and no ``spec.firewall`` is here too, because
+    ``W150`` and ``W151`` are about the zones alone: a partition nobody has
+    written policy over yet is still a partition, and an empty one in it is
+    still worth saying.
+    """
+
+    owner_fqn: str
+    owner: Device
+    #: The declared zones, in declaration order. :data:`LOCAL_ZONE` is not
+    #: here: nobody declared it, so no finding can be anchored at it.
+    zones: tuple[Zone, ...]
+    #: The filter policy in declaration order — *not* priority order, since a
+    #: finding's field path is a position in the document.
+    rules: tuple[FirewallRule, ...]
+
+    @property
+    def policy(self) -> FirewallConfig | None:
+        return self.owner.spec.firewall
+
+    def zone_path(self, index: int, *suffix: str | int) -> tuple[str | int, ...]:
+        return ("spec", "zones", index, *suffix)
+
+    def rule_path(self, rule: FirewallRule, *suffix: str | int) -> tuple[str | int, ...]:
+        """The path of ``rule`` in the document it was written in.
+
+        By identity rather than by a stored index, because the checks walk the
+        chain in *priority* order — which is the order the device walks it — and
+        the document order is what a field path has to name.
+        """
+        return ("spec", "firewall", "rules", self.rules.index(rule), *suffix)
 
 
 @dataclass(frozen=True, slots=True)
@@ -654,8 +701,10 @@ class _Context:
     sessions: tuple[_Session, ...] = ()
     #: Every VRF any device declares, with what is bound and placed in it (§16.1).
     vrfs: tuple[_Vrf, ...] = ()
-    #: Every device that declares a routing table or a policy rule (§16.6).
+    #: Every device that declares a routing table or a policy rule (§16.4).
     policies: tuple[_PolicyDatabase, ...] = ()
+    #: Every device that declares a security zone or a filter policy (§24).
+    firewalls: tuple[_Firewall, ...] = ()
     #: Devices that declare ``spec.routing``, in load order.
     routing: Mapping[str, RoutingConfig] = field(default_factory=dict)
     #: Every address the inventory configures -> where it is, first declaration
@@ -868,6 +917,7 @@ def _build_context(inventory: Inventory) -> _Context:
         sessions=routing.sessions,
         vrfs=routing.vrfs,
         policies=routing.policies,
+        firewalls=routing.firewalls,
         routing=routing.routing,
         address_owners=routing.address_owners,
         power=power_plan(inventory),
@@ -877,10 +927,10 @@ def _build_context(inventory: Inventory) -> _Context:
 
 @dataclass(frozen=True, slots=True)
 class _Routing:
-    """Everything §16 contributes to the context, collected in one pass.
+    """Everything §16 and §24 contribute to the context, collected in one pass.
 
-    One walk rather than four, and no walk at all for an inventory that declares
-    no routing — which is every inventory written before §16 existed. The
+    One walk rather than five, and no walk at all for an inventory that declares
+    no routing and no filtering — which is every inventory written before §16 existed. The
     per-rule cost of the routing group is nil (``tools/profile_validate.py``);
     what would have shown up is four more traversals of every device in
     :func:`_build_context`, so there is one.
@@ -890,12 +940,13 @@ class _Routing:
     sessions: tuple[_Session, ...] = ()
     vrfs: tuple[_Vrf, ...] = ()
     policies: tuple[_PolicyDatabase, ...] = ()
+    firewalls: tuple[_Firewall, ...] = ()
     routing: Mapping[str, RoutingConfig] = field(default_factory=dict)
     address_owners: Mapping[_IPAddress, tuple[str, str]] = field(default_factory=dict)
 
 
 def _collect_routing(owners: Mapping[str, InterfaceOwner]) -> _Routing:
-    """Flatten the routing state of every device (§16), or nothing at all.
+    """Flatten the routing and filtering state of every device, or nothing at all.
 
     Two short-circuits, because most inventories say nothing about routing and
     ``_build_context`` is a third of ``validate``:
@@ -912,6 +963,7 @@ def _collect_routing(owners: Mapping[str, InterfaceOwner]) -> _Routing:
     routes: list[_RouteEntry] = []
     vrfs: list[_Vrf] = []
     policies: list[_PolicyDatabase] = []
+    firewalls: list[_Firewall] = []
     routing: dict[str, RoutingConfig] = {}
     peers: list[tuple[str, Device, BgpConfig]] = []
 
@@ -949,6 +1001,15 @@ def _collect_routing(owners: Mapping[str, InterfaceOwner]) -> _Routing:
                     rules=tuple(spec.routing_policy),
                 )
             )
+        if spec.zones or spec.firewall is not None:
+            firewalls.append(
+                _Firewall(
+                    owner_fqn=fqn,
+                    owner=owner,
+                    zones=tuple(spec.zones),
+                    rules=tuple(spec.firewall.rules) if spec.firewall else (),
+                )
+            )
         if spec.routing is not None:
             routing[fqn] = spec.routing
             if spec.routing.bgp is not None and spec.routing.bgp.neighbors:
@@ -972,13 +1033,21 @@ def _collect_routing(owners: Mapping[str, InterfaceOwner]) -> _Routing:
         sessions=tuple(sessions),
         vrfs=tuple(vrfs),
         policies=tuple(policies),
+        firewalls=tuple(firewalls),
         routing=routing,
         address_owners=addresses,
     )
 
 
 def _routes_anything(owners: Mapping[str, InterfaceOwner]) -> bool:
-    """Does any device declare routing state at all (§16)?"""
+    """Does any device declare routing or filtering state at all (§16, §24)?
+
+    Both in one predicate because both are collected in one walk. A firewall is
+    not routing, but the question the short-circuit is asking is "is there
+    anything on a device's ``spec`` past its interfaces", and the answer has to
+    cover everything that walk gathers or the walk would be skipped with work
+    left in it.
+    """
     return any(
         isinstance(owner, Device)
         and (
@@ -987,6 +1056,8 @@ def _routes_anything(owners: Mapping[str, InterfaceOwner]) -> bool:
             or owner.spec.route_tables
             or owner.spec.routing_policy
             or owner.spec.routing is not None
+            or owner.spec.zones
+            or owner.spec.firewall is not None
         )
         for owner in owners.values()
     )
@@ -1759,6 +1830,222 @@ def _check_shadowed_policy(ctx: _Context) -> Iterator[_Draft]:
                 (database.owner_fqn,),
                 database.rule_path(first, "priority"),
             )
+
+
+def _check_empty_zone(ctx: _Context) -> Iterator[_Draft]:
+    """W150 — a declared zone holds no interface (``NG-B010``).
+
+    A zone is a partition of the device's interfaces, so one holding none is
+    empty in the strongest sense: no packet can ever be in it, and every rule
+    naming it — however carefully written — matches nothing. The finding counts
+    those rules, because the number is the difference between a placeholder
+    nobody has filled in yet and a policy that has quietly stopped working.
+    """
+    for firewall in ctx.firewalls:
+        for index, zone in enumerate(firewall.zones):
+            if zone.interfaces:
+                continue
+            policy = firewall.policy
+            entries: tuple[FirewallRule | NatRule, ...] = (
+                (*policy.rules, *policy.nat) if policy is not None else ()
+            )
+            naming = [rule for rule in entries if zone.name in rule.zones]
+            written = (
+                f"; {count_text(len(naming), 'rule')} naming it can never match" if naming else ""
+            )
+            yield _Draft(
+                f"element {_q(firewall.owner_fqn)} declares security zone {_q(zone.name)}, "
+                f"which holds no interface; a zone is a partition of the device's interfaces, "
+                f"so nothing can ever be in this one{written}",
+                (firewall.owner_fqn,),
+                firewall.zone_path(index, "name"),
+            )
+
+
+def _check_unzoned_interface(ctx: _Context) -> Iterator[_Draft]:
+    """W151 — an interface in no zone, on a device that has zones (``NG-B011``).
+
+    Only on a device that declares zones at all: a machine with no zones has
+    every interface outside one, which is the ordinary case and says nothing.
+    Once a partition exists, though, an interface outside it is traffic the
+    policy cannot name — a rule saying *from lan* does not reach it, and what it
+    gets is whichever default applies, which is rarely what somebody dividing a
+    device into zones had in mind.
+
+    Reported once per device rather than once per interface: a 48-port switch
+    with two zones would otherwise fill the report with one identical line per
+    port, and the answer to all of them is the same one edit.
+    """
+    for firewall in ctx.firewalls:
+        if not firewall.zones:
+            continue
+        outside = firewall.owner.spec.unzoned_interfaces()
+        if not outside:
+            continue
+        names = _join_plain([interface.name for interface in outside])
+        yield _Draft(
+            f"element {_q(firewall.owner_fqn)} divides its interfaces into "
+            f"{count_text(len(firewall.zones), 'zone')}, and {names} "
+            f"{'is' if len(outside) == 1 else 'are'} in none of them; no rule naming a zone "
+            f"can match traffic there, so it gets the chain default",
+            (firewall.owner_fqn,),
+            ("spec", "zones"),
+        )
+
+
+def _check_mark_nothing_reads(ctx: _Context) -> Iterator[_Draft]:
+    """W152 — the firewall writes a mark the routing policy never matches (``NG-B012``).
+
+    One half of §16.9. Policy-based routing has no layer-4 selector on purpose:
+    the portable way to route by port is to mark the packet in the firewall and
+    match ``fwmark`` in the policy database. A mark written by a rule nothing
+    reads is that plan half-built — the marking works, every command applies, and
+    the traffic goes out the default uplink anyway.
+
+    A mark is *local to the machine*: it is metadata attached to a packet inside
+    one kernel and it is gone the moment the packet leaves. So there is nowhere
+    else the reader could be, and its absence is a statement about this device
+    that can be made without looking at any other.
+    """
+    for firewall in ctx.firewalls:
+        if firewall.policy is None:
+            continue
+        read = set(firewall.owner.spec.policy_marks())
+        for rule in firewall.policy.rules_in():
+            if rule.mark is None or rule.mark in read:
+                continue
+            where = (
+                "the device declares no 'spec.routing_policy' at all"
+                if not read
+                else f"the policy database matches {_join_plain(sorted(read))}"
+            )
+            yield _Draft(
+                f"element {_q(firewall.owner_fqn)} writes mark {rule.mark} in firewall rule "
+                f"{_q(rule.describe())}, and no rule in 'spec.routing_policy' matches it: "
+                f"{where}. A mark exists to be read, and it does not leave the machine",
+                (firewall.owner_fqn,),
+                firewall.rule_path(rule, "mark"),
+            )
+
+
+def _check_mark_nothing_writes(ctx: _Context) -> Iterator[_Draft]:
+    """W153 — the routing policy matches a mark the firewall never writes (``NG-B013``).
+
+    The other half of ``W152``, and the more common shape: the routing is done,
+    the table is filled, and the rule that would mark the traffic is the line
+    that never got typed. The rule matches nothing, so the packet falls through
+    to the next one — the failure that looks like it works.
+
+    Only on a device that declares ``spec.firewall``, because that is what makes
+    the absence meaningful. A device whose filtering nobody has written down may
+    well be marking; a device whose whole policy is in the inventory is not.
+    """
+    for firewall in ctx.firewalls:
+        policy = firewall.policy
+        if policy is None:
+            continue
+        written = set(policy.marks())
+        for index, rule in enumerate(firewall.owner.spec.routing_policy):
+            if rule.fwmark is None or rule.fwmark in written:
+                continue
+            where = (
+                "its 'spec.firewall' writes no mark at all"
+                if not written
+                else f"its 'spec.firewall' writes {_join_plain(sorted(written))}"
+            )
+            yield _Draft(
+                f"element {_q(firewall.owner_fqn)} routes by mark {rule.fwmark} in policy rule "
+                f"{_q(rule.describe())}, and {where}; nothing puts that mark on a packet, so "
+                f"the rule never matches and the traffic is routed by whatever comes after it",
+                (firewall.owner_fqn,),
+                ("spec", "routing_policy", index, "fwmark"),
+            )
+
+
+def _check_shadowed_firewall_rule(ctx: _Context) -> Iterator[_Draft]:
+    """W154 — a filter rule below one that already decided its traffic (``NG-B014``).
+
+    The chain is walked from the lowest priority upwards and the first *terminal*
+    match decides, so a rule with no selector and a terminal action ends the walk
+    for everything it covers. That is how a chain is meant to be closed — the
+    last rule is often ``drop`` — and it is also the most common way to break
+    one, by numbering a new rule above the closer instead of below it.
+
+    **Covers**, not "matches everything". A rule with no selector is still about
+    the zone pair it names, and ``lan -> wan accept`` says nothing about a packet
+    from ``wan`` to ``dmz``. So an earlier rule shadows a later one only when its
+    zone pair is at least as broad: each half is either unstated — which is every
+    zone — or the same zone the later rule names. Getting this wrong in the
+    other direction would be the worse failure: a finding telling an operator
+    that a working rule is dead is a finding that gets the rule deleted.
+
+    Per hook *and* per family, because those are separate chains: a closer in
+    ``input`` shadows nothing in ``forward``, and an IPv4 one shadows nothing in
+    IPv6. A ``mark`` or ``log`` rule shadows nothing either — it does something
+    to the packet and the walk carries on, which is the whole reason those two
+    actions exist.
+
+    One finding per shadowed rule, not one per chain it is shadowed in: a rule
+    below the closer in both families is one mistake, and saying so twice would
+    double the report without doubling the work.
+    """
+    for firewall in ctx.firewalls:
+        policy = firewall.policy
+        if policy is None:
+            continue
+        reported: set[int] = set()
+        for hook in FirewallHook:
+            for family in AddressFamily:
+                for shadowed, blocker in _shadowed_in(policy.rules_in(hook, family)):
+                    if shadowed.priority in reported:
+                        continue
+                    reported.add(shadowed.priority)
+                    yield _Draft(
+                        f"element {_q(firewall.owner_fqn)} has {family.value} {hook.value} "
+                        f"firewall rule {_q(shadowed.describe())} below "
+                        f"{_q(blocker.describe())}, which matches every packet between "
+                        f"those zones and decides it; the chain is walked in priority "
+                        f"order, so this rule can never run",
+                        (firewall.owner_fqn,),
+                        firewall.rule_path(shadowed, "priority"),
+                    )
+
+
+def _shadowed_in(
+    walk: Sequence[FirewallRule],
+) -> Iterator[tuple[FirewallRule, FirewallRule]]:
+    """``(unreachable rule, the rule that decided its traffic first)`` pairs.
+
+    ``walk`` is one chain in priority order. A rule is unreachable when some
+    earlier rule is terminal, carries no selector, and covers its zone pair —
+    which is what :func:`_covers` decides. Only the *first* such blocker is
+    reported per rule: naming the earliest one is naming the edit.
+    """
+    closers: list[FirewallRule] = []
+    for rule in walk:
+        blocker = next((entry for entry in closers if _covers(entry, rule)), None)
+        if blocker is not None:
+            yield rule, blocker
+            continue
+        if rule.is_catch_all and rule.action.is_terminal:
+            closers.append(rule)
+
+
+def _covers(blocker: FirewallRule, rule: FirewallRule) -> bool:
+    """Does ``blocker``'s zone pair take in every packet ``rule`` is about?
+
+    An unstated zone is every zone, so it covers whatever the later rule names;
+    a stated one covers only itself. ``lan -> wan`` therefore closes the ``lan``
+    to ``wan`` traffic and nothing else, while a rule naming neither zone closes
+    the whole chain it is in.
+    """
+    return all(
+        theirs is None or theirs == ours
+        for theirs, ours in (
+            (blocker.src_zone, rule.src_zone),
+            (blocker.dst_zone, rule.dst_zone),
+        )
+    )
 
 
 def _check_vlan_mismatch(ctx: _Context) -> Iterator[_Draft]:
@@ -5441,6 +5728,11 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W147", _check_policy_empty_table),
     ("W148", _check_unselected_route_table),
     ("W149", _check_shadowed_policy),
+    ("W150", _check_empty_zone),
+    ("W151", _check_unzoned_interface),
+    ("W152", _check_mark_nothing_reads),
+    ("W153", _check_mark_nothing_writes),
+    ("W154", _check_shadowed_firewall_rule),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),

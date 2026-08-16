@@ -482,7 +482,7 @@ def _table(plan: DevicePlan, name: str) -> str:
 
 
 def _policy_rules(plan: DevicePlan) -> Iterator[list[str]]:
-    """``[RoutingPolicyRule]`` per rule of the policy database (§16.6).
+    """``[RoutingPolicyRule]`` per rule of the policy database (§16.4).
 
     The one section here that is not about the link the file matches: a policy
     rule is a property of the *stack*, and networkd installs one from whichever

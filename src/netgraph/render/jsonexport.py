@@ -114,9 +114,11 @@ from netgraph.render.graph import (
     NetnsView,
     Node,
     PatchView,
+    PolicyView,
     PortView,
     RackView,
     RoutingView,
+    SecurityView,
     Subnet,
     TunnelView,
     WirelessView,
@@ -411,6 +413,8 @@ def _node(
         payload["power"] = _power(node.power)
     if node.netns is not None:
         payload["netns"] = _netns(node.netns)
+    if node.security is not None:
+        payload["zone"] = _zone(node.security)
     if node.cluster:
         payload["cluster"] = node.cluster
     payload["vlans"] = sorted(node.vlans)
@@ -625,6 +629,49 @@ def _routing(view: RoutingView) -> dict[str, Any]:
     return payload
 
 
+def _zone(view: SecurityView) -> dict[str, Any]:
+    """What one security zone is, for a consumer of the graph (§24.5).
+
+    ``declared`` is emitted rather than left to be inferred from the name: a
+    consumer must be able to tell a zone the inventory wrote from ``local`` and
+    ``any``, which the view minted, without knowing that those two words are
+    reserved.
+    """
+    payload: dict[str, Any] = {
+        "element": view.element,
+        "elementKind": view.owner_kind,
+        "name": view.name,
+        "declared": view.is_declared,
+    }
+    if view.interfaces:
+        payload["interfaces"] = list(view.interfaces)
+    if view.description:
+        payload["description"] = view.description
+    if view.rules:
+        payload["rules"] = view.rules
+    if view.translations:
+        payload["translations"] = view.translations
+    return payload
+
+
+def _policy(view: PolicyView) -> dict[str, Any]:
+    """What a device's firewall does between two of its zones (§24.5).
+
+    ``rules`` and ``translations`` are the rendered forms — the same strings the
+    diagram prints — in the order the device walks them; a consumer that wants
+    the fields reads the inventory, which is where they are declared.
+    """
+    payload: dict[str, Any] = {
+        "from": view.source,
+        "to": view.target,
+        "verdict": view.verdict,
+        "rules": list(view.rules),
+    }
+    if view.translations:
+        payload["translations"] = list(view.translations)
+    return payload
+
+
 def _adjacency(view: AdjacencyView) -> dict[str, Any]:
     """One protocol adjacency: which protocol, and what it is between.
 
@@ -779,6 +826,9 @@ def _edge(
         # Nor does a power feed: a cord is not a network medium, and a PoE feed
         # rides on a run the diagram draws somewhere else.
         payload["feed"] = _feed(edge.feed)
+    elif edge.policy is not None:
+        # Nor does a policy edge: it is a decision, not a path.
+        payload["policy"] = _policy(edge.policy)
     elif edge.tunnel is not None:
         # Neither does a tunnel: what it runs over is the rest of the diagram.
         payload["tunnel"] = _tunnel(edge.tunnel)

@@ -131,7 +131,7 @@ from netgraph.layout.graphviz import (
 )
 from netgraph.layout.routing import Route, label_position
 from netgraph.loader.inventory import namespace_of, short_name
-from netgraph.models import format_watts
+from netgraph.models import LOCAL_ZONE, format_watts
 from netgraph.power import PowerNode
 from netgraph.render.aggregate import AggregateView
 from netgraph.render.annotations import (
@@ -153,6 +153,7 @@ from netgraph.render.details import (
 )
 from netgraph.render.diffview import Mark
 from netgraph.render.graph import (
+    ANY_ZONE,
     Edge,
     EdgeKind,
     Graph,
@@ -161,6 +162,7 @@ from netgraph.render.graph import (
     RackSlot,
     RackView,
     RoutingView,
+    SecurityView,
     TunnelView,
 )
 from netgraph.render.highlight import Highlight
@@ -1788,7 +1790,21 @@ def _subtitle(node: Node) -> str:
         # labelled against; the kind is still readable from the shape.
         detail = ", ".join(node.routing.describe())
         return f"[{node.kind}, {detail}]" if detail else f"[{node.kind}]"
+    if node.security is not None:
+        # What the zone *is*, which for the two undeclared ones is the whole of
+        # what there is to say: 'local' is the machine, 'any' is a rule that
+        # named no zone. A declared zone says how much of the device it holds.
+        return f"[zone, {_zone_detail(node.security)}]"
     return f"[{node.kind}]"
+
+
+def _zone_detail(view: SecurityView) -> str:
+    """``2 interfaces``, ``this machine``, ``every zone`` — the bracketed clause."""
+    if view.name == LOCAL_ZONE:
+        return "this machine"
+    if view.name == ANY_ZONE:
+        return "every zone"
+    return count_text(len(view.interfaces), "interface")
 
 
 def _node_style(node: Node, style: ResolvedStyle) -> str | None:
@@ -1865,6 +1881,12 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
 
     if node.routing is not None:
         return _routing_rows(node.routing)
+
+    if node.security is not None:
+        # Spanning rows: what is in a zone is a list of interface names, not the
+        # three-column port table, because at this layer a port is not a place
+        # anything is plugged into -- it is what puts traffic in this box.
+        return tuple(_Row(port=_inline(line), spans=True) for line in node.security.describe())
 
     if node.power is not None:
         return _power_rows(node.power)
@@ -2497,6 +2519,13 @@ def _edge_label(edge: Edge, layer: Layer, options: RenderOptions) -> str:
         if edge.adjacency.description:
             adjacency.append(_inline(edge.adjacency.description))
         return "\n".join(adjacency)
+
+    if edge.policy is not None:
+        # The rules themselves, up to the handful that fit, because a policy
+        # diagram in which the lines are unlabelled has drawn the topology of a
+        # firewall and not its policy. Past that the label counts and the
+        # tooltip lists; a chain is as long as it needs to be, a label is not.
+        return "\n".join(_inline(line) for line in edge.policy.label())
 
     parts: list[str] = []
     ports = _port_pair(edge)

@@ -1,0 +1,63 @@
+# W152 (NG-B012) - a mark written by the firewall that no policy rule reads.
+#
+# Half of the plan of section 16.9: mark the packet in the firewall, route by
+# the mark in the policy database. The marking half is here; the routing half
+# was written by source prefix instead and never grew a 'fwmark'. So the marked
+# traffic goes out the default uplink, and every command applies cleanly.
+apiVersion: netgraph.dev/v1alpha1
+kind: firewall
+metadata:
+  name: fw-a
+spec:
+  route_tables:
+    - name: uplink-b
+      id: 100
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+  zones:
+    - name: wan
+      interfaces: [eth0]
+  firewall:
+    rules:
+      - priority: 100
+        dst_zone: wan
+        protocol: tcp
+        dst_ports: ['1194']
+        action: mark
+        mark: '0x2'
+  routes:
+    - prefix: 0.0.0.0/0
+      via: 10.0.0.2
+      dev: eth0
+      table: uplink-b
+  routing_policy:
+    # By source, not by the mark: the two halves were written a week apart.
+    - priority: 100
+      src: 10.20.0.0/16
+      table: uplink-b
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - fw-a:eth0
+    - rtr-b:eth0
+  medium: copper

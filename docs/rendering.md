@@ -18,7 +18,7 @@ labelled links](images/home-lab.svg)
 
 ## Contents
 
-- [Layers: one inventory, ten questions](#layers-one-inventory-ten-questions)
+- [Layers: one inventory, eleven questions](#layers-one-inventory-eleven-questions)
   - [`physical` and `l1`: the cabling record and the network](#physical-and-l1-the-cabling-record-and-the-network)
   - [`l2`: the same graph, annotated with VLANs](#l2-the-same-graph-annotated-with-vlans)
   - [`l3`: prefixes and who is addressed in them](#l3-prefixes-and-who-is-addressed-in-them)
@@ -28,6 +28,7 @@ labelled links](images/home-lab.svg)
   - [`power`: the PDUs and what they feed](#power-the-pdus-and-what-they-feed)
   - [`identity`: who is in what](#identity-who-is-in-what)
   - [`netns`: the stacks inside a machine](#netns-the-stacks-inside-a-machine)
+  - [`security`: the zones and what may cross](#security-the-zones-and-what-may-cross)
 - [Filters: drawing less of the network](#filters-drawing-less-of-the-network)
 - [Aggregation: one node per site, one line per bundle](#aggregation-one-node-per-site-one-line-per-bundle)
 - [Icons](#icons)
@@ -51,7 +52,7 @@ labelled links](images/home-lab.svg)
 
 <a id="layers-one-inventory-ten-questions"></a>
 
-## Layers: one inventory, ten questions
+## Layers: one inventory, eleven questions
 
 One inventory, ten questions. `--layer` picks which one the diagram answers.
 
@@ -66,6 +67,7 @@ One inventory, ten questions. `--layer` picks which one the diagram answers.
 | `rack` | one node per rack named by a `metadata.location` | none — a cable says nothing about where either end is bolted | a front elevation: one row per unit, occupied and empty alike, each occupant annotated with what it draws | "How much room is left in that cabinet, and what is above the UPS?" |
 | `power` | the PDUs, **plus** every element the inventory records power for | one per feed: an `outlet` cord from a PDU (solid amber) and a `poe` feed from a PSE port (dashed) | outlets used, load against capacity and the `input_feed` on a PDU; draw, redundancy and PoE budget on everything else | "Is this rack fed from one strip, and is there capacity left?" A single-fed cabinet, an oversubscribed PoE budget, a box nobody wrote a power path for. |
 | `identity` | one node per `user` and per `group` — no hardware whatsoever | one per membership: the group ↔ what it holds, nested groups included | the account, the uid, the status and the key count on a user; the headcount and the gid on a group | "Who can get at this, and how did they get the access?" A group nobody emptied when somebody left, an account in nothing at all. |
+| `security` | one node per **security zone** of every filtering device, framed by device — plus `local` and `any` where the policy names them | one per **zone pair** the policy mentions, directed, labelled with the rules; green where the pair is open, red where it is closed, dashed amber where it is conditional | which interfaces are in each zone, every rule and translation of the pair, and whether the zone was declared at all | "What is this box actually allowed to let through?" A hole opened above the rule that closes the chain, a zone nothing is in, a policy nobody has read since it was written. |
 | `netns` | one node per **network stack**: the element itself for a machine's initial namespace, plus one per declared `spec.netns` entry, framed by machine | one per veth pair (solid cyan), one per nesting (dotted), and the cables, re-pointed at the stack holding the port they land on | the path of a nested namespace, the interfaces and addresses in each stack, the peer of every veth end | "What is *inside* this box?" A container host drawn as one node has hidden a dozen routing tables; this is the only view that opens it. |
 
 The default is `l1`. `-f html` accepts `--layer` more than once and puts a
@@ -423,6 +425,52 @@ has somewhere to arrive.
 $ netgraph -i examples/containers render --layer netns -o containers.svg
 ```
 
+### `security`: the zones and what may cross
+
+`security` is the one layer whose edges are **decisions** rather than paths
+([`docs/schema.md` §24.5](schema.md#245-what-it-draws)). Everywhere else a line
+means "these two can reach each other". Here it means "and this is what is
+allowed to cross".
+
+**Nodes** are zones, not devices. `spec.zones` divides a device's interfaces
+into regions ([§24.1](schema.md#241-zones)), and each becomes a pale red box
+inside a frame named after the device that declares it. Two zones the inventory
+never wrote are minted where the policy reaches for them: `local`, which is the
+machine itself — the traffic that terminates on it rather than crossing it — and
+`any`, which stands for a rule that left a zone unset. The tooltip and the JSON
+both carry `declared: false` for those two, because a reader who thinks `any` is
+a zone somebody configured has misread the whole picture.
+
+**Edges** are zone pairs, and they are **directed**. Policy is asymmetric: *lan
+to wan* is a different statement from *wan to lan*, and a diagram that drew them
+as one line would have merged the one distinction a firewall exists to make. The
+label is the rules themselves up to three of them, and a count past that; the
+whole chain is on the tooltip and in the JSON, in the order the device walks it.
+
+**Colour is the verdict**, and there are three:
+
+* **green, solid** — every terminal rule of the pair accepts. Traffic crosses.
+* **red, solid** — every one denies. Nothing does.
+* **amber, dashed** — *conditional*: the pair holds both kinds, or holds nothing
+  terminal at all (everything in it marks or logs, and the decision is further
+  down the chain). This is the case worth opening the tooltip for, and the dash
+  is what says so in a greyscale print.
+
+None of the topology survives, and none of it should. A cable between two hosts
+says nothing about whether the firewall between them lets anything through, and
+the diagram somebody needs in order to argue about policy is one whose boxes are
+the zones.
+
+The filters below reach a zone through the **device it is on**, since nothing
+here stands for the box itself: `--name fw-edge` draws that firewall's zones and
+nothing else, and `--kind firewall` draws the zones of every appliance while
+leaving a router's behind.
+
+<!-- norun: writes policy.svg into the reader's directory -->
+```console
+$ netgraph -i examples/campus render --layer security -o policy.svg
+```
+
 ## Filters: drawing less of the network
 
 **Filters** narrow what is drawn. Values *within* one option are alternatives;
@@ -435,7 +483,7 @@ themselves.
 |---|---|---|
 | `--namespace NS` | yes | Elements in `NS` or in any namespace below it. |
 | `--vlan VID` | yes | Elements participating in that VLAN (1–4094). A host on an untagged access port counts as a member. |
-| `--kind KIND` | yes | Elements of that kind: `switch`, `router`, `hub`, `computer`, `server`, `adapter`, `patchpanel`, `pdu`, `user`, `group`. A cable is an edge and so is a tunnel, so neither is selectable; both follow whichever elements survive. |
+| `--kind KIND` | yes | Elements of that kind: `switch`, `router`, `firewall`, `hub`, `computer`, `server`, `adapter`, `patchpanel`, `pdu`, `user`, `group`. A cable is an edge and so is a tunnel, so neither is selectable; both follow whichever elements survive. |
 | `--name GLOB` | yes | Elements whose short **or** fully-qualified name matches the shell-style glob. |
 | `--neighbors-of NAME` | no | Only the neighbourhood of one element. An unknown name is a usage error, with suggestions. |
 | `--depth N` | no | How many hops `--neighbors-of` reaches. Default 1. |

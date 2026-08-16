@@ -197,7 +197,7 @@ and on the site page of every element they name.
 | `-f`, `--format` | `[markdown\|html\|json]` | `markdown` | markdown is committed next to the inventory and diffed; html is one self-contained site, where a device in a diagram links to its page; json is the whole document in one file, for downstream tooling. |
 | `-o`, `--out` | `DIRECTORY` | — | Directory to write the bundle into; created if absent. Required for markdown and html, which write several files. json writes one document, and goes to stdout when no directory is named. |
 | `--template` | `DIR` | — | Take page templates from this directory before the bundled ones. A directory holding only 'device.md.j2' overrides the device page and nothing else. |
-| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns]` | every layer the inventory declares something for | Draw this layer on every page, instead of the ones the inventory has earned. Repeatable, and honoured verbatim: a layer with nothing in it is reported as empty rather than dropped. |
+| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | every layer the inventory declares something for | Draw this layer on every page, instead of the ones the inventory has earned. Repeatable, and honoured verbatim: a layer with nothing in it is reported as empty rather than dropped. |
 | `--title` | `TEXT` | — | Title for the overview page. |
 | `--group-depth` | `N` | 1 when the namespace tree branches below the site level, else 0 | How many namespace levels below the shared prefix one site page covers. 0 puts the whole selection on a single site page. |
 | `--diagrams`, `--no-diagrams` | — | `--diagrams` | Draw the layer diagrams. Off writes the tables alone, which is faster and needs no Graphviz; each figure then says so rather than going missing. |
@@ -206,7 +206,7 @@ and on the site page of every element they name.
 | `--prune` | — | off | Delete the .md, .html, .svg and .json files in --out that this report does not write — the pages of an element that has since been deleted. They are reported either way. |
 | `--namespace` | `NS` | — | Keep only elements in this namespace or below it. Repeatable. |
 | `--vlan` | `VID` | — | Keep only elements participating in this VLAN. Repeatable. |
-| `--kind` | `[switch\|router\|hub\|computer\|server\|adapter\|patchpanel\|pdu\|user\|group]` | — | Keep only elements of this kind. Repeatable. |
+| `--kind` | `[switch\|router\|firewall\|hub\|computer\|server\|adapter\|patchpanel\|pdu\|user\|group]` | — | Keep only elements of this kind. Repeatable. |
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |

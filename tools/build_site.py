@@ -131,10 +131,11 @@ DEMOS: Final[tuple[Demo, ...]] = (
     Demo(
         name="campus",
         summary=(
-            "Several sites, a routed core, BGP and OSPF. The one to open the "
-            "namespace collapsing and the routing layer on."
+            "Several sites, a routed core, BGP and OSPF, and a firewall on the "
+            "West core. The one to open namespace collapsing, the routing layer "
+            "and the security layer on."
         ),
-        layers=("l1", "l2", "l3", "routing"),
+        layers=("l1", "l2", "l3", "routing", "security"),
     ),
     Demo(
         name="overlay",

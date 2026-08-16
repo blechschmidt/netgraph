@@ -1,4 +1,4 @@
-"""Shared scaffolding for the six configuration readers.
+"""Shared scaffolding for the seven configuration readers.
 
 Split from the package's ``__init__`` because that module imports every reader
 and the readers import this one: a helper and a registry in one file would be a
@@ -87,6 +87,7 @@ CONFIG_DIALECT_NAMES: Final[tuple[str, ...]] = (
     "networkd",
     "ifupdown",
     "frr",
+    "nftables",
     "wireguard",
     "interfaces",
 )
@@ -109,6 +110,10 @@ _SIGNATURES: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     ("interfaces", re.compile(r"^device\s+\S+\s*$", re.MULTILINE)),
     ("frr", re.compile(r"^(?:frr version|router (?:bgp|ospf)|line vty)\b", re.MULTILINE)),
     ("ifupdown", re.compile(r"^iface\s+\S+\s+inet6?\s+\w+", re.MULTILINE)),
+    # ``table inet netgraph {`` or ``table ip filter {``: the one construct only
+    # an nftables ruleset opens with, and the one word no other grammar here
+    # begins a line with.
+    ("nftables", re.compile(r"^table\s+(?:ip6?|inet|arp|bridge|netdev)\s+\S+\s*\{", re.M)),
 )
 
 
@@ -138,8 +143,8 @@ def sniff(text: str) -> str | None:
 
     The banner wins when there is one: a file netgraph wrote says what it is, and
     guessing at it instead would be choosing a heuristic over a statement. For
-    anything else the six grammars are told apart by a line only one of them can
-    have -- ``network:``, ``[Interface]``, ``[Match]``, a ``device`` stanza, an
+    anything else the seven grammars are told apart by a line only one of them
+    can have -- ``network:``, ``[Interface]``, ``[Match]``, a ``device`` stanza, an
     FRR keyword, an ``iface`` line.
 
     ``None`` rather than a guess when nothing matches: the caller falls back to

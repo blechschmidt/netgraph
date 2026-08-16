@@ -1249,6 +1249,7 @@ def runner() -> CliRunner:
 #: say correctly writes nothing — which is asserted separately.
 _CONFIG_SUBJECTS: Final[dict[str, tuple[str, str]]] = {
     "frr": ("campus", "sw-north-acc-01"),
+    "nftables": ("campus", "rtr-west-core-01"),
     "wireguard": ("overlay", "rtr-hq"),
 }
 

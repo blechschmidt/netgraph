@@ -169,6 +169,7 @@ spec:
   route_tables: []
   routes: []
   routing_policy: []
+  zones: []
 ```
 
 The `description: Access port 1 - staff` is worth pausing on: the template wrote
@@ -241,6 +242,7 @@ spec:
   route_tables: []
   routes: []
   routing_policy: []
+  zones: []
 ```
 
 `192.168.10.20/24` is one string in the file and two fields in the model, and it

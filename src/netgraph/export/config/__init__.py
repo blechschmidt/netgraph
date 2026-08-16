@@ -6,7 +6,7 @@ device actually runs is, and until netgraph could write one, the inventory was a
 document beside the truth rather than the source of it: somebody still typed the
 addresses into the box, and the typing is where the two started to disagree.
 
-Six dialects, each a pure function from a :class:`~netgraph.export.config.plan.
+Seven dialects, each a pure function from a :class:`~netgraph.export.config.plan.
 DevicePlan` to a set of files:
 
 ===============  =============================================================
@@ -14,11 +14,15 @@ DevicePlan` to a set of files:
 ``networkd``     ``etc/systemd/network/*.network`` and ``*.netdev``
 ``ifupdown``     ``etc/network/interfaces``, the Debian original
 ``frr``          ``etc/frr/frr.conf``: VRFs, static routes, OSPF and BGP
+``nftables``     ``etc/nftables.conf``: the zones, the filter policy and the NAT
 ``wireguard``    ``etc/wireguard/<if>.conf``, one per tunnel, keys left blank
 ``interfaces``   netgraph's own vendor-neutral rendering, for everything else
 ===============  =============================================================
 
-Four rules hold across all six, and they are the difference between a generator
+Six of the seven describe how a device is *wired*; ``nftables`` describes what it
+refuses, which is the one half of a configuration none of the others could write.
+
+Four rules hold across all seven, and they are the difference between a generator
 worth trusting and one worth reading over.
 
 **Nothing is invented.** A value that is not in the inventory is not in the
@@ -57,7 +61,15 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Final
 
-from netgraph.export.config import frr, ifupdown, netplan, networkd, neutral, wireguard
+from netgraph.export.config import (
+    frr,
+    ifupdown,
+    netplan,
+    networkd,
+    neutral,
+    nftables,
+    wireguard,
+)
 from netgraph.export.config.header import DIALECT_KEY, ELEMENT_KEY, SOURCE_KEY, parse_banner
 from netgraph.export.config.model import (
     ConfigFile,
@@ -186,6 +198,21 @@ CONFIG_DIALECTS: Final[Mapping[str, ConfigDialect]] = {
         declines=frr.declines,
         limits=frr.limits,
         files=frr.files,
+    ),
+    "nftables": ConfigDialect(
+        name="nftables",
+        description="an /etc/nftables.conf of the zones, the filter policy and the NAT",
+        lossy=(
+            "the firewall only: nothing here creates an interface or an address, and a rule "
+            "inverting its whole selector set has no nftables spelling, so a device using "
+            "'invert' is refused rather than written matching the opposite"
+        ),
+        suffix=".conf",
+        comment="#",
+        selects=nftables.selects,
+        declines=nftables.declines,
+        limits=nftables.limits,
+        files=nftables.files,
     ),
     "wireguard": ConfigDialect(
         name="wireguard",

@@ -7,7 +7,7 @@ transcription, which is exactly why it is worth having — a routing plan that
 lives only in a diagram gets typed into a box by hand, and the typing is where
 the diagram and the network start to disagree.
 
-``spec.routing_policy`` is the same statement one level up (§16.6): the rules
+``spec.routing_policy`` is the same statement one level up (§16.4): the rules
 that decide *which table* a packet is routed by. They are emitted here, with
 their routes, because the two halves are useless apart — a table nobody selects
 holds routes nobody consults, and a rule selecting a table nobody filled routes
@@ -217,7 +217,7 @@ def _route_commands(spec: DeviceSpec) -> Iterator[str]:
 
 
 def _rule_commands(spec: DeviceSpec) -> Iterator[str]:
-    """The policy database, in the order the device walks it (§16.6).
+    """The policy database, in the order the device walks it (§16.4).
 
     Each rule is a ``del`` of the priority followed by an ``add`` of the rule,
     which is how ``ip rule`` is made idempotent: it has no ``replace``, a

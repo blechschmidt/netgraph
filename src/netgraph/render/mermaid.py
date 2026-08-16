@@ -66,6 +66,7 @@ from netgraph.render.graph import (
     SUBNET_KIND,
     TUNNEL_KIND,
     USER_KIND,
+    ZONE_KIND,
     Edge,
     EdgeKind,
     Graph,
@@ -94,6 +95,9 @@ MERMAID_MAX_EDGES: Final = 500
 #: unmistakably not one of the hardware shapes.
 _NODE_SHAPE: Final[Mapping[str, tuple[str, str]]] = {
     "router": ("([", "])"),
+    # ``{…}`` is Mermaid's rhombus: the decision shape, and a firewall is the
+    # one box on the diagram whose whole job is deciding.
+    "firewall": ("{", "}"),
     "switch": ("[", "]"),
     "hub": ("{{", "}}"),
     "computer": ("[/", "/]"),
@@ -117,12 +121,16 @@ _NODE_SHAPE: Final[Mapping[str, tuple[str, str]]] = {
     # the mirror of the aggregate's: several things narrowing into one heading,
     # which is what a group is.
     GROUP_KIND: ("[\\", "/]"),
+    # A zone is a region rather than a thing, so it takes the plainest frame
+    # Mermaid has left: the square box every kind above declined.
+    ZONE_KIND: ("[", "]"),
 }
 _DEFAULT_SHAPE: Final[tuple[str, str]] = ("[", "]")
 
 #: Per-kind fill, applied through ``classDef`` so the styling stays readable.
 _CLASS_STYLE: Final[Mapping[str, str]] = {
     "router": "fill:#dbe9f6,stroke:#2563eb,stroke-width:1px",
+    "firewall": "fill:#fde8e8,stroke:#dc2626,stroke-width:1px",
     "switch": "fill:#dcf0dc,stroke:#16a34a,stroke-width:1px",
     "hub": "fill:#f0e6d2,stroke:#a16207,stroke-width:1px",
     "computer": "fill:#f5f5f5,stroke:#6b7280,stroke-width:1px",
@@ -134,6 +142,7 @@ _CLASS_STYLE: Final[Mapping[str, str]] = {
     AGGREGATE_KIND: "fill:#e2e8f0,stroke:#475569,stroke-width:2px",
     USER_KIND: "fill:#fce7f3,stroke:#be185d,stroke-width:1px",
     GROUP_KIND: "fill:#fbcfe8,stroke:#9d174d,stroke-width:2px",
+    ZONE_KIND: "fill:#fef2f2,stroke:#dc2626,stroke-width:1px",
 }
 
 #: Link syntax per edge style: solid, thick (fibre) and dotted (attachment).
@@ -477,6 +486,10 @@ def _node_text(node: Node, options: RenderOptions, layer: Layer) -> str:
         routing.extend(node.routing.routes)
         return "\n".join(routing)
 
+    if node.security is not None:
+        # The zone, and what is in it: the same content the DOT record holds.
+        return "\n".join([node.name, "[zone]", *node.security.describe()])
+
     if node.power is not None:
         # What this box draws, distributes or hands out: the same content the DOT
         # record holds, and the whole reason the node is drawn at this layer.
@@ -519,6 +532,11 @@ def _edge_text(edge: Edge, layer: Layer, options: RenderOptions) -> str:
         if edge.adjacency.description:
             adjacency.append(edge.adjacency.description)
         return " · ".join(adjacency)
+
+    if edge.policy is not None:
+        # The same content the DOT label carries, folded onto the one line
+        # Mermaid link labels read well in; see :meth:`PolicyView.label`.
+        return " · ".join(edge.policy.label())
 
     parts: list[str] = []
     ports = _port_text(edge)

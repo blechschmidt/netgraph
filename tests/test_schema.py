@@ -117,8 +117,8 @@ def test_the_schema_is_json_serialisable() -> None:
 
 
 def test_an_unknown_kind_is_refused() -> None:
-    with pytest.raises(UnknownKindError, match="firewall"):
-        build_schema("firewall")
+    with pytest.raises(UnknownKindError, match="loadbalancer"):
+        build_schema("loadbalancer")
 
 
 def test_kind_is_required_in_every_branch() -> None:
@@ -301,7 +301,7 @@ def test_a_valid_document_is_accepted_by_the_models(case: str) -> None:
 #: Schema, once by the pydantic models. A case that only one of them rejects is
 #: a case where the editor and ``netgraph validate`` would disagree.
 BROKEN: dict[str, dict[str, Any]] = {
-    "unknown kind": _document("firewall", {"interfaces": [_port()]}),
+    "unknown kind": _document("loadbalancer", {"interfaces": [_port()]}),
     "missing kind": {
         "apiVersion": "netgraph.dev/v1alpha1",
         "metadata": {"name": "el"},
@@ -504,9 +504,9 @@ def test_the_command_emits_one_kind() -> None:
 
 
 def test_the_command_rejects_an_unknown_kind() -> None:
-    result = CliRunner().invoke(cli, ["schema", "--kind", "firewall"])
+    result = CliRunner().invoke(cli, ["schema", "--kind", "loadbalancer"])
     assert result.exit_code == 2
-    assert "firewall" in result.output
+    assert "loadbalancer" in result.output
 
 
 def test_the_command_rejects_all_together_with_kind() -> None:

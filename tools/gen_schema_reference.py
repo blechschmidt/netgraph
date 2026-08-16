@@ -56,10 +56,15 @@ from netgraph.models import (  # noqa: E402
     BridgeType,
     Bss,
     CableSpec,
+    ConnState,
     DeviceSpec,
     Duplex,
     EdgeGeometry,
     ElementBase,
+    FirewallAction,
+    FirewallConfig,
+    FirewallHook,
+    FirewallRule,
     Forwarding,
     GroupGeometry,
     GroupSpec,
@@ -77,6 +82,8 @@ from netgraph.models import (  # noqa: E402
     Location,
     Medium,
     Metadata,
+    NatRule,
+    NatType,
     NetnsDefinition,
     NodeGeometry,
     NoteAnchor,
@@ -92,6 +99,7 @@ from netgraph.models import (  # noqa: E402
     PowerDraw,
     PowerInput,
     PowerSource,
+    Protocol,
     RouteTable,
     RoutingConfig,
     Size,
@@ -115,6 +123,7 @@ from netgraph.models import (  # noqa: E402
     VlanSet,
     VrfDefinition,
     WirelessConfig,
+    Zone,
 )
 from netgraph.models.document import ELEMENT_MODELS  # noqa: E402
 from netgraph.models.element import (  # noqa: E402
@@ -192,8 +201,8 @@ SECTIONS: Final[tuple[Section, ...]] = (
     ),
     Section(
         DeviceSpec,
-        "`spec` — switch, router, hub, computer, server",
-        "The five device kinds share one spec shape. They differ in which fields they permit "
+        "`spec` — switch, router, firewall, hub, computer, server",
+        "The six device kinds share one spec shape. They differ in which fields they permit "
         "(a `hub` rejects `bridge`, `vlans`, `forwarding` and all layer-3 configuration) and in "
         "the default value of `forwarding`.",
         extra_rows=(
@@ -418,6 +427,70 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "that resolves to nothing is a warning (`NG-F013`), because an eBGP peer may be a "
             "transit provider nobody declares here; a peer whose own `asn` contradicts "
             "`remote_asn` is an error (`NG-F011`).",
+        ),
+    ),
+    Section(
+        Zone,
+        "`spec.zones[]`",
+        "One security zone (§24.1): a name, and the interfaces in it. Policy is written between "
+        "zones rather than between interfaces, so a rule survives a port being renamed.",
+        notes=(
+            "An interface is in at most one zone (`NG-B003`). That is the defining property of "
+            "a zone, and what makes `from lan` a statement about a packet rather than a "
+            "question.",
+            "`local` is the machine itself and may not be declared (`NG-B001`); it is nameable "
+            "in a rule without being declared.",
+            "A zone holding no interface is inert (`W150`); an interface in no zone, on a "
+            "device that declares zones at all, is worth a second look (`W151`).",
+        ),
+    ),
+    Section(
+        FirewallConfig,
+        "`spec.firewall`",
+        "What the device does to the packets it sees (§24.2): the three defaults, the filter "
+        "policy and the address translations.",
+        notes=(
+            "The defaults are *deny inbound, deny transit, permit outbound*. Each has to decide "
+            "the packet, so `mark` and `log` are refused there (`NG-B007`).",
+            "Available on every layer-3 kind, not only on `kind: firewall`: a router with three "
+            "rules on it filters, and that is what most networks run. A `hub` has no IP stack "
+            "and refuses both this and `zones` (`NG-H003`).",
+        ),
+    ),
+    Section(
+        FirewallRule,
+        "`spec.firewall.rules[]`",
+        "One filter rule (§24.2): which packets it picks out, and what happens to them. Read it "
+        "as a sentence — *at priority 100, TCP from the lan zone to this machine's port 22 is "
+        "accepted*.",
+        notes=(
+            "The chain is walked from the lowest `priority` upwards and the first *terminal* "
+            "match decides, so `priority` is the rule's position and its identity: unique "
+            "within the device, per family (`NG-B008`).",
+            "`accept`, `drop` and `reject` are terminal; `mark` and `log` do something to the "
+            "packet and carry on walking, which is what makes them useful.",
+            "The hook is derived, never written: `dst_zone: local` is input, `src_zone: local` "
+            "is output, two real zones are forward. A rule naming one real zone is in both the "
+            "hooks it could be in.",
+            "A rule with no selector matches everything reaching its hooks, which terminates "
+            "the chain — and makes every rule after it unreachable (`W154`).",
+            "`action: mark` is the half of §16.9 that writes; `spec.routing_policy[].fwmark` is "
+            "the half that reads. A mark written that nothing reads is `W152`, and one read "
+            "that nothing writes is `W153`.",
+        ),
+    ),
+    Section(
+        NatRule,
+        "`spec.firewall.nat[]`",
+        "One address translation (§24.4). Apart from the filter rules because it happens apart "
+        "from them: a packet is translated *and* filtered, in different hooks.",
+        notes=(
+            "Order in the list is the order the translations are tried, first match winning. "
+            "There is no `priority`: a number that only ever repeated the position would be one "
+            "more thing to keep in step.",
+            "`snat` and `dnat` state the address they translate to; `masquerade` cannot (it is "
+            "the egress interface's, unknown until the packet leaves) and `redirect` need not "
+            "(it is this machine) — `NG-B006`.",
         ),
     ),
     Section(
@@ -802,6 +875,36 @@ ENUMS: Final[tuple[tuple[type[enum.Enum], str, str], ...]] = (
         "Derived from `type`; `gre` and `esp` run directly over IP and carry no port.",
     ),
     (TunnelMode, "`tunnel.mode`", "IPsec only; every other type has a single mode."),
+    (
+        FirewallAction,
+        "`firewall.rules[].action`",
+        "`accept`, `drop` and `reject` decide the packet and end the walk; `mark` and `log` do "
+        "something to it and carry on to the next rule.",
+    ),
+    (
+        Protocol,
+        "`firewall.rules[].protocol`",
+        "Only `tcp`, `udp` and `sctp` have ports to select on. `icmp` is IPv4 and `icmpv6` is "
+        "IPv6, so stating either against the other family is refused (`NG-B005`).",
+    ),
+    (
+        ConnState,
+        "`firewall.rules[].ct_state`",
+        "Connection-tracking states, matched as a set. One rule accepting `established` and "
+        "`related` replaces the return path of every other rule in the file.",
+    ),
+    (
+        NatType,
+        "`firewall.nat[].type`",
+        "`snat` and `masquerade` rewrite the source on the way out; `dnat` and `redirect` "
+        "rewrite the destination on the way in.",
+    ),
+    (
+        FirewallHook,
+        "firewall hook",
+        "Never written in a document: derived from `src_zone` and `dst_zone`, and named here "
+        "because the three defaults of `spec.firewall` are one per hook.",
+    ),
     (
         PoeStandard,
         "`poe.standard`",

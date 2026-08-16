@@ -86,6 +86,56 @@ spec:
       via: 2001:db8:ff:2::1
       dev: xe-0/0/2
       table: lab-egress
+  zones:
+    # The two directions traffic can come from, which is what the policy below
+    # is written about. lo0 is in neither: traffic to a loopback terminates on
+    # the router, and the zone for that is 'local', which nothing is put in.
+    - name: campus
+      interfaces: [xe-0/0/0]
+      description: Everything behind sw-west-dist-01 - the site's VLANs
+    - name: backbone
+      interfaces: [xe-0/0/1, xe-0/0/2]
+      description: The inter-site ring
+  firewall:
+    description: |
+      A campus core routes; it does not police transit, so 'default_forward' is
+      'accept' and the rules here are about what terminates on the router and
+      what gets marked on the way through.
+    default_input: drop
+    default_forward: accept
+    rules:
+      - priority: 10
+        ct_state: [established, related]
+        action: accept
+        description: The return path of everything below, in one line
+      - priority: 20
+        src_zone: backbone
+        dst_zone: local
+        protocol: tcp
+        dst_ports: ['179']
+        action: accept
+        description: iBGP from the other two cores
+      - priority: 30
+        src_zone: campus
+        dst_zone: local
+        src: 10.3.99.0/24
+        protocol: tcp
+        dst_ports: ['22']
+        action: accept
+        description: SSH, from the management VLAN and nowhere else
+      # The mark the policy database at priority 110 routes by. It is written
+      # *here*, on this router, because a firewall mark does not survive the
+      # wire: it is metadata inside one kernel and it is gone the moment the
+      # packet leaves. A box that routes by a mark is the box that has to set it.
+      - priority: 100
+        src_zone: campus
+        dst_zone: backbone
+        src: 10.3.20.0/24
+        protocol: tcp
+        dst_ports: ['1194', '51820']
+        action: mark
+        mark: '0x1'
+        description: Lab VPN egress, marked for the lab-egress table
   routing_policy:
     # Which table each packet is routed by, walked lowest priority first --
     # so the refusal is numbered *below* the diversion it would otherwise
@@ -102,7 +152,7 @@ spec:
     - priority: 110
       fwmark: '0x1'
       table: lab-egress
-      description: And so does anything the edge firewall marked as lab traffic
+      description: And so does anything 'spec.firewall' marked as lab traffic
     - priority: 32766
       table: main
       description: Everything else, routed the ordinary way

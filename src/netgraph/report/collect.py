@@ -184,6 +184,8 @@ def layers_for(inventory: Inventory, requested: Sequence[Layer] = ()) -> tuple[L
         chosen.append(Layer.RACK)
     if inventory.pdus or any(device.spec.power is not None for device in devices):
         chosen.append(Layer.POWER)
+    if any(device.spec.zones or device.spec.firewall is not None for device in devices):
+        chosen.append(Layer.SECURITY)
     return tuple(chosen)
 
 

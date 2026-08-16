@@ -18,12 +18,12 @@ explicit first. A name that came from a file name is recorded as such in the
 generated document, because it is the one field the capture did not supply; a
 name that came from a banner is not, because the file stated it.
 
-**Chooses a dialect.** ``--from`` names one; ``auto`` sniffs, and the nine
+**Chooses a dialect.** ``--from`` names one; ``auto`` sniffs, and the ten
 dialects are disjoint enough for that to be reliable rather than lucky. An LLDP
 capture is a JSON object with an ``lldp`` key and an iproute capture is a JSON
 array of link records, so JSON is decided by its shape. Anything else is offered
 to the configuration sniffer, which reads the banner of a file netgraph wrote
-and otherwise matches a line only one of the six grammars can have
+and otherwise matches a line only one of the seven grammars can have
 (:func:`netgraph.importer.config.sniff`). The CSV is what is left: it is the one
 format with no shape of its own, so it is the fallback rather than a match.
 Sniffing is what makes ``netgraph import collected/*`` work on a directory
@@ -68,7 +68,7 @@ __all__ = [
 ]
 
 #: What ``--from`` accepts. ``auto`` is first because it is the default; the
-#: three *capture* dialects follow, and then the six *configuration* dialects
+#: three *capture* dialects follow, and then the seven *configuration* dialects
 #: :mod:`netgraph.export.config` also writes. The split matters: a capture
 #: describes a running kernel, a configuration describes what somebody asked
 #: for, and :mod:`netgraph.drift.coverage` treats their silences differently.
@@ -277,7 +277,7 @@ def build_draft(
 def dialect_of(entry: ImportInput, requested: str = "auto") -> str:
     """The dialect to read ``entry`` as, sniffing it when ``auto`` was asked for.
 
-    The nine dialects fall into three shapes, and sniffing walks them in the
+    The ten dialects fall into three shapes, and sniffing walks them in the
     order that cannot be wrong. JSON is either an LLDP capture or an ``ip -j``
     one. Anything else is offered to the configuration sniffer, which answers
     from the file's own banner when netgraph wrote it and from a line only one

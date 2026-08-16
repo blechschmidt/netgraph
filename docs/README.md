@@ -39,7 +39,7 @@ This whole documentation set is also published, with those demos beside it, at
 | stop retyping the same flags | [configuration.md](configuration.md) |
 | run it without installing Python or Graphviz | [docker.md](docker.md) |
 | turn the inventory into hosts files, DNS zones, Ansible or Prometheus | [export.md](export.md) |
-| generate the netplan, systemd-networkd, ifupdown, FRR or WireGuard configuration a device would run | [export.md](export.md#device-configuration-the-six-dialects) |
+| generate the netplan, systemd-networkd, ifupdown, FRR, nftables or WireGuard configuration a device would run | [export.md](export.md#device-configuration-the-seven-dialects) |
 | hand a diagram to somebody who only has draw.io, and take it back | [drawio.md](drawio.md) |
 | hand over as-built documentation: a page per site and per device | [commands/report.md](commands/report.md) |
 | look up a command's flags | [commands/](commands/README.md) |
@@ -96,7 +96,7 @@ This whole documentation set is also published, with those demos beside it, at
 * **[paths.md](paths.md)** — how the trace works, what counts as a hop, several paths and
   none, and how to draw the answer.
 * **[export.md](export.md)** — the eight operational artefacts, what each guarantees, what
-  each drops, and how names are folded; then the six configuration dialects, which
+  each drops, and how names are folded; then the seven configuration dialects, which
   generate the file a device would actually run from.
 * **[drawio.md](drawio.md)** — the draw.io round trip: what the exported diagram
   carries, what a draw.io user may and may not safely change, and how an edited file

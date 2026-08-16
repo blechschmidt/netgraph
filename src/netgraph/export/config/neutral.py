@@ -1,7 +1,7 @@
 """``interfaces`` — the dialect for a device netgraph has no dialect for.
 
 A campus inventory is mostly boxes nobody generates netplan for: a Catalyst, a
-MikroTik, an access point, a hub. Five of the six dialects here would say nothing
+MikroTik, an access point, a hub. Six of the seven dialects here would say nothing
 about any of them, and a configuration export that silently covers a third of the
 estate is worse than one that covers none — the third that is missing is the
 third somebody will assume is fine.
@@ -311,7 +311,7 @@ def _route(route: StaticRoute) -> Iterator[str]:
 
 
 def _policy(rule: PolicyRule) -> Iterator[str]:
-    """A ``policy`` stanza — one rule of the policy database (§16.6).
+    """A ``policy`` stanza — one rule of the policy database (§16.4).
 
     Opened by the priority, because that is the rule's identity: it is where the
     rule sits in the walk, and two rules of one family cannot share it

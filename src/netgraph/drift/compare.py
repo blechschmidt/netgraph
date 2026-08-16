@@ -4,14 +4,14 @@
 YAML is the assertion and the capture is the evidence, and what comes out is the
 list of places where the two disagree. The parsing is the importer's, verbatim —
 :mod:`netgraph.importer.lldp`, :mod:`netgraph.importer.iproute`,
-:mod:`netgraph.importer.csvlinks` and the six configuration readers in
+:mod:`netgraph.importer.csvlinks` and the seven configuration readers in
 :mod:`netgraph.importer.config` produce the same
 :class:`~netgraph.importer.draft.Draft` here as they do there — so a dialect
 netgraph can import is a dialect netgraph can check against, with no second
 parser to keep in step.
 
 Those six close the loop the other way as well. :mod:`netgraph.export.config`
-writes the configuration a device would run, in the same six dialects, so
+writes the configuration a device would run, in the same seven dialects, so
 ``netgraph export netplan`` and ``netgraph drift --from netplan`` are two ends of
 one round trip: generate what the inventory says the box should have, collect
 what it does have, and compare the two with no format in between that only one

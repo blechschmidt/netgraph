@@ -37,14 +37,17 @@ from netgraph.render.graph import (
     SUBNET_KIND,
     TUNNEL_KIND,
     USER_KIND,
+    ZONE_KIND,
     Edge,
     EdgeKind,
     Layer,
 )
 
 __all__ = [
+    "CLOSED_POLICY_STYLE",
     "CLUSTER_NOUN",
     "CLUSTER_PALETTE",
+    "CONDITIONAL_POLICY_STYLE",
     "DEFAULT_EDGE_PALETTE",
     "DEFAULT_MEDIUM_STYLE",
     "DEFAULT_NODE_PALETTE",
@@ -54,6 +57,7 @@ __all__ = [
     "NESTING_STYLE",
     "NODE_PALETTE",
     "NODE_STYLE",
+    "OPEN_POLICY_STYLE",
     "VETH_STYLE",
     "edge_palette_key",
     "edge_style_for",
@@ -82,6 +86,14 @@ CLUSTER_FONT_SIZE: Final = 11
 NODE_STYLE: Final[Mapping[str, tuple[str, str, str]]] = MappingProxyType(
     {
         "router": ("diamond", "#dbe9f6", "#2563eb"),
+        # A firewall is a router that says no, and the palette says both halves.
+        # The trapezium is the one glyph left in the vocabulary that narrows --
+        # everything arriving at the wide edge leaves through a smaller one,
+        # which is what a policy does to traffic -- and the red is the only warm
+        # stop-colour no other kind claims. A diamond in red would have been the
+        # other reading, "a router that is also this", but a shape a reader can
+        # tell apart in a monochrome print is worth more than the pun.
+        "firewall": ("trapezium", "#fde8e8", "#dc2626"),
         "switch": ("box3d", "#dcf0dc", "#16a34a"),
         "hub": ("box", "#f0e6d2", "#a16207"),
         "computer": ("rectangle", "#f5f5f5", "#6b7280"),
@@ -126,6 +138,12 @@ NODE_STYLE: Final[Mapping[str, tuple[str, str, str]]] = MappingProxyType(
         # makes the netns view legible at a glance: the boxes and the lines
         # between them are one vocabulary.
         NETNS_KIND: ("rounded", "#cffafe", "#0891b2"),
+        # A security zone (§24.5) is a *region*, not a device: it stands for a
+        # part of the network rather than for a thing in a rack. So it takes the
+        # one remaining neutral frame -- a plain box -- in the firewall's red,
+        # lightened until the edges drawn between two of them are what the eye
+        # goes to. The zone is the setting; the policy is the picture.
+        ZONE_KIND: ("box", "#fef2f2", "#dc2626"),
     }
 )
 DEFAULT_NODE_STYLE: Final[tuple[str, str, str]] = ("box", "#f5f5f5", "#6b7280")
@@ -194,6 +212,16 @@ POE_STYLE: Final[tuple[str, str]] = ("#ca8a04", "dashed")
 VETH_STYLE: Final[tuple[str, str]] = ("#0891b2", "solid")
 NESTING_STYLE: Final[tuple[str, str]] = ("#475569", "dotted")
 
+#: The three verdicts of the security view (§24.5). A zone pair whose rules all
+#: accept is drawn solid green, one whose rules all deny solid red, and one
+#: holding both -- or holding nothing terminal at all -- dashed amber, because
+#: *conditional* is the case a reader has to open the tooltip for and the dash
+#: is what says "there is more to this line than its colour". Hue alone would
+#: not survive a greyscale print; a dash against two solids does.
+OPEN_POLICY_STYLE: Final[tuple[str, str]] = ("#15803d", "solid")
+CLOSED_POLICY_STYLE: Final[tuple[str, str]] = ("#b91c1c", "solid")
+CONDITIONAL_POLICY_STYLE: Final[tuple[str, str]] = ("#b45309", "dashed")
+
 #: Fill and outline per element kind, without the Graphviz shape — for a
 #: renderer that draws its own glyphs but must colour a node the way a diagram
 #: does. Derived from :data:`NODE_STYLE` rather than restated, so the mxGraph
@@ -224,6 +252,9 @@ EDGE_PALETTE: Final[Mapping[str, tuple[str, str]]] = MappingProxyType(
         "poe": POE_STYLE,
         "veth": VETH_STYLE,
         "nesting": NESTING_STYLE,
+        "policy-open": OPEN_POLICY_STYLE,
+        "policy-closed": CLOSED_POLICY_STYLE,
+        "policy-conditional": CONDITIONAL_POLICY_STYLE,
     }
 )
 
@@ -265,6 +296,10 @@ CLUSTER_NOUN: Final[Mapping[Layer, str]] = MappingProxyType(
         # *is* the machine — and saying so is what keeps it from being read as
         # one more namespace, which is exactly what the things inside it are.
         Layer.NETNS: "machine",
+        # The security view boxes every zone of one device together, so the box
+        # is the device -- the same reasoning as the netns view's, and the same
+        # need to say so: what is inside it is not a device.
+        Layer.SECURITY: "device",
     }
 )
 
@@ -278,10 +313,15 @@ def edge_palette_key(edge: Edge) -> str:
     two ways, and a legend that named a colour the diagram does not use is worse
     than no legend.
 
-    A tunnel is the one kind whose entry depends on more than the kind: what a
-    reader most needs to know about a tunnel is whether anything encrypts it, so
-    a cleartext one is drawn in its own colour.
+    Two kinds have an entry that depends on more than the kind. What a reader
+    most needs to know about a tunnel is whether anything encrypts it, so a
+    cleartext one is drawn in its own colour; and what a reader needs from a
+    policy edge (§24.5) is whether anything may cross it, which is the one thing
+    the line is there to say.
     """
+    if edge.kind is EdgeKind.POLICY:
+        verdict = "conditional" if edge.policy is None else edge.policy.verdict
+        return f"policy-{verdict}"
     if edge.kind is EdgeKind.TUNNEL:
         return "tunnel" if edge.tunnel is None or edge.tunnel.protected else "cleartext-tunnel"
     if edge.kind is EdgeKind.CABLE:

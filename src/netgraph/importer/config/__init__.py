@@ -1,7 +1,7 @@
 """Reading a device's running configuration back, in the dialects netgraph writes.
 
 :mod:`netgraph.export.config` turns an inventory into the configuration a device
-would run. This closes the loop: the same six dialects are read *back*, so what
+would run. This closes the loop: the same seven dialects are read *back*, so what
 ``netgraph export`` writes is exactly what ``netgraph drift`` compares against,
 and "does the network match the inventory?" becomes a question an operator can
 answer with two commands and no bespoke collection script::
@@ -26,7 +26,7 @@ so ``--from`` and the sniffer are both unnecessary for the round trip.
 **The banner names the element.** ``netgraph-element:`` carries the
 fully-qualified name, so ``--host`` is unnecessary too. A configuration collected
 off a real device has neither, and then :func:`sniff` decides from the shape of
-the file — which is reliable here because the six grammars are disjoint in their
+the file — which is reliable here because the seven grammars are disjoint in their
 first non-comment line.
 
 The one thing a running configuration is *not* is a superset of the generated
@@ -55,6 +55,7 @@ from netgraph.importer.config.ifupdown import read_ifupdown
 from netgraph.importer.config.netplan import read_netplan
 from netgraph.importer.config.networkd import read_networkd
 from netgraph.importer.config.neutral import read_interfaces
+from netgraph.importer.config.nftables import read_nftables
 from netgraph.importer.config.wireguard import read_wireguard
 
 __all__ = [
@@ -69,6 +70,7 @@ __all__ = [
     "read_interfaces",
     "read_netplan",
     "read_networkd",
+    "read_nftables",
     "read_wireguard",
     "sniff",
     "stanzas",
@@ -86,6 +88,7 @@ CONFIG_READERS: Final[Mapping[str, ConfigReader]] = {
     "networkd": read_networkd,
     "ifupdown": read_ifupdown,
     "frr": read_frr,
+    "nftables": read_nftables,
     "wireguard": read_wireguard,
     "interfaces": read_interfaces,
 }

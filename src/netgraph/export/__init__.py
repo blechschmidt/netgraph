@@ -29,12 +29,13 @@ Format             What it is
 ``networkd``,      per device: :mod:`netgraph.export.config`. These are the only
 ``ifupdown``,      formats here whose artefact is a *tree* rather than one
 ``frr``,           document, and the only ones that can refuse — a dialect that
-``wireguard``,     cannot express a declared field writes nothing and says which
-``interfaces``     field, rather than emitting a device that is almost right.
+``nftables``,      cannot express a declared field writes nothing and says which
+``wireguard``,     field, rather than emitting a device that is almost right.
+``interfaces``     ``nftables`` is the one that writes what a device *refuses*.
 =================  =========================================================
 
-Four promises hold across all fourteen, and they are why this is a package
-rather than fourteen ad-hoc printers:
+Four promises hold across all fifteen, and they are why this is a package
+rather than fifteen ad-hoc printers:
 
 **Deterministic.** Every collection is sorted by an explicit canonical key —
 never by dict order, never by the loader's directory traversal. Two runs over an
@@ -141,7 +142,7 @@ class Exporter:
     #: :attr:`layers` stays the honest default for ``--help`` and the docs.
     select: Callable[[ExportOptions], tuple[Layer, ...]] | None = None
     #: For a format whose artefact is a *tree of files* rather than one
-    #: document — the six configuration dialects, which write one directory per
+    #: document — the seven configuration dialects, which write one directory per
     #: device (:mod:`netgraph.export.config`). ``--out DIR`` writes the tree;
     #: :attr:`emit` remains the single-stream form stdout gets.
     bundle: Callable[[ExportContext], ConfigSet] | None = None
@@ -258,7 +259,7 @@ class ExportResult:
     #: package emits bytes, which is what makes all of them diffable.
     payload: str
     manifest: Manifest
-    #: The same artefact as a tree of files, for the six configuration dialects;
+    #: The same artefact as a tree of files, for the seven configuration dialects;
     #: ``None`` for every format whose artefact is one document. When it is set,
     #: :attr:`payload` was derived from it rather than generated separately, so
     #: the two cannot describe different devices.

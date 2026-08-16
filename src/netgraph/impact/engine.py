@@ -104,7 +104,7 @@ REDUNDANCY_RULES: Final[tuple[str, ...]] = ("E047", "E048", "W141")
 #: ``link`` are classes rather than kinds: a person writing a maintenance ticket
 #: says "the device", not "the router or switch or hub or computer or server".
 _KIND_CLASSES: Final[Mapping[str, frozenset[str]]] = {
-    "device": frozenset({"switch", "router", "hub", "computer", "server"}),
+    "device": frozenset({"switch", "router", "firewall", "hub", "computer", "server"}),
     "link": frozenset({"cable", "tunnel"}),
 }
 
@@ -112,6 +112,7 @@ _KINDS: Final[frozenset[str]] = frozenset(
     {
         "switch",
         "router",
+        "firewall",
         "hub",
         "computer",
         "server",

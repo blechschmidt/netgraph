@@ -71,9 +71,12 @@ FILENAME = "etc/netplan/10-netgraph.yaml"
 #: The kinds this dialect claims. A Linux host renders netplan; a Catalyst does
 #: not, and generating a netplan file for one would be a category error rather
 #: than a lossy export. A ``router`` is here because a Linux box doing the
-#: routing is the ordinary home and edge case; a ``router`` that is not one is
-#: refused the moment it declares something netplan cannot write.
-HOST_KINDS: Final[frozenset[str]] = frozenset({"computer", "server", "router"})
+#: routing is the ordinary home and edge case, and a ``firewall`` for the same
+#: reason -- most of them are a Linux box too. Either that is not one is refused
+#: the moment it declares something netplan cannot write; ``spec.firewall``
+#: itself is not that, since netplan has no filter table and never claimed one
+#: (``netgraph export nftables`` writes it).
+HOST_KINDS: Final[frozenset[str]] = frozenset({"computer", "server", "router", "firewall"})
 
 #: netplan's ``tunnels[].mode`` for the tunnel types that are a netdev on Linux.
 #: The four that are missing — IPsec, OpenVPN, PPTP and L2TP — are daemons, not

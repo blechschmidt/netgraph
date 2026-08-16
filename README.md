@@ -263,7 +263,7 @@ The files describe the network once; each command asks something different of th
 | how do I move a switch on the diagram and have it stay there? | [`netgraph layout`](docs/commands/layout.md) |
 | how full is that /24, and where is the next free /28? | [`netgraph ipam`](docs/ipam.md) |
 | what should `/etc/hosts`, the DNS zone, the Ansible inventory, the pull list or the routing script say? | [`netgraph export`](docs/export.md) |
-| what should this device's netplan, systemd-networkd, ifupdown, FRR or WireGuard configuration say? | [`netgraph export netplan`](docs/export.md#device-configuration-the-six-dialects) |
+| what should this device's netplan, systemd-networkd, ifupdown, FRR, nftables or WireGuard configuration say? | [`netgraph export netplan`](docs/export.md#device-configuration-the-seven-dialects) |
 | can I hand the diagram to somebody who only has draw.io, and take their edits back? | [`netgraph export drawio`](docs/drawio.md) |
 | what do I hand over as the as-built documentation? | [`netgraph report`](docs/commands/report.md), and [an example of what it writes](docs/example-report/) |
 | what did that template and that interface range actually expand to? | [`netgraph show`](docs/commands/show.md) |

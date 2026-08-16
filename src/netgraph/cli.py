@@ -756,11 +756,11 @@ def import_group() -> None:
     default="auto",
     show_default=True,
     help=(
-        "Input dialect. 'auto' sniffs each input on its own, so one run may mix all nine: "
+        "Input dialect. 'auto' sniffs each input on its own, so one run may mix all ten: "
         "lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', "
         "csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, "
-        "frr, wireguard and interfaces are a device's running configuration in the same "
-        "dialects 'netgraph export' writes."
+        "frr, nftables, wireguard and interfaces are a device's running configuration in "
+        "the same dialects 'netgraph export' writes."
     ),
 )
 @click.option(
@@ -1206,8 +1206,8 @@ FAIL_ON: Final[tuple[str, ...]] = ("drift", "none")
         "Input dialect, as for 'netgraph import'. 'auto' sniffs each input on its own: "
         "lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', "
         "csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, "
-        "frr, wireguard and interfaces are the running configuration in the same dialects "
-        "'netgraph export' writes."
+        "frr, nftables, wireguard and interfaces are the running configuration in the same "
+        "dialects 'netgraph export' writes."
     ),
 )
 @click.option(
@@ -3602,7 +3602,8 @@ _LAYER_OPTION: Final[Callable[[Any], Any]] = click.option(
         "BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels "
         "l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the "
         "feeds into everything they power; identity draws the users and groups; netns opens "
-        "each machine up into the network stacks inside it, joined by their veth pairs. "
+        "each machine up into the network stacks inside it, joined by their veth pairs; "
+        "security draws the firewall zones and what the policy lets cross between them. "
         "Repeatable for -f html, which draws each layer and puts a switcher over them."
     ),
 )

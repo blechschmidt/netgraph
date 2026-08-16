@@ -87,6 +87,7 @@ __all__ = [
 #: uses, and the only one that reads at a glance as "not equipment".
 ICON_KINDS: Final[tuple[str, ...]] = (
     "router",
+    "firewall",
     "switch",
     "hub",
     "computer",

@@ -1,0 +1,53 @@
+# W154 (NG-B014) - a rule numbered above the one that closes its chain.
+#
+# The chain is walked from the lowest priority upwards and the first terminal
+# match decides. Rule 100 names no selector and drops, so it closes the forward
+# chain; rule 200 was meant to open a hole in it and is never consulted.
+apiVersion: netgraph.dev/v1alpha1
+kind: firewall
+metadata:
+  name: fw-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+  zones:
+    - name: wan
+      interfaces: [eth0]
+  firewall:
+    rules:
+      - priority: 100
+        src_zone: wan
+        dst_zone: local
+        action: drop
+      - priority: 200
+        src_zone: wan
+        dst_zone: local
+        protocol: tcp
+        dst_ports: ['22']
+        action: accept
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - fw-a:eth0
+    - rtr-b:eth0
+  medium: copper

@@ -23,11 +23,12 @@ the field maps to, with `…` standing for
 
 | `kind` | `spec` model | Notes |
 |---|---|---|
-| `switch` | [DeviceSpec](#spec--switch-router-hub-computer-server) | VLAN-aware bridge. Layer-2 by default: `forwarding` is false/false. |
-| `router` | [DeviceSpec](#spec--switch-router-hub-computer-server) | Forwards by default: `forwarding` is true/true. |
-| `hub` | [DeviceSpec](#spec--switch-router-hub-computer-server) | Layer-1 repeater. Rejects `vlan`, `ipv4`, `ipv6`, `bridge`, `vlans` and `forwarding`; every interface must be `ethernet`. |
-| `computer` | [DeviceSpec](#spec--switch-router-hub-computer-server) | End host, drawn as a workstation. |
-| `server` | [DeviceSpec](#spec--switch-router-hub-computer-server) | End host, drawn as a rack-mount server. Structurally identical to `computer`. |
+| `switch` | [DeviceSpec](#spec--switch-router-firewall-hub-computer-server) | VLAN-aware bridge. Layer-2 by default: `forwarding` is false/false. |
+| `router` | [DeviceSpec](#spec--switch-router-firewall-hub-computer-server) | Forwards by default: `forwarding` is true/true. |
+| `firewall` | [DeviceSpec](#spec--switch-router-firewall-hub-computer-server) | A router that filters. Forwards by default; drawn as a wall. Structurally identical to `router` — `zones` and `firewall` are available on every layer-3 kind. |
+| `hub` | [DeviceSpec](#spec--switch-router-firewall-hub-computer-server) | Layer-1 repeater. Rejects `vlan`, `ipv4`, `ipv6`, `bridge`, `vlans` and `forwarding`; every interface must be `ethernet`. |
+| `computer` | [DeviceSpec](#spec--switch-router-firewall-hub-computer-server) | End host, drawn as a workstation. |
+| `server` | [DeviceSpec](#spec--switch-router-firewall-hub-computer-server) | End host, drawn as a rack-mount server. Structurally identical to `computer`. |
 | `cable` | [CableSpec](#spec--cable) | An undirected link between exactly two interfaces. Owns no interfaces. |
 | `adapter` | [AdapterSpec](#spec--adapter) | Presents interfaces over a non-network host port. |
 | `tunnel` | [TunnelSpec](#spec--tunnel) | An undirected logical link between two or more `tunnel` interfaces. Owns no interfaces; `over` nests it inside another tunnel. |
@@ -35,7 +36,7 @@ the field maps to, with `…` standing for
 | `pdu` | [PduSpec](#spec--pdu) | A power distribution unit. Its numbered outlets are derived from `outlets`; they are not interfaces, and a device names one in `power.inputs` rather than being cabled to it. Placed on a rack elevation like any other hardware. |
 | `user` | [UserSpec](#spec-of-a-user-document) | One identity: a person, a service account or a shared login. Owns no interfaces and terminates no cable; it is drawn only in the `identity` view. |
 | `group` | [GroupSpec](#spec-of-a-group-document) | A named set of identities. `members` may name a `user` or another `group`, which is what makes a hierarchy expressible; the nesting must not loop (`NG-S012`). |
-| `template` | partial [DeviceSpec](#spec--switch-router-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
+| `template` | partial [DeviceSpec](#spec--switch-router-firewall-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
 | `layout` | [LayoutSpec](#spec-of-a-layout-document) | Diagram geometry for elements declared elsewhere, scoped by view. Not an element: it carries no network facts and is never drawn as a node. See `netgraph layout`. |
 | `testsuite` | [TestSuiteSpec](#spec-of-a-testsuite-document) | Named assertions about the network the other documents describe, graded by `netgraph test`. Not an element: it declares no device and is never drawn. |
 | `note` | [NoteSpec](#spec-of-a-note-document) | One free-text callout on the diagram, pinned to a point or anchored to an element or a link. Presentational: it declares no network fact and never changes what `validate`, `path`, `export` or `plan` conclude. |
@@ -84,9 +85,9 @@ Where the hardware physically is. Optional, and shared by every kind: a patch pa
 * `site`, `room` and `rack` together identify a rack (`NG-U001`). Two elements that name the same three share a cabinet and may not overlap; naming `position` or `rack_height` without `rack` is `NG-U004`.
 * `netgraph render --layer rack` draws one front elevation per rack, empty units included.
 
-## `spec` — switch, router, hub, computer, server
+## `spec` — switch, router, firewall, hub, computer, server
 
-The five device kinds share one spec shape. They differ in which fields they permit (a `hub` rejects `bridge`, `vlans`, `forwarding` and all layer-3 configuration) and in the default value of `forwarding`.
+The six device kinds share one spec shape. They differ in which fields they permit (a `hub` rejects `bridge`, `vlans`, `forwarding` and all layer-3 configuration) and in the default value of `forwarding`.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
@@ -100,10 +101,12 @@ The five device kinds share one spec shape. They differ in which fields they per
 | `forwarding` | [Forwarding](#specforwarding) | no | *unset* | Device-wide default for per-interface IP forwarding. Defaults to true/true on a `router` and false/false on every other kind; a `hub` must not declare it. | — |
 | `netns` | [NetnsDefinition](#specnetns) list | no | `[]` | The network namespaces this machine runs (§23.1). Each is a whole second network stack — its own interfaces, addresses and routing table — and `parent` nests one inside another, arbitrarily deep. Not a VRF: a VRF partitions one stack's routing table, a namespace *is* a second stack. | — |
 | `vrfs` | [VrfDefinition](#specvrfs) list | no | `[]` | The routing instances (VRFs) this device implements. An interface binds to one with `vrf`, and that binding is what partitions the address namespace. | `/ni:network-instances/ni:network-instance` |
-| `route_tables` | [RouteTable](#specroute_tables) list | no | `[]` | The routing tables this device holds beyond `main`, `local` and `default`. A table on its own changes nothing; what reaches it is a rule in `routing_policy` (§16.6). | — |
+| `route_tables` | [RouteTable](#specroute_tables) list | no | `[]` | The routing tables this device holds beyond `main`, `local` and `default`. A table on its own changes nothing; what reaches it is a rule in `routing_policy` (§16.4). | — |
 | `routes` | [StaticRoute](#specroutes) list | no | `[]` | Configured static routes, in the order the device holds them. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes` |
-| `routing_policy` | [PolicyRule](#specrouting_policy) list | no | `[]` | The routing policy database: the ordered rules deciding which *table* a packet is routed by, from its source, its firewall mark, its ingress interface or its DSCP. This is policy-based routing (§16.6). | — |
+| `routing_policy` | [PolicyRule](#specrouting_policy) list | no | `[]` | The routing policy database: the ordered rules deciding which *table* a packet is routed by, from its source, its firewall mark, its ingress interface or its DSCP. This is policy-based routing (§16.4). | — |
 | `routing` | [RoutingConfig](#specrouting) | no | *unset* | The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol` |
+| `zones` | [Zone](#speczones) list | no | `[]` | The security zones the device divides its interfaces into (§24.1). Policy is written *between* zones rather than between interfaces, so a rule survives a port being renamed, doubled or moved to a LAG. An interface is in at most one zone (`NG-B003`). | — |
+| `firewall` | [FirewallConfig](#specfirewall) | no | *unset* | What the device does to the packets it sees: the filter policy and the address translations (§24.2). Absent records nothing about its filtering, which is not the same as saying it filters nothing. | — |
 | `power` | [PowerConfig](#specpower) | no | *unset* | What the device draws, which PDU outlets feed it, and how much PoE it hands out (§17.2). Absent means the inventory records nothing about its power. | `/eo-mib:eoPowerTable/eoPowerEntry` |
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 | `from` | element reference | no | *unset* | Names a `kind: template` document whose partial spec is merged underneath this one. Consumed by the loader: it is gone before validation, the graph or any renderer sees the device. `interfaces` is required only when `from` is absent. | — |
@@ -390,6 +393,89 @@ One BGP session. The peer is an **address**, which is what the device is configu
 | `description` | string | no | *unset* | Free text: what the session is for. | — |
 
 * The address is resolved against every address the inventory configures. A peer that resolves to nothing is a warning (`NG-F013`), because an eBGP peer may be a transit provider nobody declares here; a peer whose own `asn` contradicts `remote_asn` is an error (`NG-F011`).
+
+## `spec.zones[]`
+
+One security zone (§24.1): a name, and the interfaces in it. Policy is written between zones rather than between interfaces, so a rule survives a port being renamed.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `name` | element name | **yes** | — | Name of the zone. Unique within the device, and not `local`, which is the machine itself and is nameable in a rule without being declared (`NG-B001`). | — |
+| `interfaces` | interface name list | no | `[]` | The interfaces in this zone. Each names an interface of this device (`NG-B002`), and no interface is in two zones (`NG-B003`). A zone holding none is inert (`W150`). | — |
+| `description` | string | no | *unset* | Free text: what the zone is for. | — |
+
+* An interface is in at most one zone (`NG-B003`). That is the defining property of a zone, and what makes `from lan` a statement about a packet rather than a question.
+* `local` is the machine itself and may not be declared (`NG-B001`); it is nameable in a rule without being declared.
+* A zone holding no interface is inert (`W150`); an interface in no zone, on a device that declares zones at all, is worth a second look (`W151`).
+
+## `spec.firewall`
+
+What the device does to the packets it sees (§24.2): the three defaults, the filter policy and the address translations.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `default_input` | `accept` \| `drop` \| `reject` \| `mark` \| `log` | no | `drop` | What a packet *for this machine* gets when no rule decides. One of `accept`, `drop` and `reject` — a default has to decide (`NG-B007`). Defaults to `drop`. | — |
+| `default_forward` | `accept` \| `drop` \| `reject` \| `mark` \| `log` | no | `drop` | What a packet *through* this machine gets when no rule decides, on the same terms. Defaults to `drop`. | — |
+| `default_output` | `accept` \| `drop` \| `reject` \| `mark` \| `log` | no | `accept` | What a packet *from* this machine gets when no rule decides, on the same terms. Defaults to `accept`: a machine that cannot answer a DNS query cannot be administered either. | — |
+| `rules` | [FirewallRule](#specfirewallrules) list | no | `[]` | The filter policy, in declaration order. What the device walks is this list in *priority* order, lowest first, first terminal match deciding (§24.2). | — |
+| `nat` | [NatRule](#specfirewallnat) list | no | `[]` | The address translations, in the order they are tried (§24.4). Apart from `rules` because a packet is translated *and* filtered, in different hooks. | — |
+| `description` | string | no | *unset* | Free text: what the policy as a whole is for. | — |
+
+* The defaults are *deny inbound, deny transit, permit outbound*. Each has to decide the packet, so `mark` and `log` are refused there (`NG-B007`).
+* Available on every layer-3 kind, not only on `kind: firewall`: a router with three rules on it filters, and that is what most networks run. A `hub` has no IP stack and refuses both this and `zones` (`NG-H003`).
+
+## `spec.firewall.rules[]`
+
+One filter rule (§24.2): which packets it picks out, and what happens to them. Read it as a sentence — *at priority 100, TCP from the lan zone to this machine's port 22 is accepted*.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `priority` | integer, 0–4294967295 | **yes** | — | Unique within the device, per family (`NG-B008`). The chain is walked from the lowest priority upwards; the first rule whose action is terminal decides, and nothing after it is consulted. | — |
+| `name` | element name | no | *unset* | Optional label, for the diagram and for a diagnostic to name the rule by. | — |
+| `src_zone` | element name | no | *unset* | The zone the packet came from: a declared zone, or `local` for traffic this machine generated (`NG-B004`). Unset matches any zone. | — |
+| `dst_zone` | element name | no | *unset* | The zone the packet is going to, on the same terms (`NG-B004`). Together with `src_zone` this decides the hook: `to: local` is input, `from: local` is output, two real zones are forward. | — |
+| `family` | `ipv4` \| `ipv6` | no | *unset* | Which family's chain the rule is in. Omit to install in both, and derive from `src`, `dst` or `protocol` when possible (`NG-B005`); `ipv4` and `ipv6` are explicit. | — |
+| `src` | IPv4 prefix \| IPv6 prefix | no | *unset* | Source prefix selector. Either family; optional. | — |
+| `dst` | IPv4 prefix \| IPv6 prefix | no | *unset* | Destination prefix selector, on the same terms. | — |
+| `protocol` | `tcp` \| `udp` \| `icmp` \| `icmpv6` \| `sctp` \| `esp` \| `ah` \| `gre` | no | *unset* | The IP protocol. Required by `src_ports` and `dst_ports`, which only `tcp`, `udp` and `sctp` have (`NG-B005`). `icmp` is IPv4 and `icmpv6` is IPv6, and stating one against the other family is refused. | — |
+| `src_ports` | string list | no | `[]` | Source ports: single ports and closed ranges (`443`, `30000-32767`), matched as a set. | — |
+| `dst_ports` | string list | no | `[]` | Destination ports, on the same terms. The usual selector, since it is the one that names the service. | — |
+| `ct_state` | `new` \| `established` \| `related` \| `invalid` list | no | `[]` | Connection-tracking states, matched as a set. Empty matches any state; one rule accepting `established` and `related` replaces the return path of every other rule. | — |
+| `iif` | interface name | no | *unset* | Ingress interface selector (`NG-B009`), for when a zone is too coarse. Rare: the point of a zone is not needing this. | — |
+| `oif` | interface name | no | *unset* | Egress interface selector, on the same terms (`NG-B009`). | — |
+| `invert` | boolean | no | `false` | Match everything the selectors do not. Meaningless without a selector to invert (`NG-B005`). | — |
+| `action` | `accept` \| `drop` \| `reject` \| `mark` \| `log` | **yes** | — | `accept`, `drop` and `reject` decide the packet and end the walk; `mark` writes a firewall mark and `log` records it, and both carry on to the next rule. Stated, never defaulted. | — |
+| `mark` | string | no | *unset* | The mark to write, hexadecimal, optionally masked. Required by `action: mark` and refused by everything else (`NG-B005`). This is what `spec.routing_policy[].fwmark` reads — see §16.9 and §24.3. | — |
+| `log_prefix` | string, ≤ 64 characters | no | *unset* | The tag put in front of a logged packet. For `action: log` only (`NG-B005`). | — |
+| `description` | string | no | *unset* | Free text: what the rule is for. | — |
+
+* The chain is walked from the lowest `priority` upwards and the first *terminal* match decides, so `priority` is the rule's position and its identity: unique within the device, per family (`NG-B008`).
+* `accept`, `drop` and `reject` are terminal; `mark` and `log` do something to the packet and carry on walking, which is what makes them useful.
+* The hook is derived, never written: `dst_zone: local` is input, `src_zone: local` is output, two real zones are forward. A rule naming one real zone is in both the hooks it could be in.
+* A rule with no selector matches everything reaching its hooks, which terminates the chain — and makes every rule after it unreachable (`W154`).
+* `action: mark` is the half of §16.9 that writes; `spec.routing_policy[].fwmark` is the half that reads. A mark written that nothing reads is `W152`, and one read that nothing writes is `W153`.
+
+## `spec.firewall.nat[]`
+
+One address translation (§24.4). Apart from the filter rules because it happens apart from them: a packet is translated *and* filtered, in different hooks.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `name` | element name | no | *unset* | Optional label, for a diagnostic to name the translation by. | — |
+| `type` | `snat` \| `masquerade` \| `dnat` \| `redirect` | **yes** | — | `snat` and `masquerade` rewrite the source on the way out; `dnat` and `redirect` rewrite the destination on the way in. Which of the two fields below are required follows from this (`NG-B006`). | — |
+| `src_zone` | element name | no | *unset* | The zone the packet came from (`NG-B004`). | — |
+| `dst_zone` | element name | no | *unset* | The zone it is going to (`NG-B004`). The usual selector for a source translation: *everything leaving towards the wan is masqueraded*. | — |
+| `family` | `ipv4` \| `ipv6` | no | *unset* | Which family the translation is in. Derived from any address it names (`NG-B006`). | — |
+| `src` | IPv4 prefix \| IPv6 prefix | no | *unset* | Source prefix selector. | — |
+| `dst` | IPv4 prefix \| IPv6 prefix | no | *unset* | Destination prefix selector. | — |
+| `protocol` | `tcp` \| `udp` \| `icmp` \| `icmpv6` \| `sctp` \| `esp` \| `ah` \| `gre` | no | *unset* | The IP protocol. Required by `dst_ports` (`NG-B006`). | — |
+| `dst_ports` | string list | no | `[]` | Destination ports: the *published* port, not the internal one, which is `to_port`. | — |
+| `to_address` | IPv4 address \| IPv6 address | no | *unset* | What the address becomes. Required by `snat` and `dnat`; refused by `masquerade` (whose address is the egress interface's, unknown here) and by `redirect` (whose address is this machine) — `NG-B006`. | — |
+| `to_port` | integer, 1–65535 | no | *unset* | What the port becomes. Required by `redirect`, which translates the port and nothing else; on a source translation it needs a `dst_ports` to be about (`NG-B006`). | — |
+| `description` | string | no | *unset* | Free text: what the translation is for. | — |
+
+* Order in the list is the order the translations are tried, first match winning. There is no `priority`: a number that only ever repeated the position would be one more thing to keep in step.
+* `snat` and `dnat` state the address they translate to; `masquerade` cannot (it is the egress interface's, unknown until the packet leaves) and `redirect` need not (it is this machine) — `NG-B006`.
 
 ## `spec` — cable
 
@@ -939,6 +1025,65 @@ IPsec only; every other type has a single mode.
 |---|
 | `tunnel` |
 | `transport` |
+
+### `firewall.rules[].action`
+
+`accept`, `drop` and `reject` decide the packet and end the walk; `mark` and `log` do something to it and carry on to the next rule.
+
+| Value |
+|---|
+| `accept` |
+| `drop` |
+| `reject` |
+| `mark` |
+| `log` |
+
+### `firewall.rules[].protocol`
+
+Only `tcp`, `udp` and `sctp` have ports to select on. `icmp` is IPv4 and `icmpv6` is IPv6, so stating either against the other family is refused (`NG-B005`).
+
+| Value |
+|---|
+| `tcp` |
+| `udp` |
+| `icmp` |
+| `icmpv6` |
+| `sctp` |
+| `esp` |
+| `ah` |
+| `gre` |
+
+### `firewall.rules[].ct_state`
+
+Connection-tracking states, matched as a set. One rule accepting `established` and `related` replaces the return path of every other rule in the file.
+
+| Value |
+|---|
+| `new` |
+| `established` |
+| `related` |
+| `invalid` |
+
+### `firewall.nat[].type`
+
+`snat` and `masquerade` rewrite the source on the way out; `dnat` and `redirect` rewrite the destination on the way in.
+
+| Value |
+|---|
+| `snat` |
+| `masquerade` |
+| `dnat` |
+| `redirect` |
+
+### firewall hook
+
+Never written in a document: derived from `src_zone` and `dst_zone`, and named here because the three defaults of `spec.firewall` are one per hook.
+
+| Value |
+|---|
+| `input` |
+| `forward` |
+| `output` |
 
 ### `poe.standard`
 

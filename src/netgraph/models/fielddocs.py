@@ -37,6 +37,7 @@ from netgraph.models.base import NetgraphModel
 from netgraph.models.cable import CableSpec, InterfaceRef
 from netgraph.models.device import BridgeConfig, DeviceSpec, Forwarding, VlanDefinition
 from netgraph.models.element import ElementBase
+from netgraph.models.firewall import FirewallConfig, FirewallRule, NatRule, Zone
 from netgraph.models.identity import GroupSpec, UserSpec
 from netgraph.models.interface import (
     Bss,
@@ -128,6 +129,10 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     OspfConfig,
     BgpConfig,
     BgpNeighbor,
+    Zone,
+    FirewallConfig,
+    FirewallRule,
+    NatRule,
     CableSpec,
     InterfaceRef,
     AdapterSpec,
@@ -165,6 +170,8 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
 KIND_NOTES: Final[dict[str, str]] = {
     "switch": "VLAN-aware bridge. Layer-2 by default: `forwarding` is false/false.",
     "router": "Forwards by default: `forwarding` is true/true.",
+    "firewall": "A router that filters. Forwards by default; drawn as a wall. Structurally "
+    "identical to `router` — `zones` and `firewall` are available on every layer-3 kind.",
     "hub": "Layer-1 repeater. Rejects `vlan`, `ipv4`, `ipv6`, `bridge`, `vlans` and "
     "`forwarding`; every interface must be `ethernet`.",
     "computer": "End host, drawn as a workstation.",
@@ -298,7 +305,7 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("DeviceSpec", "route_tables"): Doc(
         "The routing tables this device holds beyond `main`, `local` and `default`. A table on "
-        "its own changes nothing; what reaches it is a rule in `routing_policy` (§16.6).",
+        "its own changes nothing; what reaches it is a rule in `routing_policy` (§16.4).",
         NONE,
     ),
     ("DeviceSpec", "routes"): Doc(
@@ -308,13 +315,25 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("DeviceSpec", "routing_policy"): Doc(
         "The routing policy database: the ordered rules deciding which *table* a packet is "
         "routed by, from its source, its firewall mark, its ingress interface or its DSCP. "
-        "This is policy-based routing (§16.6).",
+        "This is policy-based routing (§16.4).",
         NONE,
     ),
     ("DeviceSpec", "power"): Doc(
         "What the device draws, which PDU outlets feed it, and how much PoE it hands out "
         "(§17.2). Absent means the inventory records nothing about its power.",
         "/eo-mib:eoPowerTable/eoPowerEntry",
+    ),
+    ("DeviceSpec", "zones"): Doc(
+        "The security zones the device divides its interfaces into (§24.1). Policy is written "
+        "*between* zones rather than between interfaces, so a rule survives a port being "
+        "renamed, doubled or moved to a LAG. An interface is in at most one zone (`NG-B003`).",
+        NONE,
+    ),
+    ("DeviceSpec", "firewall"): Doc(
+        "What the device does to the packets it sees: the filter policy and the address "
+        "translations (§24.2). Absent records nothing about its filtering, which is not the "
+        "same as saying it filters nothing.",
+        NONE,
     ),
     ("DeviceSpec", "routing"): Doc(
         "The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous "
@@ -478,6 +497,156 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         NONE,
     ),
     ("PolicyRule", "description"): Doc("Free text: what the rule is for."),
+    ("Zone", "name"): Doc(
+        "Name of the zone. Unique within the device, and not `local`, which is the machine "
+        "itself and is nameable in a rule without being declared (`NG-B001`).",
+        NONE,
+    ),
+    ("Zone", "interfaces"): Doc(
+        "The interfaces in this zone. Each names an interface of this device (`NG-B002`), and "
+        "no interface is in two zones (`NG-B003`). A zone holding none is inert (`W150`).",
+        NONE,
+    ),
+    ("Zone", "description"): Doc("Free text: what the zone is for."),
+    ("FirewallConfig", "default_input"): Doc(
+        "What a packet *for this machine* gets when no rule decides. One of `accept`, `drop` "
+        "and `reject` — a default has to decide (`NG-B007`). Defaults to `drop`.",
+        NONE,
+    ),
+    ("FirewallConfig", "default_forward"): Doc(
+        "What a packet *through* this machine gets when no rule decides, on the same terms. "
+        "Defaults to `drop`.",
+        NONE,
+    ),
+    ("FirewallConfig", "default_output"): Doc(
+        "What a packet *from* this machine gets when no rule decides, on the same terms. "
+        "Defaults to `accept`: a machine that cannot answer a DNS query cannot be "
+        "administered either.",
+        NONE,
+    ),
+    ("FirewallConfig", "rules"): Doc(
+        "The filter policy, in declaration order. What the device walks is this list in "
+        "*priority* order, lowest first, first terminal match deciding (§24.2).",
+        NONE,
+    ),
+    ("FirewallConfig", "nat"): Doc(
+        "The address translations, in the order they are tried (§24.4). Apart from `rules` "
+        "because a packet is translated *and* filtered, in different hooks.",
+        NONE,
+    ),
+    ("FirewallConfig", "description"): Doc("Free text: what the policy as a whole is for."),
+    ("FirewallRule", "priority"): Doc(
+        "Unique within the device, per family (`NG-B008`). The chain is walked from the lowest "
+        "priority upwards; the first rule whose action is terminal decides, and nothing after "
+        "it is consulted.",
+        NONE,
+    ),
+    ("FirewallRule", "name"): Doc(
+        "Optional label, for the diagram and for a diagnostic to name the rule by.",
+        NONE,
+    ),
+    ("FirewallRule", "src_zone"): Doc(
+        "The zone the packet came from: a declared zone, or `local` for traffic this machine "
+        "generated (`NG-B004`). Unset matches any zone.",
+        NONE,
+    ),
+    ("FirewallRule", "dst_zone"): Doc(
+        "The zone the packet is going to, on the same terms (`NG-B004`). Together with "
+        "`src_zone` this decides the hook: `to: local` is input, `from: local` is output, two "
+        "real zones are forward.",
+        NONE,
+    ),
+    ("FirewallRule", "family"): Doc(
+        "Which family's chain the rule is in. Omit to install in both, and derive from `src`, "
+        "`dst` or `protocol` when possible (`NG-B005`); `ipv4` and `ipv6` are explicit.",
+        NONE,
+    ),
+    ("FirewallRule", "src"): Doc("Source prefix selector. Either family; optional.", NONE),
+    ("FirewallRule", "dst"): Doc("Destination prefix selector, on the same terms.", NONE),
+    ("FirewallRule", "protocol"): Doc(
+        "The IP protocol. Required by `src_ports` and `dst_ports`, which only `tcp`, `udp` and "
+        "`sctp` have (`NG-B005`). `icmp` is IPv4 and `icmpv6` is IPv6, and stating one against "
+        "the other family is refused.",
+        NONE,
+    ),
+    ("FirewallRule", "src_ports"): Doc(
+        "Source ports: single ports and closed ranges (`443`, `30000-32767`), matched as a set.",
+        NONE,
+    ),
+    ("FirewallRule", "dst_ports"): Doc(
+        "Destination ports, on the same terms. The usual selector, since it is the one that "
+        "names the service.",
+        NONE,
+    ),
+    ("FirewallRule", "ct_state"): Doc(
+        "Connection-tracking states, matched as a set. Empty matches any state; one rule "
+        "accepting `established` and `related` replaces the return path of every other rule.",
+        NONE,
+    ),
+    ("FirewallRule", "iif"): Doc(
+        "Ingress interface selector (`NG-B009`), for when a zone is too coarse. Rare: the "
+        "point of a zone is not needing this.",
+        NONE,
+    ),
+    ("FirewallRule", "oif"): Doc("Egress interface selector, on the same terms (`NG-B009`).", NONE),
+    ("FirewallRule", "invert"): Doc(
+        "Match everything the selectors do not. Meaningless without a selector to invert "
+        "(`NG-B005`).",
+        NONE,
+    ),
+    ("FirewallRule", "action"): Doc(
+        "`accept`, `drop` and `reject` decide the packet and end the walk; `mark` writes a "
+        "firewall mark and `log` records it, and both carry on to the next rule. Stated, never "
+        "defaulted.",
+        NONE,
+    ),
+    ("FirewallRule", "mark"): Doc(
+        "The mark to write, hexadecimal, optionally masked. Required by `action: mark` and "
+        "refused by everything else (`NG-B005`). This is what `spec.routing_policy[].fwmark` "
+        "reads — see §16.9 and §24.3.",
+        NONE,
+    ),
+    ("FirewallRule", "log_prefix"): Doc(
+        "The tag put in front of a logged packet. For `action: log` only (`NG-B005`).",
+        NONE,
+    ),
+    ("FirewallRule", "description"): Doc("Free text: what the rule is for."),
+    ("NatRule", "name"): Doc("Optional label, for a diagnostic to name the translation by.", NONE),
+    ("NatRule", "type"): Doc(
+        "`snat` and `masquerade` rewrite the source on the way out; `dnat` and `redirect` "
+        "rewrite the destination on the way in. Which of the two fields below are required "
+        "follows from this (`NG-B006`).",
+        NONE,
+    ),
+    ("NatRule", "src_zone"): Doc("The zone the packet came from (`NG-B004`).", NONE),
+    ("NatRule", "dst_zone"): Doc(
+        "The zone it is going to (`NG-B004`). The usual selector for a source translation: "
+        "*everything leaving towards the wan is masqueraded*.",
+        NONE,
+    ),
+    ("NatRule", "family"): Doc(
+        "Which family the translation is in. Derived from any address it names (`NG-B006`).",
+        NONE,
+    ),
+    ("NatRule", "src"): Doc("Source prefix selector.", NONE),
+    ("NatRule", "dst"): Doc("Destination prefix selector.", NONE),
+    ("NatRule", "protocol"): Doc("The IP protocol. Required by `dst_ports` (`NG-B006`).", NONE),
+    ("NatRule", "dst_ports"): Doc(
+        "Destination ports: the *published* port, not the internal one, which is `to_port`.",
+        NONE,
+    ),
+    ("NatRule", "to_address"): Doc(
+        "What the address becomes. Required by `snat` and `dnat`; refused by `masquerade` "
+        "(whose address is the egress interface's, unknown here) and by `redirect` (whose "
+        "address is this machine) — `NG-B006`.",
+        NONE,
+    ),
+    ("NatRule", "to_port"): Doc(
+        "What the port becomes. Required by `redirect`, which translates the port and nothing "
+        "else; on a source translation it needs a `dst_ports` to be about (`NG-B006`).",
+        NONE,
+    ),
+    ("NatRule", "description"): Doc("Free text: what the translation is for."),
     ("RoutingConfig", "ospf"): Doc(
         "The OSPF area this device runs, and on which interfaces.",
         "…/rt:control-plane-protocol[type='ospf']",

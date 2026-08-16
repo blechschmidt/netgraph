@@ -270,6 +270,9 @@ def _node_lines(record: Mapping[str, Any]) -> Iterator[str]:
     rack = record.get("rack")
     if isinstance(rack, Mapping):
         yield from _rack_lines(rack)
+    zone = record.get("zone")
+    if isinstance(zone, Mapping):
+        yield from _zone_lines(zone)
 
     vlans = record.get("vlans")
     if vlans:
@@ -287,6 +290,11 @@ def _subtitle(record: Mapping[str, Any]) -> str:
         return f"{tunnel.get('type', 'tunnel')} tunnel"
     if isinstance(record.get("aggregate"), Mapping):
         return "namespace"
+    zone = record.get("zone")
+    if isinstance(zone, Mapping):
+        # The device, not the kind: at this layer every box is a zone, and which
+        # machine a zone belongs to is the one thing the shape cannot carry.
+        return f"zone of {plain_text(str(zone.get('element', '')))}"
     kind = plain_text(str(record.get("kind", "element")))
     routing = record.get("routing")
     if isinstance(routing, Mapping) and routing.get("asn") is not None:
@@ -436,6 +444,42 @@ def _tunnel_lines(tunnel: Mapping[str, Any]) -> Iterator[str]:
     yield from _rows("endpoints", tunnel.get("endpoints", ()), _endpoint_row)
 
 
+def _zone_lines(zone: Mapping[str, Any]) -> Iterator[str]:
+    """A security zone: whose it is, what is in it, and how much names it (§24.5)."""
+    yield f"device: {plain_text(str(zone.get('element', '')))}"
+    if not zone.get("declared"):
+        # The two the view mints. Saying which one it is matters more than
+        # anything else on the tooltip: a reader who thinks 'any' is a zone
+        # somebody declared has misread the whole diagram.
+        name = plain_text(str(zone.get("name", "")))
+        explained = (
+            "traffic that terminates on this machine rather than crossing it"
+            if name == "local"
+            else "a rule that named no zone, so it matches wherever the packet came from"
+        )
+        yield f"not declared: {explained}"
+    interfaces = [plain_text(str(name)) for name in zone.get("interfaces", ())]
+    yield "interfaces: " + (_listed(interfaces) if interfaces else "none")
+    counts = []
+    if zone.get("rules"):
+        counts.append(f"{zone['rules']} filter rule(s)")
+    if zone.get("translations"):
+        counts.append(f"{zone['translations']} translation(s)")
+    if counts:
+        yield "named by: " + ", ".join(counts)
+
+
+def _policy_lines(policy: Mapping[str, Any]) -> Iterator[str]:
+    """What the firewall does between two zones: the verdict, then every rule."""
+    source = plain_text(str(policy.get("from", "")))
+    target = plain_text(str(policy.get("to", "")))
+    yield f"{source} -> {target}: {plain_text(str(policy.get('verdict', '')))}"
+    yield from _rows("rules", [{"route": rule} for rule in policy.get("rules", ())], _route_row)
+    yield from _rows(
+        "nat", [{"route": entry} for entry in policy.get("translations", ())], _route_row
+    )
+
+
 def _adjacency_lines(adjacency: Mapping[str, Any]) -> Iterator[str]:
     """A routing session: which protocol, between which AS or in which area."""
     protocol = plain_text(str(adjacency.get("protocol", "")))
@@ -543,6 +587,13 @@ def _edge_lines(record: Mapping[str, Any]) -> Iterator[str]:
     adjacency = record.get("adjacency")
     if isinstance(adjacency, Mapping):
         yield from _adjacency_lines(adjacency)
+
+    policy = record.get("policy")
+    if isinstance(policy, Mapping):
+        # A decision, not a path: it has no medium, no rate and no length, so
+        # the rules are the whole record and the walk stops here.
+        yield from _policy_lines(policy)
+        return
 
     tunnel = record.get("tunnel")
     if isinstance(tunnel, Mapping):

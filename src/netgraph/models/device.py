@@ -1,6 +1,6 @@
-"""Device elements: ``switch``, ``router``, ``hub``, ``computer`` and ``server``.
+"""Device elements: ``switch``, ``router``, ``firewall``, ``hub``, ``computer``, ``server``.
 
-The five kinds share one ``spec`` shape (§6.1 of ``docs/schema.md``); they
+The six kinds share one ``spec`` shape (§6.1 of ``docs/schema.md``); they
 differ in which fields are permitted (§6.5) and in how the renderer draws them.
 """
 
@@ -15,6 +15,7 @@ from pydantic import Field, model_validator
 from netgraph.models.base import NetgraphModel
 from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
+from netgraph.models.firewall import LOCAL_ZONE, FirewallConfig, FirewallRule, NatRule, Zone
 from netgraph.models.interface import Interface, InterfaceList, InterfaceType
 from netgraph.models.netns import ROOT_NETNS, NetnsDefinition, resolve_netns_tree
 from netgraph.models.power import PowerConfig
@@ -38,6 +39,7 @@ __all__ = [
     "Computer",
     "Device",
     "DeviceSpec",
+    "Firewall",
     "Forwarding",
     "Hub",
     "Router",
@@ -116,10 +118,18 @@ class DeviceSpec(NetgraphModel):
     route_tables: list[RouteTable] = Field(default_factory=list)
     #: Configured static routes (§16.5).
     routes: list[StaticRoute] = Field(default_factory=list)
-    #: The routing policy database: which table each packet is routed by (§16.6).
+    #: The routing policy database: which table each packet is routed by (§16.4).
     routing_policy: list[PolicyRule] = Field(default_factory=list)
     #: The dynamic routing protocols the device takes part in (§16.7).
     routing: RoutingConfig | None = None
+    #: The security zones the device divides its interfaces into (§24.1). A zone
+    #: is what firewall policy is written *between*, so that a rule survives an
+    #: interface being renamed or moved to a LAG.
+    zones: list[Zone] = Field(default_factory=list)
+    #: What the device does to the packets it sees: the filter policy and the
+    #: address translations (§24.2). Absent means the inventory records nothing
+    #: about its filtering, which is not the same as "it filters nothing".
+    firewall: FirewallConfig | None = None
     #: What the device draws, which outlets feed it, and how much PoE it hands
     #: out (§17.2). Absent means the inventory records nothing about its power.
     power: PowerConfig | None = None
@@ -324,6 +334,119 @@ class DeviceSpec(NetgraphModel):
         return self
 
     @model_validator(mode="after")
+    def _check_zones(self) -> DeviceSpec:
+        """``NG-B001``/``NG-B002``/``NG-B003``: the zone table and what is in it.
+
+        The same shape as :meth:`_check_vrf_table` and for the same reason: a
+        zone is named from two places in one ``spec`` — an interface is put in
+        one, a rule is written between two — and every reference is resolvable
+        from inside this document, because a zone cannot reach outside one. It is
+        a partition of *this machine's* interfaces, and the machine is here.
+        """
+        names = {interface.name for interface in self.interfaces}
+        declared: set[str] = set()
+        placed: dict[str, str] = {}
+        for index, zone in enumerate(self.zones):
+            if zone.name == LOCAL_ZONE:
+                raise field_error(
+                    f"{LOCAL_ZONE!r} is the machine itself — the traffic that terminates "
+                    f"here rather than passing through — so it is nameable in a rule "
+                    f"without being declared, and it is not one of the parts the "
+                    f"interfaces are divided into",
+                    rule="NG-B001",
+                    path=("zones", index, "name"),
+                )
+            if zone.name in declared:
+                raise field_error(
+                    f"security zone {zone.name!r} is declared twice",
+                    rule="NG-B001",
+                    path=("zones", index, "name"),
+                )
+            declared.add(zone.name)
+            for position, port in enumerate(zone.interfaces):
+                if port not in names:
+                    raise field_error(
+                        f"zone {zone.name!r} holds interface {port!r}, which the device does "
+                        f"not have; it has {_name_list(names)}",
+                        rule="NG-B002",
+                        path=("zones", index, "interfaces", position),
+                    )
+                if (owner := placed.get(port)) is not None:
+                    written = (
+                        "twice in this zone"
+                        if owner == zone.name
+                        else f"in {owner!r} as well as here"
+                    )
+                    raise field_error(
+                        f"interface {port!r} is {written}; an interface is in at most one "
+                        f"zone, which is what makes 'from {owner}' a statement about a "
+                        f"packet rather than a question",
+                        rule="NG-B003",
+                        path=("zones", index, "interfaces", position),
+                    )
+                placed[port] = zone.name
+        return self
+
+    @model_validator(mode="after")
+    def _check_firewall(self) -> DeviceSpec:
+        """``NG-B004``/``NG-B008``/``NG-B009``: the policy over the zone table.
+
+        Separate from :meth:`_check_zones` because it depends on it: every zone
+        a rule names has to be one the device declares, and the set of those is
+        what the previous validator establishes. pydantic runs ``mode="after"``
+        validators in declaration order, so by the time this one runs the table
+        has been checked and its names can be trusted.
+        """
+        if self.firewall is None:
+            return self
+        resolvable = {zone.name for zone in self.zones} | {LOCAL_ZONE}
+        names = {interface.name for interface in self.interfaces}
+
+        seen: dict[tuple[AddressFamily, int], int] = {}
+        for index, rule in enumerate(self.firewall.rules):
+            self._check_rule_zones(rule, resolvable, path=("firewall", "rules", index))
+            for family in rule.families:
+                if (first := seen.get((family, rule.priority))) is not None:
+                    raise field_error(
+                        f"two {family.value} firewall rules share priority {rule.priority} "
+                        f"(this one and entry {first}); the chain is walked in priority "
+                        f"order, so which of them decides is not something the document says",
+                        rule="NG-B008",
+                        path=("firewall", "rules", index, "priority"),
+                    )
+                seen[(family, rule.priority)] = index
+            for key in ("iif", "oif"):
+                port: str | None = getattr(rule, key)
+                if port is not None and port not in names:
+                    raise field_error(
+                        f"firewall rule {rule.priority} selects on {key} {port!r}, which the "
+                        f"device does not have; it has {_name_list(names)}",
+                        rule="NG-B009",
+                        path=("firewall", "rules", index, key),
+                    )
+
+        for index, entry in enumerate(self.firewall.nat):
+            self._check_rule_zones(entry, resolvable, path=("firewall", "nat", index))
+        return self
+
+    def _check_rule_zones(
+        self,
+        rule: FirewallRule | NatRule,
+        resolvable: set[str],
+        *,
+        path: tuple[str | int, ...],
+    ) -> None:
+        """``NG-B004``: both zone fields of one rule name a zone that exists."""
+        for key in ("src_zone", "dst_zone"):
+            name: str | None = getattr(rule, key)
+            if name is not None and name not in resolvable:
+                raise field_error(
+                    f"{rule.describe()} names zone {name!r}, which {_zone_list(resolvable)}",
+                    rule="NG-B004",
+                    path=(*path, key),
+                )
+
+    @model_validator(mode="after")
     def _check_vlan_database(self) -> DeviceSpec:
         """``NG-V001``: ``vlans[].id`` is unique within a device."""
         seen: set[int] = set()
@@ -388,11 +511,11 @@ class DeviceSpec(NetgraphModel):
         return tuple(route for route in self.routes if route.table_name == table)
 
     def policy_for(self, table: str) -> tuple[PolicyRule, ...]:
-        """Every policy rule that looks ``table`` up, in declaration order (§16.6)."""
+        """Every policy rule that looks ``table`` up, in declaration order (§16.4)."""
         return tuple(rule for rule in self.routing_policy if rule.table == table)
 
     def policy_in(self, family: AddressFamily) -> tuple[PolicyRule, ...]:
-        """The policy database of one family, in the order it is walked (§16.6).
+        """The policy database of one family, in the order it is walked (§16.4).
 
         Sorted by priority rather than by declaration, because that *is* the
         database: two rules in the document are a set, and the order they are
@@ -405,6 +528,66 @@ class DeviceSpec(NetgraphModel):
                 key=lambda rule: rule.priority,
             )
         )
+
+    def zone(self, name: str) -> Zone | None:
+        """Look a declared security zone up by name (§24.1).
+
+        Declared only: :data:`~netgraph.models.firewall.LOCAL_ZONE` is a zone
+        every rule may name and no document declares, so it answers ``None``
+        here. Callers that mean "is this a zone at all" want :meth:`has_zone`.
+        """
+        return next((zone for zone in self.zones if zone.name == name), None)
+
+    def has_zone(self, name: str) -> bool:
+        """Is ``name`` a zone a rule of this device may name — declared or local?"""
+        return name == LOCAL_ZONE or self.zone(name) is not None
+
+    def zone_of(self, interface: str) -> Zone | None:
+        """The zone ``interface`` is in, or ``None`` if it is in none (§24.1).
+
+        At most one can match: ``NG-B003`` is what makes that true, and it is
+        also what makes this answer meaningful — an interface in two zones would
+        leave every rule naming either of them ambiguous.
+        """
+        return next((zone for zone in self.zones if interface in zone.interfaces), None)
+
+    def unzoned_interfaces(self) -> tuple[Interface, ...]:
+        """Every interface that could be in a zone and is not, in order (``W151``).
+
+        Not an error: an interface carrying no transit traffic — a console port,
+        a namespace-internal veth end — belongs in no zone, and a device that
+        declares no zone at all has all of them here.
+
+        Two kinds of interface are left out, because for them "in no zone" is
+        not an omission but the truth:
+
+        * a **loopback**, which carries no transit traffic by construction.
+          Traffic to it terminates on the machine, and the zone for that is
+          :data:`~netgraph.models.firewall.LOCAL_ZONE`, which nothing is put in;
+        * a **member of an aggregate**, which is governed by the LAG or bridge
+          above it exactly as §10.6 has it everywhere else. Putting ``bond0`` in
+          a zone puts its lanes there; demanding each lane separately would be
+          asking for the one statement the aggregate exists to avoid repeating.
+        """
+        aggregated = {
+            member for interface in self.interfaces for member in (interface.members or ())
+        }
+        return tuple(
+            interface
+            for interface in self.interfaces
+            if interface.type is not InterfaceType.LOOPBACK
+            and interface.name not in aggregated
+            and self.zone_of(interface.name) is None
+        )
+
+    def firewall_marks(self) -> tuple[str, ...]:
+        """Every mark the filter policy writes, once each (§24.3, ``W152``)."""
+        return () if self.firewall is None else self.firewall.marks()
+
+    def policy_marks(self) -> tuple[str, ...]:
+        """Every mark the routing policy database reads, once each (``W153``)."""
+        read = [rule.fwmark for rule in self.routing_policy if rule.fwmark is not None]
+        return tuple(dict.fromkeys(read))
 
     def netns_entry(self, name: str) -> NetnsDefinition | None:
         """Look a network namespace up by name (§23.1).
@@ -483,6 +666,18 @@ def _table_list(resolvable: Iterable[str]) -> str:
     ``main`` was available without being declared.
     """
     return "is no table of this device; it routes by " + ", ".join(
+        repr(name) for name in sorted(resolvable)
+    )
+
+
+def _zone_list(resolvable: Iterable[str]) -> str:
+    """``is no zone of this device; it has …`` — the tail of ``NG-B004``.
+
+    :data:`~netgraph.models.firewall.LOCAL_ZONE` is named alongside the declared
+    ones because it is an equally valid answer: somebody who wrote
+    ``dst_zone: lokal`` needs to see that ``local`` was available undeclared.
+    """
+    return "is no zone of this device; it has " + ", ".join(
         repr(name) for name in sorted(resolvable)
     )
 
@@ -653,7 +848,7 @@ class Device(ElementBase):
                     )
 
         if not self.layer3_aware:
-            for key in ("forwarding", "vrfs", "routes", "routing"):
+            for key in ("forwarding", "vrfs", "routes", "routing", "zones", "firewall"):
                 if getattr(self.spec, key):
                     raise field_error(
                         f"a {self.kind} has no IP stack and must not declare {key!r}",
@@ -749,6 +944,27 @@ class Router(Device):
     default_glyph: ClassVar[str] = "router"
 
 
+class Firewall(Device):
+    """A layer-3 forwarder that filters. Forwards by default (§6.1.1).
+
+    Structurally a router, and deliberately so: the ``spec`` is the same one,
+    because the difference between a firewall and a router is a policy either of
+    them may carry rather than a shape only one of them has. ``spec.zones`` and
+    ``spec.firewall`` are available on every layer-3 kind (§24), so a router with
+    three rules on it is describable — which it has to be, since that is what
+    most networks actually run.
+
+    What the kind buys is the picture and the vocabulary. An operator who bought
+    a box whose whole job is filtering writes ``kind: firewall`` and gets a brick
+    wall on the diagram rather than a router's diamond, and every reader of the
+    inventory learns at a glance which boxes the policy is expected to be on.
+    """
+
+    kind: Literal["firewall"] = "firewall"
+    forwarding_default: ClassVar[bool] = True
+    default_glyph: ClassVar[str] = "firewall"
+
+
 class Hub(Device):
     """A layer-1 repeater: no MAC table, no VLANs, no IP stack (§6.5)."""
 
@@ -777,4 +993,4 @@ class Server(Device):
 
 #: The kinds whose ``spec`` is a :class:`DeviceSpec`, and therefore the kinds a
 #: ``template`` can be merged into (§6.6). In the order §3 lists them.
-DEVICE_KINDS: tuple[str, ...] = ("switch", "router", "hub", "computer", "server")
+DEVICE_KINDS: tuple[str, ...] = ("switch", "router", "firewall", "hub", "computer", "server")

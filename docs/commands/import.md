@@ -221,7 +221,7 @@ $ netgraph import drawio site.drawio         # apply it
 <!-- generated: options import captures -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|wireguard\|interfaces]` | `auto` | Input dialect. 'auto' sniffs each input on its own, so one run may mix all nine: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, frr, wireguard and interfaces are a device's running configuration in the same dialects 'netgraph export' writes. |
+| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect. 'auto' sniffs each input on its own, so one run may mix all ten: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, frr, nftables, wireguard and interfaces are a device's running configuration in the same dialects 'netgraph export' writes. |
 | `--host` | `NAME` | — | Device every input was captured on. An lldp or iproute capture never names its own host. Without this the name comes from the file name, or from a 'NAME=path' argument. |
 | `-o`, `--output` | `DIRECTORY` | current directory | Inventory root to write the devices/ and cables/ tree into. |
 | `--dry-run` | — | off | Print the tree to stdout and write nothing. |
@@ -235,7 +235,7 @@ $ netgraph import drawio site.drawio         # apply it
 <!-- generated: options import drawio -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns]` | the view the file says it was exported from | Which view the diagram draws. Read from the file for anything netgraph exported; needed only for a diagram netgraph did not write. |
+| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | the view the file says it was exported from | Which view the diagram draws. Read from the file for anything netgraph exported; needed only for a diagram netgraph did not write. |
 | `--geometry`, `--no-geometry` | — | `--geometry` | Carry cells that were dragged back as stored geometry. |
 | `--renames`, `--no-renames` | — | `--renames` | Carry a retyped label back as a rename, rewriting every reference to it. |
 | `--deletions`, `--no-deletions` | — | `--deletions` | Carry a deleted cell back as a deleted element. Never applied to a diagram that was exported from a filtered view, whichever way this is set. |

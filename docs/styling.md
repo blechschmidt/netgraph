@@ -83,7 +83,7 @@ What a style cannot reach, whatever it says:
 * **[`netgraph path`](paths.md).** No colour moves a hop, adds one, or changes
   which route is shortest.
 * **generated device configuration.** Nothing
-  [`netgraph export`](export.md#device-configuration-the-six-dialects) writes
+  [`netgraph export`](export.md#device-configuration-the-seven-dialects) writes
   for a device — netplan, networkd, ifupdown, FRR, WireGuard — knows that a fill
   exists.
 * **a build.** The two things that can go wrong *semantically* with a style are
