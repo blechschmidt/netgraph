@@ -30,6 +30,14 @@
 *.yaml text eol=lf
 *.yml  text eol=lf
 
+# The one file whose whole point is *not* being LF. It is a seed for the loader
+# fuzzer (tests/test_fuzz_loader.py), and the case it seeds is "this document
+# arrives with CRLF line endings" -- which the rule above would translate away,
+# leaving a fixture called crlf.yaml that holds no CRLF. `-text` is what stops
+# Git touching it in either direction, so the bytes in the checkout are the bytes
+# in the commit.
+tests/fuzz-corpus/crlf.yaml -text
+
 # Renderer, trace and export goldens: compared byte for byte by tests/test_golden.py,
 # tests/test_path.py and tests/test_export.py, and regenerated with
 # `pytest --regen-golden`. A CRLF checkout would make the regenerated file
