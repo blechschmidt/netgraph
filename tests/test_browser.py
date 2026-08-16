@@ -19,7 +19,10 @@ would see:
 * a read-only session offers no control that would write, and refuses one that
   is asked for anyway;
 * an edit made outside the session reaches the open page, and a save that would
-  have clobbered it is refused instead.
+  have clobbered it is refused instead;
+* the badge, the Save button and the disk never disagree — see *What the badge
+  says*, which is a section rather than a test because every case in it was a
+  bug, and none of them was findable anywhere but here.
 
 Two properties hold for every test here, and they are the cheap half of the
 value:
@@ -2167,6 +2170,373 @@ def test_a_stale_save_is_refused_rather_than_clobbering(open_editor: OpenEditor)
     expect(page.locator("#toast")).to_contain_text("save again to overwrite it")
     expect(page.locator("#editor-state")).to_have_text("changed on disk since you opened it")
     assert editor.read(relative) == elsewhere, "the other editor's work is still there"
+
+
+# --------------------------------------------------------------------------- #
+# What the badge says
+# --------------------------------------------------------------------------- #
+#
+# One line of text in the corner of the editor pane carries the whole of what
+# this page knows about the gap between the text on screen and the bytes on
+# disk. Everything above tests what a *gesture* writes; this section tests what
+# the page then says about itself, because a badge that is wrong is worse than
+# no badge: it is a page telling somebody their work is safe when it is not, or
+# that it is unsaved when it has been saved.
+#
+# Every one of these was a bug when it was written. They are grouped because
+# they are one invariant several ways:
+#
+#     the badge, the Save button and the "in use" claim always agree
+#     with each other, and all three agree with the disk.
+
+
+def _set_a_field(editor: Editor, address: str, path: str, value: str) -> None:
+    """Right-click ``address`` and set one field on it, through ``/api/ops``.
+
+    A resource change made from the diagram rather than from the text pane: the
+    gesture that goes to the file behind whatever the pane happens to be showing.
+    """
+    open_menu_on(editor, address)
+    menu_row(editor, "element.set").click()
+    prompt = editor.page.locator(".prompt")
+    expect(prompt).to_be_visible()
+    # By index rather than by name: the prompt labels its controls for a screen
+    # reader and numbers them for itself; see keys.js.
+    prompt.locator("#prompt-field-0").fill(address)
+    prompt.locator("#prompt-field-1").fill(path)
+    prompt.locator("#prompt-field-2").fill(value)
+    prompt.locator('button[type="submit"]').click()
+
+
+def _delete_element(editor: Editor, address: str) -> None:
+    open_menu_on(editor, address)
+    menu_row(editor, "element.delete").click()
+    prompt = editor.page.locator(".prompt")
+    expect(prompt).to_be_visible()
+    prompt.locator("#prompt-field-0").fill(address)
+    prompt.locator('button[type="submit"]').click()
+
+
+def _open(editor: Editor, relative: str) -> None:
+    editor.page.locator(f'#file-list .file[data-path="{relative}"]').click()
+    expect(editor.page.locator("#editor-title")).to_have_text(relative)
+
+
+#: A spare switch nothing else in the home lab refers to, so that deleting it is
+#: a delete rather than a refusal — see the cascade test below for the other half.
+SPARE_SWITCH: Final = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-spare
+spec:
+  interfaces:
+    - name: GigabitEthernet0/1
+      type: ethernet
+"""
+
+
+def test_a_save_that_writes_no_bytes_still_clears_the_badge(open_editor: OpenEditor) -> None:
+    """Type something, put it back, save: "saved" and "unsaved changes" at once.
+
+    The server writes nothing when the bytes it is handed are the bytes already
+    there, so the changeset it answers with names no file — and the page, which
+    read its new state out of that list, found nothing to adopt and left the
+    badge up and Save enabled over a file it had just agreed with. The badge is
+    about the pane, not about whether the filesystem was touched.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+    relative = "switches/sw-home.yaml"
+    original = editor.read(relative)
+    _open(editor, relative)
+
+    page.locator("#source").fill(original + "\n# thought better of it\n")
+    expect(page.locator("#editor-state")).to_have_text("unsaved changes")
+    page.locator("#source").fill(original)
+    expect(page.locator("#save")).to_be_enabled()
+
+    page.keyboard.press("Control+s")
+
+    expect(page.locator("#toast")).to_contain_text(f"saved {relative}")
+    expect(page.locator("#editor-state")).to_be_hidden()
+    expect(page.locator("#save")).to_be_disabled()
+    # And the row in the file list agrees with the corner of the pane.
+    expect(page.locator(f'#file-list .file[data-path="{relative}"] .badge')).to_have_count(0)
+    assert editor.read(relative) == original
+
+
+def test_saving_again_after_a_conflict_overwrites_as_it_promised(
+    open_editor: OpenEditor,
+) -> None:
+    """The offer a conflict makes — *save again to overwrite it* — has to be real.
+
+    It was not. A conflicted save stopped quoting a precondition, meaning to say
+    "write this over whatever is there" — but an absent hash is how the write
+    route spells *create*, so the second Ctrl-S came back "already exists; open
+    it before writing to it" and the sentence the page had just printed was a
+    lie. The page now adopts the hash the refusal reported and quotes that, so
+    the retry is a write over the version it was told about, and a file that
+    moves a *third* time is refused again rather than clobbered blindly.
+    """
+    editor = open_editor(writable=True, watch=False)
+    page = editor.page
+    relative = "hosts/srv-nas.yaml"
+    original = editor.read(relative)
+    editor.console.allow("409")
+    _open(editor, relative)
+    expect(page.locator("#source")).to_have_value(original)
+
+    mine = original + "\n# typed in the browser\n"
+    page.locator("#source").fill(mine)
+    editor.write(relative, original + "\n# written by another editor\n")
+
+    page.keyboard.press("Control+s")
+    expect(page.locator("#toast")).to_contain_text("save again to overwrite it")
+    expect(page.locator("#editor-state")).to_have_text("changed on disk since you opened it")
+
+    page.keyboard.press("Control+s")
+
+    expect(page.locator("#toast")).to_contain_text(f"saved {relative}")
+    expect(page.locator("#editor-state")).to_be_hidden()
+    expect(page.locator("#save")).to_be_disabled()
+    assert editor.read(relative) == mine, "the overwrite the page offered has to happen"
+
+    # And the hash it adopted is a real one: the ordinary save still works after.
+    page.locator("#source").fill(mine + "\n# and once more\n")
+    page.keyboard.press("Control+s")
+    expect(page.locator("#editor-state")).to_be_hidden()
+    assert editor.read(relative).endswith("# and once more\n")
+
+
+def test_a_conflict_resolved_by_agreeing_with_the_disk_clears(open_editor: OpenEditor) -> None:
+    """The awkward corner of the two cases above: a conflicted save writing nothing.
+
+    You type your way to exactly what the other editor had, so the write the
+    page asks for changes no bytes and the changeset names no file. Everything
+    that is stuck-badge-shaped meets here: a conflict, a retry, and a save with
+    nothing to write. The badge still has to come off — the pane and the file
+    *are* the same — and the hash the page ends up holding has to be the one the
+    save quoted, or the save after it conflicts against a version nobody has.
+
+    The first Ctrl-S is refused on purpose. The page noticed the other editor
+    but did *not* adopt its hash: a page that adopted it would let the next
+    Ctrl-S clobber the other editor's work without ever refusing anything, and
+    the refusal is the only thing that makes somebody read the badge.
+    """
+    editor = open_editor(writable=True, watch=True)
+    page = editor.page
+    relative = "hosts/srv-nas.yaml"
+    original = editor.read(relative)
+    editor.console.allow("409")
+    _open(editor, relative)
+    expect(page.locator("#source")).to_have_value(original)
+
+    page.locator("#source").fill(original + "\n# typed in the browser\n")
+    expect(page.locator("#editor-state")).to_have_text("unsaved changes")
+    elsewhere = original + "\n# written by another editor\n"
+    editor.write(relative, elsewhere)
+    expect(page.locator("#editor-state")).to_have_text("changed on disk since you opened it")
+
+    # Agree with the other editor, character for character, and save twice: the
+    # refusal, and then the write that turns out to have nothing to write.
+    page.locator("#source").fill(elsewhere)
+    page.keyboard.press("Control+s")
+    expect(page.locator("#toast")).to_contain_text("save again to overwrite it")
+    page.keyboard.press("Control+s")
+
+    expect(page.locator("#toast")).to_contain_text(f"saved {relative}")
+    expect(page.locator("#editor-state")).to_be_hidden()
+    expect(page.locator("#save")).to_be_disabled()
+    assert editor.read(relative) == elsewhere
+
+    # And the hash it kept is a real one: the next save works first time.
+    page.locator("#source").fill(elsewhere + "\n# and once more\n")
+    page.keyboard.press("Control+s")
+    expect(page.locator("#toast")).to_contain_text(f"saved {relative}")
+    expect(page.locator("#editor-state")).to_be_hidden()
+    assert editor.read(relative).endswith("# and once more\n")
+
+
+def test_a_change_from_the_diagram_does_not_discard_unsaved_typing(
+    open_editor: OpenEditor,
+) -> None:
+    """A canvas gesture is applied to the *file*, and the pane may not be it.
+
+    ``netgraph edit set`` runs against the tree on disk, so a page with unsaved
+    text in the same file has two different documents in hand. Adopting the
+    file — which is what the page used to do — threw the typing away without
+    anybody being asked. This is the one thing session.js does not do to unsaved
+    text, and it now says so in the same words it uses when ``$EDITOR`` is the
+    one that moved underneath.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+    relative = "switches/sw-home.yaml"
+    _open(editor, relative)
+
+    page.locator("#source").fill(editor.read(relative) + "\n# typed in the browser\n")
+    expect(page.locator("#editor-state")).to_have_text("unsaved changes")
+
+    _set_a_field(editor, "switches/sw-home", "spec.model", "C9200")
+
+    assert editor.settles(lambda: "C9200" in editor.read(relative), timeout=TIMEOUT_MS / 1000), (
+        "the change never reached the file"
+    )
+    expect(page.locator("#editor-state")).to_have_class(re.compile(r"\bconflict\b"))
+    expect(page.locator("#toast")).to_contain_text("still has unsaved edits here")
+    # The typing is still on screen, which is the whole point.
+    expect(page.locator("#source")).to_have_value(re.compile(r"typed in the browser", re.S))
+
+
+def test_a_change_to_another_file_leaves_this_ones_typing_alone(
+    open_editor: OpenEditor,
+) -> None:
+    """The control case for the one above: don't over-correct.
+
+    A gesture that writes a file the pane is not showing is none of the pane's
+    business. The badge stays exactly what it was — unsaved, not conflicted —
+    and no toast claims otherwise.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+    _open(editor, "switches/sw-home.yaml")
+    page.locator("#source").fill(editor.read("switches/sw-home.yaml") + "\n# typed here\n")
+    expect(page.locator("#editor-state")).to_have_text("unsaved changes")
+
+    _set_a_field(editor, "hosts/srv-nas", "spec.model", "TS-873A")
+
+    assert editor.settles(
+        lambda: "TS-873A" in editor.read("hosts/srv-nas.yaml"), timeout=TIMEOUT_MS / 1000
+    )
+    expect(page.locator("#editor-state")).to_have_text("unsaved changes")
+    expect(page.locator("#source")).to_have_value(re.compile(r"typed here", re.S))
+
+
+def test_deleting_the_open_files_element_closes_the_pane(open_editor: OpenEditor) -> None:
+    """The editor must not go on offering a file the person just deleted.
+
+    The pane used to keep the text, keep the title and grow a "deleted on disk"
+    badge — the page blaming the filesystem for something it had just done
+    itself, over a document that could be saved back into existence by one
+    Ctrl-S. There is nothing unsaved here, so there is nothing to keep.
+    """
+    editor = open_editor(writable=True, extra={"spare.yaml": SPARE_SWITCH})
+    page = editor.page
+    _open(editor, "spare.yaml")
+
+    _delete_element(editor, "sw-spare")
+
+    assert editor.settles(
+        lambda: not (editor.root / "spare.yaml").exists(), timeout=TIMEOUT_MS / 1000
+    ), "the delete never removed the file"
+    expect(page.locator("#editor-title")).to_have_text("no file open")
+    expect(page.locator("#source")).to_have_value("")
+    expect(page.locator("#editor-state")).to_be_hidden()
+    expect(page.locator("#save")).to_be_disabled()
+    expect(page.locator('#file-list .file[data-path="spare.yaml"]')).to_have_count(0)
+    expect(page.locator("#viewport")).not_to_contain_text("sw-spare")
+
+
+def test_deleting_a_file_with_unsaved_typing_keeps_the_only_copy(
+    open_editor: OpenEditor,
+) -> None:
+    """The other half of the rule above: unsaved text is never thrown away.
+
+    Once the document is gone, the text in the pane may be the only copy of it
+    left anywhere. So it stays on screen and is badged for what it is, rather
+    than being closed along with the file.
+    """
+    editor = open_editor(writable=True, extra={"spare.yaml": SPARE_SWITCH})
+    page = editor.page
+    _open(editor, "spare.yaml")
+    page.locator("#source").fill(SPARE_SWITCH + "\n# worth keeping\n")
+    expect(page.locator("#editor-state")).to_have_text("unsaved changes")
+
+    _delete_element(editor, "sw-spare")
+
+    assert editor.settles(
+        lambda: not (editor.root / "spare.yaml").exists(), timeout=TIMEOUT_MS / 1000
+    )
+    expect(page.locator("#editor-state")).to_have_text("deleted; this text is the only copy")
+    expect(page.locator("#source")).to_have_value(re.compile(r"worth keeping", re.S))
+
+
+def test_a_delete_the_inventory_refuses_says_what_refers_to_it(
+    open_editor: OpenEditor,
+) -> None:
+    """A refusal has to name the thing doing the refusing, on screen.
+
+    ``pc-desk`` is cabled to the switch, so deleting it alone would leave a
+    cable pointing at nothing and the edit layer refuses. What matters here is
+    that the page says which element is in the way rather than failing quietly:
+    the refusal is the only thing standing between a diagram gesture and a
+    broken inventory.
+    """
+    editor = open_editor(writable=True)
+    editor.console.allow("400")
+
+    _delete_element(editor, "hosts/pc-desk")
+
+    expect(editor.page.locator("#toast")).to_contain_text("cables/cbl-sw-desk")
+    expect(editor.page.locator("#toast")).to_contain_text("cascade")
+    assert (editor.root / "hosts" / "pc-desk.yaml").exists(), "nothing was written"
+    expect(editor.page.locator("#viewport")).to_contain_text("pc-desk")
+
+
+def test_a_create_the_inventory_refuses_writes_nothing_and_says_why(
+    open_editor: OpenEditor,
+) -> None:
+    """The same contract on the way in: a refused create is a visible refusal."""
+    editor = open_editor(writable=True)
+    editor.console.allow("422")
+    before = sorted(path.name for path in editor.root.rglob("*.yaml"))
+
+    editor.page.locator("#canvas").focus()
+    editor.press("n")
+    prompt = editor.page.locator(".prompt")
+    expect(prompt).to_be_visible()
+    prompt.locator("select").first.select_option("switch")
+    prompt.locator("input").first.fill("sw-home")
+    prompt.locator('button[type="submit"]').click()
+
+    expect(editor.page.locator("#toast")).to_contain_text("nothing has been written")
+    assert sorted(path.name for path in editor.root.rglob("*.yaml")) == before
+
+
+def test_a_change_from_the_diagram_reaches_the_pane_the_tree_and_the_picture(
+    open_editor: OpenEditor,
+) -> None:
+    """One gesture, four views of the inventory, and they all have to move.
+
+    The 1:1 mapping the editor exists for: a rename made on the canvas is the
+    same rename in the YAML, in the file list's document rows, and in the
+    drawing. A page where any one of them lags is a page showing two different
+    inventories at once.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+    relative = "switches/sw-home.yaml"
+    _open(editor, relative)
+
+    open_menu_on(editor, "switches/sw-home")
+    menu_row(editor, "element.rename").click()
+    prompt = page.locator(".prompt")
+    expect(prompt).to_be_visible()
+    prompt.locator("#prompt-field-0").fill("switches/sw-home")
+    prompt.locator("#prompt-field-1").fill("sw-hallway")
+    prompt.locator('button[type="submit"]').click()
+
+    assert editor.settles(
+        lambda: "sw-hallway" in editor.read(relative), timeout=TIMEOUT_MS / 1000
+    ), "the rename never reached the file"
+    expect(page.locator("#source")).to_have_value(re.compile(r"name: sw-hallway", re.S))
+    expect(page.locator("#editor-state")).to_be_hidden()
+    expect(page.locator("#file-list")).to_contain_text("sw-hallway")
+    expect(page.locator("#viewport")).to_contain_text("sw-hallway")
+    # And the cables that named it were rewritten with it, or the diagram would
+    # be drawing an element nothing connects to.
+    assert "sw-hallway" in editor.read("cables/links.yaml")
 
 
 # --------------------------------------------------------------------------- #

@@ -928,6 +928,37 @@ publish a version whose section is missing or empty — see
 
 ### Fixed
 
+- **The editor said "saved" and "unsaved changes" at the same time.** Typing into a file
+  and then putting the text back the way it was left the badge up, the Save button enabled
+  and the file listed as `unsaved` in everybody else's browser — for ever, because nothing
+  short of opening another file cleared it. The page read its new state out of the list of
+  files the write had touched, and a write whose bytes were already there touches none. The
+  badge is about the gap between the pane and the file, not about whether the filesystem
+  moved, and it now says so.
+
+  Three more of the same shape, found by the tests written to reproduce that one:
+
+  * **A change made on the diagram silently threw away unsaved typing in the pane.** A
+    canvas gesture is applied to the file, so a page holding unsaved text in that file has
+    two documents in hand — and it used to adopt the file and drop the text without asking.
+    The change still goes to the file; the pane is now marked `conflict` and keeps your
+    text, which is exactly what it already did when `$EDITOR` was the one that moved
+    underneath.
+  * **Deleting an element left its file on screen, badged `deleted on disk`.** The editor
+    blaming the filesystem for something it had just done itself, over a document one
+    Ctrl-S would have put straight back. The pane now closes — unless it holds unsaved
+    text, in which case that text is the only copy left and it stays, badged for what it is.
+  * **"save again to overwrite it" could not be taken up.** A file changed on disk under
+    unsaved edits is a `conflict`, and the toast that says so offers the way out. Saving
+    again stopped quoting a precondition — meaning "over whatever is there" — but an absent
+    hash is how the write route spells *create*, so the second Ctrl-S came back `already
+    exists; open it before writing to it` and the offer was a lie. The page now adopts the
+    hash the refusal reported and quotes *that*, so the retry writes over the version it was
+    told about and a file that moves a third time in between is refused again.
+
+  Also: a `file-changed` event that overtook the response to the write that caused it could
+  badge a plain Ctrl-S as somebody else's conflict. The page now ignores the echo of its own
+  writes, as it already did for `tree-changed`.
 - **Nothing could be drawn on Python 3.11: importing `netgraph.render` raised `ValueError`.**
   Two fields of the style resolver defaulted to a `mappingproxy`, which `dataclasses`
   refuses before 3.12 and refuses at *import* time — so on the 3.11 the package claims to

@@ -246,6 +246,12 @@ var netgraphSession = (function () {
      * what to do with the *open* file, which the file list cannot answer: the
      * text on screen may be the only copy of something. */
     "file-changed": function (data) {
+      // Our own write, echoed back. The response to it says more than this
+      // event can -- whether the bytes written were the pane's text or a
+      // gesture applied behind it -- and `applied` decides on that. Acting here
+      // as well is a race the page can lose: an event that overtakes its own
+      // response used to badge a plain Ctrl-S as somebody else's conflict.
+      if (data.client && data.client === me.id) { return; }
       if (!open.path || data.path !== open.path) { return; }
       if (data.hash === null) { mark("gone", "deleted on disk"); return; }
       if (data.hash === open.hash) { return; }
@@ -657,6 +663,40 @@ var netgraphSession = (function () {
       .catch(function (error) { host.toast(String(error.message || error), "error"); });
   }
 
+  /** Put the pane back the way `attach` left it: nothing open, nothing to save.
+   *
+   * For the file that has stopped existing. The alternative -- leaving the text
+   * of a document nobody declares any more on screen under its old title -- is
+   * an editor offering to save something back into a file the person deleted on
+   * purpose, which is how a cascade delete comes undone one file at a time. */
+  function closeFile() {
+    var wasDirty = open.dirty;
+    open = { path: null, hash: null, dirty: false, conflicted: false };
+    el.source.value = "";
+    el.source.readOnly = true;
+    el.editorTitle.textContent = "no file open";
+    el.editorHint.textContent = "choose a document on the left";
+    mark(null, "");
+    paintTree();
+    if (wasDirty) { announce(false); }   // that file is no longer "in use" by us
+  }
+
+  /** The pane and the file are the same bytes again.
+   *
+   * Everything that says "there is something here that is not on disk" comes
+   * off together: the badge, the enabled Save, the claim on the file everybody
+   * else's list shows. One function because those four had drifted apart --
+   * a save that wrote no bytes used to clear none of them.
+   */
+  function synced(hash) {
+    open.hash = hash;
+    open.dirty = false;
+    open.conflicted = false;
+    mark(null, "");
+    paintTree();
+    announce(false);
+  }
+
   /** app.js calls this on every keystroke in the textarea. */
   function markDirty() {
     if (!open.path || open.dirty) { return; }
@@ -671,10 +711,15 @@ var netgraphSession = (function () {
 
   function save(force) {
     if (!open.path || !state.writable) { return; }
-    var body = { text: el.source.value, force: !!force, client: me.id };
-    // A conflicted file is being saved deliberately over somebody else's work,
-    // so it goes without the precondition -- but only after the user was told.
-    if (!open.conflicted) { body.hash = open.hash; }
+    var path = open.path;
+    // Always with the precondition, including the deliberate write over
+    // somebody else's work: by then `refused` has adopted the hash the file
+    // really has, so quoting it says "over *that* version" rather than "over
+    // whatever happens to be there when this arrives". A file that moved a
+    // third time between the refusal and the retry is refused again, which is
+    // the whole point of having a precondition at all.
+    var body = { text: el.source.value, force: !!force, client: me.id, hash: open.hash };
+    var quoted = body.hash;   // what we believe the file is, or null to create
     el.save.disabled = true;
     fetch("/api/file/" + encodePath(open.path), {
       method: "PUT",
@@ -683,7 +728,19 @@ var netgraphSession = (function () {
       body: JSON.stringify(body)
     })
       .then(readBody)
-      .then(function (result) { applied(result, "saved " + open.path); })
+      .then(function (result) {
+        // Saving bytes that were already there writes no file, so the changeset
+        // names none and `applied` finds nothing to adopt -- but the pane is in
+        // sync with the disk all the same, which is the only thing the badge is
+        // about. Without this the page said "saved" and "unsaved changes" at
+        // once, and left Save enabled over a file it had just agreed with.
+        //
+        // `quoted` is what makes it safe to say so without going to look: the
+        // server checked the file against that hash before deciding it had
+        // nothing to write, so that is what the file hashes to now.
+        if (open.path === path && !result.files[path] && quoted) { synced(quoted); }
+        applied(result, "saved " + path);
+      })
       .catch(function (error) { refused(error, force); })
       .then(paintHistory);
   }
@@ -711,21 +768,40 @@ var netgraphSession = (function () {
    * `rewrote` says the text on screen is not what was just written -- true of an
    * undo, which puts back a file the pane is showing the *new* version of, and
    * false of a save, where the pane is already the file. Without it an undo left
-   * the editor showing text that was nowhere on disk, under a clean badge. */
+   * the editor showing text that was nowhere on disk, under a clean badge.
+   *
+   * The three things that can have happened to the open file are three
+   * different answers, and conflating them is what made the badge lie:
+   * the change removed it, the change rewrote it out from under typing nobody
+   * has saved, or the change rewrote it and there was nothing to lose. */
   function applied(result, what, rewrote) {
     state.revision = result.revision;
     state.undo = result.undo;
     state.redo = result.redo;
-    var mine = result.files[open.path];
-    if (mine && mine.state === "written") {
-      open.hash = mine.hash;
-      open.dirty = false;
-      open.conflicted = false;
-      mark(null, "");
-      announce(false);   // this file is no longer "in use" by us
+    var mine = open.path ? result.files[open.path] : null;
+    /* Said *after* the "it worked" toast below, because one replaces the other
+     * and the caveat is the half somebody has to read. */
+    var caveat = null;
+    if (mine && mine.state === "deleted") {
+      // Unsaved text may be the only copy of it left anywhere, so it stays on
+      // screen and is badged for what it is. Text that was only ever the file's
+      // has nothing left to be about, and the pane closes.
+      if (open.dirty) { mark("gone", "deleted; this text is the only copy"); }
+      else { closeFile(); }
+    } else if (mine && mine.state === "written" && rewrote && open.dirty) {
+      // The gesture was applied to the file, not to the text in the pane, and
+      // the text in the pane was never saved. Adopting the file here would
+      // throw that typing away without anybody being asked -- the one thing
+      // this module does not do to unsaved text; see `file-changed`.
+      open.conflicted = true;
+      mark("conflict", "your unsaved text, over a file this change rewrote");
+      caveat = open.path + " was rewritten by that change and still has unsaved edits here";
+    } else if (mine && mine.state === "written") {
+      synced(mine.hash);
       if (rewrote) { openFile(open.path); }
     }
     host.toast(what, "ok");
+    if (caveat) { host.toast(caveat, "error"); }
     // Only the files the change touched, and no diagnostics: the response
     // already carries this revision's, and recomputing them would mean
     // validating the whole tree a second time for the same answer.
@@ -749,6 +825,15 @@ var netgraphSession = (function () {
     var body = error.body || {};
     if (body.conflict) {
       open.conflicted = true;
+      // Adopt the hash the server says the file *really* has, so that the save
+      // this message invites is a write over that version. Without it the retry
+      // quoted nothing, the server read "quoting nothing" as "I am creating
+      // this file", and refused it a second time with "already exists" -- the
+      // offer in the sentence below could not be taken up. `null` here is a
+      // file that has been deleted underneath, where a create is exactly right.
+      // A revision conflict from /api/ops names no path, and is not about this
+      // file; only the one that names the open file re-aims its precondition.
+      if (open.path && body.conflict.path === open.path) { open.hash = body.conflict.hash; }
       mark("conflict", "changed on disk since you opened it");
       paintTree();
       host.toast(body.message + " — save again to overwrite it", "error");

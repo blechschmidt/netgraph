@@ -60,6 +60,25 @@ unsaved edits in it is `conflict`, and netgraph will not resolve that for you: i
 says so and leaves both versions alone until you decide. A file that was deleted
 underneath you says `deleted on disk`.
 
+Three consequences of that, because they are the ones people meet:
+
+* **Saving text that is already on disk still clears the badge.** Nothing is
+  written — the bytes are the bytes — but the badge is about the gap between the
+  pane and the file, and there is none.
+* **A gesture on the diagram is applied to the file, not to the pane.** If you
+  have unsaved edits in the file it rewrites, the change goes to the file and the
+  pane becomes a `conflict` holding your text. It is the same rule as an edit made
+  in `$EDITOR`: unsaved text is never thrown away to make a picture tidy.
+* **Deleting an element closes its file** if the pane was showing it and had
+  nothing unsaved in it — an editor still offering to save a document you just
+  deleted is one Ctrl-S away from putting it back. With unsaved text in it the
+  pane stays, badged `deleted`, because that text is now the only copy.
+
+A `conflict` is resolved by saving again, which is what the message offers: the
+second save is a write over the version you were told about, not over whatever
+happens to be there when it lands. If the file moves a *third* time in between,
+it is refused again — the precondition is never dropped, only re-aimed.
+
 ### The guided tour
 
 The first time you open a session, the page offers a sixty-second tour. Take it
