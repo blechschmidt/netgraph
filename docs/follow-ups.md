@@ -2486,6 +2486,49 @@ rule is evidence, not a declaration, and an inventory that stopped reporting
 duplicate addresses the moment somebody wrote a NAT rule would have made the
 finding depend on an unrelated field.
 
+## 26. An interface that can never terminate a cable, and only a veth end can say so
+
+The third thing `examples/docker` could not write down, raised while adding
+`srv-dock-03`: a macvlan slave, an ipvlan slave and a slirp4netns tap.
+
+`I002` says an enabled interface terminates no cable, and it is an *info*
+because the two readings are equally likely — a spare port, or a cable document
+nobody wrote. It exempts one kind of interface, and the reason is in the code:
+
+> A veth end is `ethernet` and can never be cabled (`E049`), so the finding
+> would be true of every one of them and actionable on none: the "spare port"
+> reading does not apply to an interface that has no socket in the first place.
+
+Exactly that argument applies to the other three. A macvlan or ipvlan slave is
+created *on a parent* — `ip link add link eno1.22 type macvlan` — and moved into
+a namespace; a tap is created by a userspace process holding the other side as a
+file descriptor. None of them is a port, none of them will ever have a wire in
+it, and `enabled: false` would be a lie about a link that is up.
+
+The exemption cannot be widened to "any interface in a namespace". A physical
+NIC moved into a container with `ip link set eth1 netns blue` is still a port
+with a socket, and "you moved a NIC into a container and never wrote the cable"
+is a finding worth keeping. What distinguishes the three is what created them,
+and the schema has no word for that: `type` is one of seven values and none of
+them is `macvlan`, `ipvlan` or `tap`, while `peer` is the only field that says
+"this interface was made as half of something else".
+
+So the example annotates the device with `netgraph/ignore: NG-C015` and a
+comment naming all four interfaces, and `tests.yaml` names them a second time in
+the query that asserts every other interface in a namespace is one end of a
+veth pair. Two lists of the same four names, kept in step by hand, is the cost.
+
+The fix is a type — `macvlan` and `ipvlan` joining the enum, with `parent`
+required on both (they are stacked interfaces, exactly as a `vlan` is, and
+`_PARENT_TYPES` already exists for that) and `is_cableable` false. A `tap` is a
+third, with no parent at all. Each then falls out of `I002`, out of `E012`, and
+into `--layer netns` as its own edge to the parent it is a slave of — which is
+the line the diagram is missing today, because a macvlan container currently
+hangs off its machine by a nesting edge and nothing else, and the interface it
+is really attached to is drawn nowhere. It interacts with nothing in entry 24's
+list, since no reference to these interfaces resolves by anything but the name
+they already have.
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

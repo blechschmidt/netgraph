@@ -425,6 +425,11 @@ has somewhere to arrive.
 $ netgraph -i examples/containers render --layer netns -o containers.svg
 ```
 
+[`examples/docker`](../examples/docker/) is the same view at the scale a
+container runtime produces it — sixteen stacks over three machines, nested three
+deep — and the one to open if you want to see what the layer is for rather than
+what it means.
+
 ### `security`: the zones and what may cross
 
 `security` is the one layer whose edges are **decisions** rather than paths

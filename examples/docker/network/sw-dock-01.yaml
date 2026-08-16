@@ -3,9 +3,11 @@ kind: switch
 metadata:
   name: sw-dock-01
   description: >-
-    The lab switch both container hosts hang off. Four ports, two VLANs: the
-    hosts' primary uplinks in one, their second uplinks in the other, which is
-    what makes the policy-based routing on srv-dock-01 mean something.
+    The lab switch all three container hosts hang off. Five ports, three VLANs:
+    the first two hosts' primary uplinks in one, their second uplinks in the
+    other - which is what makes the policy-based routing on srv-dock-01 mean
+    something - and a trunk to the build host carrying the segment its macvlan
+    containers sit on directly.
 spec:
   vendor: MikroTik
   model: CRS310-1G-5S-4S+
@@ -34,6 +36,17 @@ spec:
       vlan:
         mode: access
         access_vlan: 21
+    - name: ether5
+      type: ethernet
+      description: >-
+        srv-dock-03's only uplink, and the one trunk on this switch. VLAN 20 is
+        the host's own; VLAN 22 is tagged because the containers behind its
+        macvlan parent are on the LAN themselves, so the port has to carry a
+        segment the machine holds no address in.
+      vlan:
+        mode: trunk
+        trunk_vlans: [20, 22]
+        native_vlan: 20
   vlans:
     - id: 20
       name: lab
@@ -43,3 +56,9 @@ spec:
       description: >-
         The second path out. Nothing is bridged between it and VLAN 20: a host
         reaches it only by routing, which is the point of the table that does.
+    - id: 22
+      name: lan-direct
+      description: >-
+        The segment macvlan and ipvlan containers are addressed on. Every device
+        in it is a container; the host whose port carries it holds no address
+        here at all, which is what those two drivers do to a diagram.

@@ -1,6 +1,6 @@
 # Example inventories
 
-Six complete, self-consistent inventories. All of them load without a single
+Seven complete, self-consistent inventories. All of them load without a single
 schema error and validate clean against every rule in `docs/schema.md` §10 — no
 suppressions, no `netgraph.toml` exemptions. They double as the golden fixtures
 exercised by `tests/test_examples.py`, so a change that silently breaks them
@@ -13,6 +13,7 @@ fails the test suite.
 | [`campus/`](campus/) | 22 devices, 22 cables, 1 template, 8 annotations | Nested namespaces across three sites, layer-3 core routers in a backbone ring, VLAN trunks between access and distribution switches, fibre uplinks, one OSPF area with an iBGP mesh over it, a management VRF, one access switch declared from a `kind: template` document instead of by hand, and the [notes, areas and legends](campus/README.md#what-is-said-about-the-diagram) of §21. |
 | [`overlay/`](overlay/) | 7 devices, 6 cables, 5 tunnels | WireGuard, IPsec, OpenVPN, VXLAN and GRE over one WAN — including VXLAN and GRE nested inside the IPsec tunnel, and a three-ended mesh. |
 | [`containers/`](containers/) | 3 devices, 2 cables, 5 network namespaces | What is *inside* a machine (§23): two container hosts running five network namespaces — one of them nested inside another — joined by four veth pairs, one set bridged and one set routed. Draw it with `--layer netns`. |
+| [`docker/`](docker/) | 4 devices, 5 cables, 1 tunnel, 16 network namespaces | The same thing at the scale a container runtime produces it (§23 and §24 together): three Docker hosts, thirteen veth pairs, the default bridge and two user-defined networks, a swarm overlay whose bridge lives in a sandbox namespace, Docker-in-Docker, a pod of two containers sharing one stack, macvlan and ipvlan networks that use no veth pair at all, rootless daemons nested three levels deep, and the firewall zones that decide what crosses. |
 | [`patch-room/`](patch-room/) | 4 devices, 2 patch panels, 7 cables | Two racks and a structured-cabling plant: every server link crosses two patch panels, and every element records where it is bolted. Draw it with `--layer physical` for the cabling record, `--layer l1` for the spliced topology, and `--layer rack` for the elevations. |
 
 <!-- run: -->
@@ -28,7 +29,7 @@ $ netgraph -i examples/campus render -o campus.svg
 
 ## Reading them
 
-All six trees follow the layout suggested in `docs/schema.md` §2.5: directories
+All seven trees follow the layout suggested in `docs/schema.md` §2.5: directories
 group elements by role, and the directory a document sits in becomes its
 namespace. `examples/campus/sites/north/access/switches.yaml` declaring
 `name: sw-north-acc-01` is therefore registered as

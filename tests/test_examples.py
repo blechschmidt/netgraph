@@ -39,6 +39,7 @@ EXAMPLE_SHAPES: dict[str, dict[str, int]] = {
     "campus": {"devices": 22, "cables": 22, "adapters": 0, "tunnels": 0},
     "overlay": {"devices": 7, "cables": 6, "adapters": 0, "tunnels": 5},
     "containers": {"devices": 3, "cables": 2, "adapters": 0, "tunnels": 0},
+    "docker": {"devices": 4, "cables": 5, "adapters": 0, "tunnels": 1},
     "patch-room": {
         "devices": 8,
         "cables": 14,
@@ -65,6 +66,29 @@ def load_example(name: str) -> Inventory:
 # --------------------------------------------------------------------------- #
 # The example inventories
 # --------------------------------------------------------------------------- #
+
+
+def test_every_example_inventory_is_gated() -> None:
+    """An example nobody added to :data:`EXAMPLE_SHAPES` is an ungated example.
+
+    Every promise this module makes — loads clean, validates with no findings,
+    reaches a rendered SVG — is made about the *keys of that table* and about
+    nothing else, so a new directory under ``examples/`` is documentation the
+    suite says nothing about until it is listed here. That is how
+    ``examples/docker`` shipped: written, formatted, published on the demo site,
+    and never once validated by a test. ``tests/test_site.py`` guards the same
+    gap for the demo index; this is the other half.
+    """
+    listed = set(EXAMPLE_SHAPES)
+    present = {
+        path.name
+        for path in sorted(EXAMPLES.iterdir())
+        if path.is_dir() and not path.name.startswith((".", "_"))
+    }
+    assert listed == present, (
+        "examples/ and EXAMPLE_SHAPES disagree; "
+        f"ungated: {sorted(present - listed)}, missing: {sorted(listed - present)}"
+    )
 
 
 @pytest.mark.parametrize("name", sorted(EXAMPLE_SHAPES))

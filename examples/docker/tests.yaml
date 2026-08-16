@@ -9,7 +9,7 @@ metadata:
     are about a stack rather than about a machine - which is the whole reason
     §23 exists.
 spec:
-  description: what the two Docker hosts promise about their containers
+  description: what the three Docker hosts promise about their containers
   assertions:
     - assert: query
       name: every declared namespace holds at least one interface
@@ -20,11 +20,22 @@ spec:
       query: netns[not has interface]
 
     - assert: query
-      name: no namespace is deeper than the Docker-in-Docker container
+      name: no namespace is deeper than a build inside a rootless container
       description: |
-        Depth 1 is a container, depth 2 is a container of the inner daemon.
-        Anything below that is a level nobody in this design meant to create.
-      query: netns[depth > 2]
+        Depth 1 is a container, depth 2 is a container of a second daemon, and
+        depth 3 is the network namespace buildkit's CNI worker makes for one
+        build. Anything below that is a level nobody in this design meant to
+        create.
+      query: netns[depth > 3]
+
+    - assert: query
+      name: the build sandbox is still three levels below the machine
+      description: |
+        The other direction, and the one a refactor breaks silently: flatten
+        rl-alice-build onto its grandparent and every rule above still passes
+        while the picture stops showing that nesting has no limit.
+      query: netns[depth = 3]
+      equals: 1
 
     - assert: query
       name: every overlay interface carries the VXLAN's reduced MTU
@@ -35,13 +46,30 @@ spec:
       query: interface[address in 10.0.9.0/24 and mtu != 1450]
 
     - assert: query
-      name: every container interface is one end of a veth pair
+      name: every container interface is one end of a veth pair, or one of the four that cannot be
       description: |
         A namespace is entered by a veth pair or it is not entered at all - the
         bridges and the VXLAN device in a sandbox being the exceptions, which is
         why the query excludes them by type rather than by name.
+
+        The four names are the exceptions the schema cannot state as a type: two
+        macvlan/ipvlan slaves, which are created on a parent rather than as a
+        pair, and two slirp4netns taps, whose other end is a file descriptor in
+        a userspace process. Naming them here is the price of follow-up 26, and
+        it is also the point - a fifth uncabled, unpaired interface inside a
+        namespace is a document nobody finished.
       query: >-
-        interface[has netns and not has peer and not type in (bridge, tunnel)]
+        interface[has netns and not has peer and not type in (bridge, tunnel)
+        and not name in (mv-eth0, ipv-eth0, alice-tap0, bob-tap0)]
+
+    - assert: query
+      name: the host holds no address on the segment its own containers are on
+      description: |
+        VLAN 22 belongs to the macvlan and ipvlan containers. If an address in
+        it ever appears outside a namespace, somebody has given the parent
+        interface an address - which makes the host a member of a network it is
+        only supposed to carry, and quietly changes which stack answers there.
+      query: interface[address in 10.20.2.0/24 and not has netns]
 
     - assert: query
       name: both swarm nodes run a sandbox for the overlay
@@ -58,8 +86,13 @@ spec:
         Every bridge holding an RFC 1918 gateway is behind a translation, except
         the internal one - which reaches nothing at all, and is named here so
         that removing its isolation fails this test rather than passing it.
+
+        'lan-direct' is deliberately outside the list. A macvlan container's
+        address is on the LAN already, so there is nothing to translate, and a
+        masquerade appearing on that zone would mean somebody had misunderstood
+        the driver rather than tightened the firewall.
       query: >-
-        zone[name in (net-default, net-app, net-edge)] and not zone[translations > 0]
+        zone[name in (net-default, net-app, net-edge, net-pod)] and not zone[translations > 0]
 
     - assert: unique
       name: no two hosts claim the same uplink address
@@ -78,10 +111,21 @@ spec:
       to: srv-dock-02
       layer: l2
 
+    - assert: reachable
+      name: the build host is on the lab LAN over its trunk's native VLAN
+      description: |
+        srv-dock-03 hangs off the only trunk on the switch, and VLAN 20 is
+        untagged on it. Retagging that port - so that the machine's own address
+        moves into a tagged VLAN and eno1 stops being in the segment - is a
+        one-line change that leaves every other assertion here passing.
+      from: srv-dock-03
+      to: srv-dock-01
+      layer: l2
+
     - assert: count
-      name: two hosts, one switch
+      name: three hosts, one switch
       select: kind=server
-      equals: 2
+      equals: 3
 
     - assert: port-count-at-least
       name: the busy host declares a port per stack and then some

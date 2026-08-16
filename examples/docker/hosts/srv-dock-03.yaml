@@ -1,0 +1,328 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-dock-03
+  description: >-
+    The build host, and the one whose containers the firewall below mostly
+    cannot see: two networks that use no veth pair at all, a pod of two
+    containers sharing one stack, and two rootless daemons whose whole network
+    lives inside namespaces this machine has no interface into - one of them
+    three levels deep.
+  annotations:
+    # mv-eth0, ipv-eth0 and the two taps are enabled, terminate no cable, and
+    # never will: a macvlan slave is created on a parent and a tap is created by
+    # a userspace process, so neither has a socket to patch anything into. That
+    # is the same thing E049 says about a veth end, and I002 exempts veth ends
+    # for exactly this reason - but the schema has no type that says "macvlan
+    # slave" or "tap", so nothing here distinguishes them from a spare port.
+    # See follow-up 26 in docs/follow-ups.md.
+    netgraph/ignore: NG-C015
+spec:
+  vendor: Supermicro
+  model: SYS-5019C-MR
+  # Only the 'pod' network is forwarded by this machine. Everything else here
+  # either leaves by the parent interface without being routed (macvlan,
+  # ipvlan) or is translated inside a namespace by a userspace process
+  # (rootless), which is why the firewall at the bottom is three rules long on a
+  # host running eight containers.
+  forwarding:
+    ipv4: true
+    ipv6: false
+
+  netns:
+    - name: c-pod
+      description: >-
+        Two containers, one stack. `docker run --network container:app` starts
+        the sidecar in the namespace the app already has, so both see one eth0,
+        one address and one routing table, and reach each other over loopback.
+        It is what a Kubernetes pod is, written in the one place the difference
+        shows: a pod is a namespace, not a machine.
+    - name: c-mv
+      description: >-
+        A container on the macvlan network 'lan-direct'. Its interface is a
+        macvlan slave of eno1.22 with a MAC address of its own, so the switch
+        sees a second machine on VLAN 22 and no packet of this container's is
+        ever forwarded, filtered or translated by the host.
+    - name: c-ipv
+      description: >-
+        A container on the ipvlan L2 network over the same parent. The same
+        picture one layer up: one MAC for the parent and everything behind it,
+        the addresses telling them apart - which is what a switch port with
+        port-security or a wireless uplink leaves you.
+    - name: rl-alice
+      description: >-
+        The namespace a rootless dockerd runs in, created by rootlesskit before
+        the daemon starts. Nothing in this host's stack points at it: slirp4netns
+        holds one end of a tap device inside and a file descriptor outside, so
+        there is no veth pair, no bridge port and no interface for a rule in the
+        firewall below to name.
+    - name: rl-alice-app
+      parent: rl-alice
+      description: A container of that daemon, on the docker0 inside the namespace above.
+    - name: rl-alice-build
+      parent: rl-alice-app
+      description: >-
+        buildkitd's CNI worker gives every build a network namespace of its own,
+        created from inside the container that runs the daemon. Three levels
+        below the machine, and nothing stops a fourth.
+    - name: rl-bob
+      description: >-
+        A second user's rootless daemon, started and idle. Every rootless
+        namespace on every machine gets the same slirp4netns addressing, so this
+        one carries the same tap address as alice's - two stacks, one address,
+        no clash, which is the same thing dind-docker0 says over on srv-dock-01.
+
+  interfaces:
+    # ----------------------------------------------------------------- #
+    # The initial namespace: the machine's own stack, and the smallest of
+    # the three on this host.
+    # ----------------------------------------------------------------- #
+    - name: eno1
+      type: ethernet
+      description: >-
+        The only uplink, and a trunk rather than an access port: VLAN 20 for the
+        machine itself, VLAN 22 for the containers that are on the LAN directly.
+      mtu: 1500
+      ipv4:
+        addresses:
+          - ip: 10.20.0.23
+            prefix_length: 24
+        gateway: 10.20.0.1
+      vlan:
+        mode: trunk
+        trunk_vlans: [20, 22]
+        native_vlan: 20
+    - name: eno1.22
+      type: vlan
+      description: >-
+        `docker network create -d macvlan -o parent=eno1.22`. The parent of a
+        macvlan or an ipvlan network carries no address of its own, because
+        nothing on this machine is on that network - the containers behind it
+        are, and the host is not one of them.
+      vlan:
+        mode: access
+        access_vlan: 22
+      parent: eno1
+    - name: br-pod
+      type: bridge
+      description: Network 'pod', an ordinary user-defined bridge and the only one on this host.
+      ipv4:
+        addresses:
+          - ip: 172.30.0.1
+            prefix_length: 24
+      members: [veth-pod]
+    - name: veth-pod
+      type: ethernet
+      description: >-
+        Host end of the single pair into c-pod. Two containers run in there and
+        there is still one pair, because a namespace is entered once however
+        many processes are in it.
+      peer: pod-eth0
+
+    # ----------------------------------------------------------------- #
+    # The pod: one stack, two containers.
+    # ----------------------------------------------------------------- #
+    - name: pod-eth0
+      type: ethernet
+      description: >-
+        eth0 in c-pod. The app binds 127.0.0.1:8080 and the sidecar connects to
+        it; nothing in this document can draw that, and nothing needs to - the
+        two are in one stack, so the traffic never becomes a packet on a link.
+      ipv4:
+        addresses:
+          - ip: 172.30.0.2
+            prefix_length: 24
+        gateway: 172.30.0.1
+      netns: c-pod
+      peer: veth-pod
+
+    # ----------------------------------------------------------------- #
+    # The two drivers that enter a namespace without a veth pair. Both of
+    # these interfaces are moved into the container as slaves of eno1.22
+    # rather than created as one end of a pair, which is why neither names
+    # a peer and why the addresses are the lab's rather than a private
+    # pool's. netgraph has no type that says 'macvlan slave'; see
+    # follow-up 26.
+    # ----------------------------------------------------------------- #
+    - name: mv-eth0
+      type: ethernet
+      description: >-
+        eth0 in c-mv, on VLAN 22 with a MAC of its own. Its default gateway is
+        the lab router, not this host - and it cannot reach this host at all,
+        because a macvlan slave and its own parent are the one pair the driver
+        refuses to switch between.
+      ipv4:
+        addresses:
+          - ip: 10.20.2.31
+            prefix_length: 24
+        gateway: 10.20.2.1
+      netns: c-mv
+    - name: ipv-eth0
+      type: ethernet
+      description: >-
+        eth0 in c-ipv, sharing eno1.22's MAC address. The same prefix and the
+        same gateway as its macvlan neighbour: both are on the LAN, and the
+        driver is a choice about layer 2 rather than about addressing.
+      ipv4:
+        addresses:
+          - ip: 10.20.2.32
+            prefix_length: 24
+        gateway: 10.20.2.1
+      netns: c-ipv
+
+    # ----------------------------------------------------------------- #
+    # Rootless Docker: a daemon a user starts, in a namespace the user
+    # created. Everything from here down is invisible to the host's
+    # firewall and to `ip link` in the initial namespace.
+    # ----------------------------------------------------------------- #
+    - name: alice-tap0
+      type: ethernet
+      description: >-
+        The slirp4netns tap. Its 10.0.2.0/24 is the same address slirp gives
+        every namespace it is asked about, and the gateway it points at is a
+        userspace process rather than an interface - so 10.0.2.2 appears nowhere
+        in this inventory and cannot.
+      ipv4:
+        addresses:
+          - ip: 10.0.2.100
+            prefix_length: 24
+        gateway: 10.0.2.2
+      netns: rl-alice
+    - name: alice-docker0
+      type: bridge
+      description: >-
+        The rootless daemon's default bridge. A real one picks 172.17.0.1/16 out
+        of the same pool the rootful daemon on srv-dock-01 uses; this one is
+        given a pool of its own, for the reason in follow-up 25.
+      ipv4:
+        addresses:
+          - ip: 172.29.0.1
+            prefix_length: 24
+      members: [alice-veth-app]
+      netns: rl-alice
+    - name: alice-veth-app
+      type: ethernet
+      description: >-
+        The daemon's own host end of the pair into its container - a veth pair
+        with neither end in the machine's initial namespace, which is what a
+        namespace nested inside another one is for.
+      netns: rl-alice
+      peer: app-eth0
+
+    - name: app-eth0
+      type: ethernet
+      description: eth0 in the rootless container, two levels below the machine.
+      ipv4:
+        addresses:
+          - ip: 172.29.0.2
+            prefix_length: 24
+        gateway: 172.29.0.1
+      netns: rl-alice-app
+      peer: alice-veth-app
+    - name: app-cni0
+      type: bridge
+      description: >-
+        buildkitd's CNI bridge, created inside the container by the daemon the
+        container runs. Its pool comes out of a CNI config file nobody looked at
+        and is unique in this inventory by luck rather than by design, which is
+        the point follow-up 25 makes.
+      ipv4:
+        addresses:
+          - ip: 10.17.0.1
+            prefix_length: 16
+      members: [app-veth-bk]
+      netns: rl-alice-app
+    - name: app-veth-bk
+      type: ethernet
+      description: The container-side end of the pair into one build's sandbox.
+      netns: rl-alice-app
+      peer: build-eth0
+
+    - name: build-eth0
+      type: ethernet
+      description: >-
+        eth0 in the build sandbox. Three levels below the machine: its packets
+        are NATed by buildkit, NATed again by the rootless daemon, translated a
+        third time in userspace by slirp4netns, and arrive on the lab LAN as
+        10.20.0.23.
+      ipv4:
+        addresses:
+          - ip: 10.17.0.2
+            prefix_length: 16
+        gateway: 10.17.0.1
+      netns: rl-alice-build
+      peer: app-veth-bk
+
+    - name: bob-tap0
+      type: ethernet
+      description: >-
+        The second user's tap, carrying the address the first one carries. Two
+        namespaces are two address spaces, so this is not a duplicate and
+        netgraph does not report one.
+      ipv4:
+        addresses:
+          - ip: 10.0.2.100
+            prefix_length: 24
+        gateway: 10.0.2.2
+      netns: rl-bob
+
+  # ------------------------------------------------------------------- #
+  # Three zones and three rules, on a host running eight containers. That
+  # is not an omission: it is what the two drivers above and rootless mode
+  # do to a host firewall, and it is the reason they are worth drawing.
+  # ------------------------------------------------------------------- #
+  zones:
+    - name: wan
+      interfaces: [eno1]
+      description: The lab LAN, VLAN 20, and the machine's own way out.
+    - name: lan-direct
+      interfaces: [eno1.22]
+      description: >-
+        The macvlan and ipvlan parent. No rule below names it, and none can do
+        any good: a frame from a slave interface leaves by the parent without
+        passing through this stack's forward hook, so the policy that governs
+        c-mv and c-ipv is the lab router's and the switch's, not this host's.
+    - name: net-pod
+      interfaces: [br-pod]
+      description: Network 'pod' - the only container network on this host that the host routes.
+
+  firewall:
+    default_input: drop
+    default_forward: drop
+    default_output: accept
+    rules:
+      - priority: 10
+        ct_state: [established, related]
+        action: accept
+        description: The return path of everything below.
+      - priority: 20
+        src_zone: wan
+        dst_zone: local
+        protocol: tcp
+        dst_ports: ['22']
+        action: accept
+        description: >-
+          SSH to the host itself - and the way both rootless users reach the
+          machine their daemons run on, since neither daemon listens anywhere
+          this stack can see.
+      - priority: 100
+        src_zone: net-pod
+        dst_zone: wan
+        action: accept
+        description: The pod reaches the world. It is the only container network here that needs a rule.
+    nat:
+      - name: masq-pod
+        type: masquerade
+        dst_zone: wan
+        src: 172.30.0.0/24
+        description: >-
+          The one translation this host performs. 10.20.2.0/24 needs none - a
+          macvlan container's address is already on the LAN, which is the whole
+          reason to choose the driver - and 172.29.0.0/24 is translated by
+          slirp4netns inside alice's namespace, in userspace, where a nat table
+          on this machine cannot reach it.
+    description: |
+      Two of the three things this machine runs containers with are unfilterable
+      from here, and the document says so by having nothing to say about them.
+      A reader who expects a Docker host's ruleset to grow with its container
+      count gets the correction in the shortest possible form.

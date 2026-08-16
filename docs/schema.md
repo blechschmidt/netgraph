@@ -5482,7 +5482,11 @@ have to be trusted about:
 
 `I002` (*enabled interface terminates no cable*) exempts veth ends. Every one of
 them would otherwise be reported, and none of the reports would be actionable:
-the "spare port" reading does not apply to an interface that has no socket.
+the "spare port" reading does not apply to an interface that has no socket. A
+macvlan slave and a tap have no socket either and are *not* exempt, because
+nothing in the document distinguishes them from a port — see follow-up 26 in
+[`docs/follow-ups.md`](follow-ups.md), and `examples/docker/hosts/srv-dock-03.yaml`
+for what an inventory has to write instead.
 
 ### 23.3 The `netns` view
 
@@ -5490,6 +5494,10 @@ the "spare port" reading does not apply to an interface that has no socket.
 ```console
 $ netgraph -i examples/containers render --layer netns -o netns.svg
 ```
+
+`examples/docker` is the same view over a container runtime rather than a lab:
+three hosts, sixteen stacks, nesting three deep, and two networks that enter a
+namespace without a veth pair at all.
 
 The one view that draws *below* the machine. The element node stays and stands
 for the machine's initial namespace — it keeps its kind, its icon, its link to

@@ -158,9 +158,9 @@ DEMOS: Final[tuple[Demo, ...]] = (
     Demo(
         name="docker",
         summary=(
-            "A container runtime at the scale it really runs at: two Docker hosts, "
-            "seven namespaces on one of them, a swarm overlay between them and the "
-            "firewall zones that decide what crosses."
+            "A container runtime at the scale it really runs at: three Docker hosts, "
+            "sixteen namespaces nested up to three deep, a swarm overlay, two networks "
+            "that use no veth pair at all, and the firewall zones that decide what crosses."
         ),
         layers=("l1", "l3", "netns", "overlay", "security"),
     ),

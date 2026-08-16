@@ -37,3 +37,17 @@ spec:
   medium: copper
   speed: 1Gbps
   category: cat6
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: sw-dock-01-to-srv-dock-03-eno1
+  description: >-
+    One cable for a host running eight containers on two segments. Every
+    namespace on the far end of it is reached over this single wire, which is
+    the thing the netns view exists to show and no other layer can.
+spec:
+  endpoints: [sw-dock-01:ether5, srv-dock-03:eno1]
+  medium: copper
+  speed: 1Gbps
+  category: cat6

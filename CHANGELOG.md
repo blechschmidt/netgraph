@@ -1202,6 +1202,25 @@ publish a version whose section is missing or empty — see
 - **`[cache]` in `netgraph.toml`** — `enabled`, `dir` and `max-size`, for an inventory that
   needs to say where its cache goes on the machines it is used on.
 
+- **`examples/docker/`**, the seventh example inventory: §23 and §24 at the scale a
+  container runtime produces them, where `examples/containers/` is the same idea small
+  enough to hold in your head. Three Docker hosts on one switch, sixteen network namespaces,
+  thirteen veth pairs and one swarm overlay. `srv-dock-01` holds the networks
+  `docker network ls` prints — the default bridge, a user-defined bridge, an `--internal`
+  one, the overlay's sandbox namespace, and Docker-in-Docker with a container under it —
+  with `iptables -S` written as zones: the isolation chains, the per-network masquerade, the
+  hairpin rule, `-p 443:8443` as the two rules it really is, and a marked network routed out
+  of a second uplink. `srv-dock-02` is the other end of the overlay. `srv-dock-03` is the
+  three shapes that break the pattern: a pod of two containers sharing one stack, a macvlan
+  and an ipvlan network that enter a namespace with no veth pair and no NAT, and two rootless
+  daemons — one of them nested three levels deep, through a container to a build sandbox —
+  whose networks a host firewall cannot see or name. Its `tests.yaml` writes the design's
+  claims as thirteen `netgraph test` assertions. It validates clean, like the other six, and
+  is drawn with `--layer netns`, `--layer security` and `--layer overlay`. Follow-up 26
+  records the one thing it could not write down: there is no interface type that says
+  "macvlan slave" or "tap", so an interface that can never terminate a cable is
+  indistinguishable from a spare port unless it is a veth end.
+
 ### Fixed
 
 - **`netgraph edit rename` lost the arrangement of the element it renamed.** A rename
