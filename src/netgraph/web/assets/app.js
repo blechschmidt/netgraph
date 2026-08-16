@@ -76,6 +76,8 @@
     showIps: document.getElementById("show-ips"),
     showVlans: document.getElementById("show-vlans"),
     annotations: document.getElementById("show-annotations"),
+    showIcons: document.getElementById("show-icons"),
+    iconsField: document.getElementById("icons-field"),
     group: document.getElementById("group"),
     strict: document.getElementById("strict"),
     render: document.getElementById("render"),
@@ -197,10 +199,26 @@
    *  mouseup does not undo what the band selected. Cleared by that click. */
   var banded = false;
 
+  /** The icon theme the switch turns on, as /api/state named it, or "" while
+   *  nothing has been heard from the server. Never a path this page invented:
+   *  the only names it sends back are ones it was offered. */
+  var iconTheme = "";
+
   /* ------------------------------------------------------------ requests */
 
+  /** What "icons" is worth on the wire, or null when the page must not say.
+   *
+   *  A page that has not been told which themes the server offers says nothing
+   *  and gets whatever `--icons` chose, which is what a page whose /api/state
+   *  never arrived should do rather than guess a name.
+   */
+  function iconChoice() {
+    if (!iconTheme) { return null; }
+    return el.showIcons.checked ? iconTheme : "none";
+  }
+
   function options() {
-    return {
+    var request = {
       source: el.source.value,
       layer: el.layer.value,
       vlans: parseVlans(el.vlans.value),
@@ -212,6 +230,25 @@
       select: netgraphSearch.selector() || null,
       strict: el.strict.checked
     };
+    var icons = iconChoice();
+    if (icons !== null) { request.icons = icons; }
+    return request;
+  }
+
+  /** Say which icon themes the server offers, and start the switch where it
+   *  started the server. Called once, with what /api/state answered.
+   *
+   *  A server that offers none leaves the switch disabled rather than sending
+   *  it a theme name to guess with: the page's whole claim here is that it only
+   *  ever names a theme it was handed. */
+  function adoptIcons(state) {
+    var offer = state && state.icons;
+    if (!offer || !offer.theme || offer.theme === "none") { return; }
+    iconTheme = offer.theme;
+    el.showIcons.checked = !!offer.on;
+    el.showIcons.disabled = false;
+    el.iconsField.title = "Draw each device as its " + iconTheme
+      + " icon instead of a plain shape";
   }
 
   /** The same view options as a query string, for the session's GET. */
@@ -226,6 +263,11 @@
     ];
     var vlans = parseVlans(el.vlans.value);
     if (vlans.length) { parts.push("vlans=" + vlans.join(",")); }
+    // Part of *which drawing this is* -- a device drawn as its icon is a
+    // different picture from the same device drawn as a box -- so it belongs in
+    // the request, and in the cache key the request doubles as.
+    var icons = iconChoice();
+    if (icons !== null) { parts.push("icons=" + encodeURIComponent(icons)); }
     // Which containers the reader has folded is part of *which drawing this is*
     // -- a folded namespace is one node instead of twelve -- so it belongs in
     // the request, and in the cache key the request doubles as.
@@ -1003,7 +1045,7 @@
     if (mode === "session") { netgraphSession.markDirty(); } else { schedule(); }
   });
 
-  [el.layer, el.showIps, el.showVlans, el.annotations, el.group, el.strict]
+  [el.layer, el.showIps, el.showVlans, el.annotations, el.showIcons, el.group, el.strict]
     .forEach(function (control) { control.addEventListener("change", render); });
   el.vlans.addEventListener("input", schedule);
   el.render.addEventListener("click", render);
@@ -1305,6 +1347,13 @@
     K.define("view.annotations", {
       run: function () { toggle(el.annotations, "annotations"); }
     });
+    K.define("view.icons", {
+      run: function () { toggle(el.showIcons, "icons"); },
+      // Off the palette entirely when the server offers no theme, rather than
+      // present and doing nothing: a command that cannot work is worse than one
+      // that is not there.
+      enabled: function () { return iconTheme !== ""; }
+    });
     /* Folding one container rather than every namespace, which is what
      * `view.group` does. A view command and not an edit -- see containers.js --
      * so it lives here beside the other three and not in session.js. */
@@ -1586,6 +1635,9 @@
     return fetch("/api/state", { cache: "no-store" })
       .then(function (response) { return response.json(); })
       .then(function (state) {
+        // Before either face draws: which themes are on offer is the same
+        // answer in both, and the first render should already carry it.
+        adoptIcons(state);
         if (state.mode !== "session") { return bootStream().then(function () { return null; }); }
         mode = "session";
         netgraphSession.attach(bridge, state);

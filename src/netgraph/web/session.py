@@ -485,8 +485,13 @@ class EditingSession:
     #: Whether any write endpoint is enabled at all. Off unless the command line
     #: was given the opt-in flag on a loopback bind.
     writable: bool = False
-    #: Icon theme for the diagram, chosen on the command line because it names a
-    #: directory on this machine and a request must not be able to.
+    #: The icon theme this session starts with, from the command line — which is
+    #: where a *directory* is named, because a request must not be able to name
+    #: one. A caller that brings its own :class:`~netgraph.web.preview.
+    #: ViewOptions` has already decided (the browser may turn the theme off and
+    #: on again through :func:`~netgraph.web.preview.icon_choices`), so this is
+    #: the default for a call that passes no view at all rather than something
+    #: laid over one that does.
     icons: IconTheme | None = None
     #: ``netgraph.toml``; read from the root when not supplied, and re-read
     #: whenever the tree is reloaded so editing it takes effect like any edit.
@@ -789,9 +794,7 @@ class EditingSession:
         with self._lock:
             inventory = self.inventory()
             revision = self._revision
-        options = view or ViewOptions()
-        if options.icons is None and self.icons is not None:
-            options = replace(options, icons=self.icons)
+        options = view if view is not None else ViewOptions(icons=self.icons)
         settings = self.settings().with_overrides(strict=True if options.strict else None)
         return (
             render_inventory(
@@ -1574,9 +1577,7 @@ class EditingSession:
             origin = self._origin
         assert origin is not None  # ``inventory()`` above sets ``_origin``
         before = origin if against == SESSION_BASELINE else self._head()
-        options = view or ViewOptions()
-        if options.icons is None and self.icons is not None:
-            options = replace(options, icons=self.icons)
+        options = view if view is not None else ViewOptions(icons=self.icons)
         settings = self.settings().with_overrides(strict=True if options.strict else None)
         plan = diff_states(before, inventory)
         preview = render_diff(before, inventory, plan, options, settings=settings, known=known)
@@ -1885,9 +1886,7 @@ class EditingSession:
             commit = timeline.commit(rev)
         except HistoryError as exc:
             raise SessionError(str(exc)) from exc
-        options = view or ViewOptions()
-        if options.icons is None and self.icons is not None:
-            options = replace(options, icons=self.icons)
+        options = view if view is not None else ViewOptions(icons=self.icons)
 
         # Keyed before anything is read. The pair of tree hashes costs two
         # object lookups and decides the whole answer — the changeset as much as

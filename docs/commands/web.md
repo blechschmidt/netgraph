@@ -428,6 +428,7 @@ menu, untouched.
 | New note | Add a note to the diagram… — `Shift-N` | `--write` |
 | Paste here | Paste — `Ctrl-V` | `--write` |
 | Show another layer… | Switch layer… — *palette only* | — |
+| Toggle icons | Toggle icons — `Alt-K` | — |
 | Fit the diagram | Fit the diagram — `0` | — |
 | Undo | Undo — `Ctrl-Z` | `--write` |
 | Redo | Redo — `Ctrl-Shift-Z` | `--write` |
@@ -755,6 +756,7 @@ cable it, undo both — without dispatching a single mouse event.
 | `Alt-G` | Toggle namespace grouping | anywhere | — | Collapse each namespace into one box. |
 | `f` | Fold or unfold this namespace | the diagram | — | Draws a namespace box as the single node it stands for, or opens it again — the container the pointer picked, or the one holding the focused element. The same folding 'netgraph render --collapse' does. A view, not an edit: nothing is written, and how much of a diagram somebody wants to look at is not a fact about the network. |
 | `Alt-N` | Toggle annotations | anywhere | — | Whether the notes, areas and legends of §21 are drawn. They are commentary, never topology, so hiding them changes nothing the tool concludes — only how much of the picture is somebody's explanation. |
+| `Alt-K` | Toggle icons | anywhere | — | Whether each device is drawn as its icon or as a plain shape. The theme is the one 'netgraph web --icons' named, or the set that ships with netgraph; which of them exist is the command line's to say, because a theme is a directory, but whether this drawing uses one is a question about the picture. |
 | `Alt-S` | Toggle strict | anywhere | — | Report warnings as errors. |
 | *palette only* | Filter by VLAN… | anywhere | — | Keep only elements participating in the VLANs given. |
 | `Alt-F` | Failure mode | anywhere | a folder | Click an element and everything it would isolate from the gateways greys out; the status line names the count. Reads only — nothing is written, and Escape or the same key puts the diagram back. |
@@ -828,9 +830,33 @@ the ones [`netgraph validate`](validate.md) would list in that tree; a stream ha
 no folder of its own to look in and uses the built-in defaults plus the `strict`
 toggle in the header.
 
-`--icons` is chosen on the command line rather than in the browser for the same
-reason `--write` is: it may name a directory on this machine, and a page has no
-business reading one.
+### Icons
+
+The **icons** box in the header draws every device as its picture instead of as
+a plain shape, and unticking it puts the shapes back — no restart, no flag, and
+no reload. It is the question somebody asks *while* looking at a diagram, so it
+is answered where they are looking.
+
+The split is deliberate, and it is the same one `--write` makes. *Which* themes
+exist is the command line's to say, because a theme is a directory of images on
+this machine and a page has no business naming one: `--icons DIR` puts your own
+directory on the list, and `--icons cisco` — or nothing at all — leaves the set
+that ships with netgraph. *Whether this drawing uses one* is the browser's,
+because that is a fact about the picture and about nobody's filesystem. So the
+switch offers exactly what the server was started with, `/api/state` says what
+that is, and a request naming anything else is refused with the list it could
+have named.
+
+A directory theme is offered to the page as **`custom`**, not as its path: the
+switch has to be able to ask for it again after turning it off, and the name it
+uses to do that should say nothing about the filesystem the server is running
+on. Only this server maps `custom` back to the directory.
+
+`--icons` therefore sets where the switch *starts* rather than overriding it: a
+session started with `--icons cisco` opens with icons on and can still turn them
+off, and one started without can still turn them on. `?icons=cisco`,
+`?icons=custom` and `?icons=none` do the same thing in an address bar, like
+every other view toggle.
 
 ## The server
 
@@ -909,7 +935,7 @@ browser alone, which is what you want over SSH.
 | `--host` | `ADDRESS` | `127.0.0.1` | Address to bind. The default keeps the interface on this machine; an inventory describes internal topology, so publishing it is an explicit act. |
 | `--port` | `INTEGER, 0-65535` | `8081` | Port to bind. 0 lets the operating system choose one. |
 | `--open`, `--no-open` | — | `--open` | Open the interface in the default browser once it is listening. |
-| `--icons` | `THEME\|DIR` | — | Draw each element as an icon instead of a plain shape. Built in: cisco, none. Chosen here rather than in the browser, because it names a directory on this machine. |
+| `--icons` | `THEME\|DIR` | — | Draw each element as an icon instead of a plain shape, and start the toolbar's icon switch on. Built in: cisco, none. Which themes exist is named here rather than in the browser, because a theme is a directory on this machine; whether a drawing uses one is the switch's, and it can turn this theme off and back on. |
 | `--theme` | `NAME\|PATH` | — | Apply a stylesheet to the diagram (§22). The style inspector shows the resolved appearance and which layer each value came from. Built in: blueprint, mono, none. Chosen here rather than in the browser, because it names a file on this machine. |
 | `--write`, `--read-only` | — | --read-only | Let the browser change the inventory. Only for a SOURCE folder, only on a loopback bind, and never by default: an editor that can write is a decision. |
 | `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |

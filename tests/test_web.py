@@ -33,6 +33,7 @@ from netgraph.cli import cli
 from netgraph.errors import RenderError
 from netgraph.loader import load_stream
 from netgraph.render import Layer, build_graph, graph_to_dict
+from netgraph.render.icons import CISCO, icon_theme
 from netgraph.render.ids import element_ids
 from netgraph.watch import Status
 from netgraph.web import (
@@ -59,6 +60,7 @@ from netgraph.web.bindings import (
     markdown_table,
 )
 from netgraph.web.bindings import payload as bindings_payload
+from netgraph.web.preview import graph_digest, icon_choices
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -538,9 +540,58 @@ def test_a_request_that_asks_for_something_impossible_is_refused(
         ViewOptions.from_request(payload)
 
 
-def test_the_browser_cannot_choose_an_icon_directory() -> None:
-    view = ViewOptions.from_request({"icons": "/etc"})
-    assert view.icons is None
+@pytest.mark.parametrize("named", ["/etc", "../icons", "cisco/../../etc", "Cisco", 7])
+def test_the_browser_cannot_choose_an_icon_directory(named: object) -> None:
+    """The switch chooses between themes, and cannot invent one.
+
+    The browser may turn icons off and on because that is a question about the
+    picture; it may not say *where the pictures are*, because that is a
+    directory on the machine running the server. So every name goes through the
+    closed set, and one that is not in it is a refusal rather than a theme.
+    """
+    with pytest.raises(RequestError, match=r"unknown icon theme|must be a string"):
+        ViewOptions.from_request({"icons": named})
+
+
+def test_the_browser_may_turn_the_bundled_theme_on_and_off() -> None:
+    assert ViewOptions.from_request({"icons": "cisco"}).icons is CISCO
+    assert ViewOptions.from_request({"icons": "none"}, icons=CISCO).icons is None
+    # Silence is not "off": a request that says nothing about icons draws with
+    # whatever the command line chose.
+    assert ViewOptions.from_request({}, icons=CISCO).icons is CISCO
+
+
+def test_a_directory_theme_is_switchable_as_custom(tmp_path: Path) -> None:
+    """``--icons DIR`` stays switchable without the browser naming the directory.
+
+    The theme is offered as ``custom``, which is the whole trick: the page can
+    turn it back on after turning it off, and the only name it ever holds for it
+    is one that says nothing about this filesystem.
+    """
+    (tmp_path / "router.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    theme = icon_theme(str(tmp_path))
+    assert icon_choices(theme) == ("cisco", "custom", "none")
+    assert ViewOptions.from_query({"icons": ["custom"]}, icons=theme).icons is theme
+    assert ViewOptions.from_query({"icons": ["none"]}, icons=theme).icons is None
+    # Not even the name it has here: that name is a directory on this machine,
+    # and a page that never learns it cannot leak it.
+    for refused in (str(tmp_path), "/etc"):
+        with pytest.raises(RequestError, match="unknown icon theme"):
+            ViewOptions.from_query({"icons": [refused]}, icons=theme)
+
+
+def test_icons_are_part_of_which_drawing_this_is() -> None:
+    """Two views that differ only in their theme must not share a cache entry.
+
+    ``ViewOptions`` is a cache key — ``EditingSession.frame`` keys frames on one
+    — and the fingerprint a client holds is of the DOT. Both have to move when
+    the icons do, or switching them would answer "nothing changed".
+    """
+    plain, drawn = ViewOptions(), ViewOptions(icons=CISCO)
+    assert plain != drawn
+    assert len({plain, drawn}) == 2
+    graph = build_graph(load_stream(TWO_HOSTS))
+    assert graph_digest(graph, plain.render_options) != graph_digest(graph, drawn.render_options)
 
 
 # --------------------------------------------------------------------------- #

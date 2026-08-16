@@ -857,6 +857,58 @@ def test_the_api_draws_the_view_it_is_asked_for(served: str) -> None:
     assert body["revision"] >= 1
 
 
+def test_the_state_says_which_icon_themes_the_page_may_ask_for(served: str) -> None:
+    """The page has a switch, so the server has to say what it switches to.
+
+    ``on`` is where the switch starts — off here, because this server was given
+    no ``--icons`` — and ``theme`` is what checking it asks for. Both come from
+    the server rather than being assumed by the page, which is what keeps the
+    browser from ever naming a directory.
+    """
+    status, state = call(served, "/api/state")
+    assert status == 200
+    assert state["icons"] == {"themes": ["cisco", "none"], "theme": "cisco", "on": False}
+
+
+@requires_dot
+def test_the_browser_can_turn_icons_on_and_off(served: str) -> None:
+    """The whole of task 123, at the route the toolbar switch calls.
+
+    A device drawn as its icon is an ``<image>`` in the SVG; a device drawn as a
+    plain shape is not. The fingerprints have to differ too, or the client that
+    holds one picture would be told the other one is the same.
+    """
+    _, plain = call(served, "/api/graph?view=l1&icons=none")
+    _, drawn = call(served, "/api/graph?view=l1&icons=cisco")
+    assert "<image" not in plain["svg"]
+    assert drawn["svg"].count("<image") == 5
+    # Embedded, not fetched: the page has no route to an icon file, and the
+    # drawing must not depend on one.
+    assert "data:image/svg+xml;base64," in drawn["svg"]
+    assert plain["graphHash"] != drawn["graphHash"]
+
+    # And the picture the client already holds is still recognised as held.
+    _, again = call(served, f"/api/graph?view=l1&icons=cisco&known={drawn['graphHash']}")
+    assert again["unchanged"] is True
+
+
+def test_a_view_the_query_string_cannot_name_is_a_bad_request(served: str) -> None:
+    """Refused with the reason, rather than dropped.
+
+    Every one of these was a 500 and a closed connection until the ``GET`` side
+    caught ``RequestError`` like the ``POST`` side always did — so the page said
+    "failed" and threw away the sentence that explained why.
+    """
+    for query, reason in (
+        ("view=nonsense", "unknown layer"),
+        ("view=l1&vlans=99999", "not a VLAN id"),
+        ("view=l1&icons=%2Fetc", "unknown icon theme"),
+    ):
+        status, body = call(served, "/api/graph?" + query)
+        assert status == 400, query
+        assert reason in body["message"], query
+
+
 @requires_dot
 def test_the_graph_route_carries_the_annotations_and_the_query_turns_them_off(
     served: str, tree: Path

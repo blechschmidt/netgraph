@@ -50,6 +50,15 @@
   <label class="check"><input id="show-vlans" type="checkbox" checked> VLANs</label>
   <label class="check" title="Draw the notes, areas and legends this inventory declares">
     <input id="show-annotations" type="checkbox" checked> notes</label>
+  <!-- The theme itself is the command line's to name -- it is a directory on
+       the server -- but whether this drawing uses it is a question about the
+       picture, so it is asked here. Disabled rather than hidden until
+       /api/state names a theme: the page must not ask for one it was never
+       offered, and a control that comes and went would move the toolbar under
+       the pointer on every load. -->
+  <label id="icons-field" class="check"
+    title="Draw each device as its icon instead of a plain shape">
+    <input id="show-icons" type="checkbox" disabled> icons</label>
   <label class="check"><input id="group" type="checkbox"> group</label>
   <label class="check" title="Report warnings as errors"><input id="strict" type="checkbox"> strict</label>
   <button id="render" type="button">Render</button>

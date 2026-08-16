@@ -6255,9 +6255,11 @@ _STATUS_COLOUR: Final[dict[Status, str]] = {
     default=None,
     metavar="THEME|DIR",
     help=(
-        "Draw each element as an icon instead of a plain shape. "
-        f"Built in: {', '.join(theme_choices())}. Chosen here rather than in the browser, "
-        "because it names a directory on this machine."
+        "Draw each element as an icon instead of a plain shape, and start the toolbar's "
+        f"icon switch on. Built in: {', '.join(theme_choices())}. Which themes exist is "
+        "named here rather than in the browser, because a theme is a directory on this "
+        "machine; whether a drawing uses one is the switch's, and it can turn this theme "
+        "off and back on."
     ),
 )
 @click.option(

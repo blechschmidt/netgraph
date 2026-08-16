@@ -76,6 +76,7 @@ import yaml
 from netgraph.layout.geometry import Routing
 from netgraph.layout.routing import Anchor, route
 from netgraph.models import KINDS
+from netgraph.render.icons import icon_theme
 from netgraph.render.theme import load_theme
 from netgraph.web.server import WebServer
 from netgraph.web.session import EditingSession, TreeWatcher
@@ -434,7 +435,7 @@ class Editor:
 #: for when comparing what is on screen against the server's own answer. The
 #: layer is whichever ``<option>`` comes first in ``index.html``.
 PAGE_QUERY: Final = (
-    "view=physical&show_ips=1&show_vlans=1&annotations=1&group_by_namespace=0&strict=0"
+    "view=physical&show_ips=1&show_vlans=1&annotations=1&group_by_namespace=0&strict=0&icons=none"
 )
 
 #: A cable naming two devices nobody declared: two ``E001`` findings, in a file
@@ -556,6 +557,7 @@ def open_editor(
             beside: Editor | None = None,
             first_run: bool = False,
             theme: str | None = None,
+            icons: str | None = None,
         ) -> Editor:
             root = tmp_path / "inventory"
             if not root.exists():
@@ -582,6 +584,7 @@ def open_editor(
                         source=source or "",
                         session=session,
                         theme=load_theme(theme),
+                        icons=icon_theme(icons),
                         host="127.0.0.1",
                         port=0,
                     )
@@ -3732,6 +3735,106 @@ def test_the_scratchpad_offers_the_same_commands_and_refuses_the_write(
     # And the view commands, which need nothing, still work here.
     editor.press("]")
     expect(page.locator("#layer")).to_have_value("l1")
+
+
+# --------------------------------------------------------------------------- #
+# Icons
+# --------------------------------------------------------------------------- #
+
+
+def icon_count(editor: Editor) -> int:
+    """How many nodes on screen are drawn as a picture rather than a shape.
+
+    Counted as the ``<use>`` elements, not the ``<image>`` ones: each distinct
+    picture is stored once as a ``<symbol>`` and referred to at every site that
+    draws it (see ``netgraph.render.fragment.IconLibrary``), so the images say
+    how many *kinds* are drawn and these say how many *nodes* are.
+    """
+    return editor.page.locator("#viewport svg use").count()
+
+
+def test_icons_are_a_switch_on_the_toolbar(open_editor: OpenEditor) -> None:
+    """Task 123: the theme is the command line's, using it is the page's.
+
+    ``--icons`` was the only way to get a picture instead of a box, which meant
+    restarting the server to answer "what does this look like with icons on" —
+    the question somebody asks *while* looking at a diagram. So the toolbar has
+    the switch and the command line keeps the directory: the page names a theme
+    the server offered it and can name nothing else.
+    """
+    editor = open_editor()
+    page = editor.page
+
+    expect(page.locator("#icons-field")).to_be_visible()
+    switch = page.locator("#show-icons")
+    # Enabled only once /api/state has named a theme: the page asks for what it
+    # was offered, and for nothing it invented.
+    expect(switch).to_be_enabled()
+    expect(switch).not_to_be_checked()
+    assert icon_count(editor) == 0
+
+    switch.check()
+    expect(page.locator("#status")).to_have_text("ok")
+    assert editor.settles(lambda: icon_count(editor) == 8), (
+        f"every device in the tree is drawn as one; {icon_count(editor)} pictures on screen"
+    )
+
+    switch.uncheck()
+    expect(page.locator("#status")).to_have_text("ok")
+    assert editor.settles(lambda: icon_count(editor) == 0)
+
+
+def test_an_icon_is_still_a_node_you_can_point_at(open_editor: OpenEditor) -> None:
+    """The switch changes the picture and nothing else about the editor.
+
+    A node drawn as a picture is the same ``<g>`` with the same id, so hovering
+    it opens the same record and selecting it selects the same element. Worth
+    asserting rather than assuming: this is exactly the sort of change that
+    silently costs a diagram its interactivity.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+    page.locator("#show-icons").check()
+    expect(page.locator("#status")).to_have_text("ok")
+    assert editor.settles(lambda: icon_count(editor) > 0)
+
+    shape = editor.shape("switches/sw-home")
+    expect(shape.locator("use")).to_have_count(1)
+    shape.hover()
+    expect(page.locator("#info")).to_be_visible()
+    expect(page.locator("#info h2")).to_contain_text("sw-home")
+
+    shape.click()
+    assert editor.settles(lambda: selected(editor) == ["switches/sw-home"])
+
+
+def test_the_command_line_decides_where_the_switch_starts(open_editor: OpenEditor) -> None:
+    """``netgraph web --icons cisco`` opens with icons on, and can turn them off.
+
+    The flag is not overridden by the page, it is where the page starts — which
+    is what makes a bookmarked ``--icons`` setup still a setup, and the switch
+    still a switch.
+    """
+    editor = open_editor(icons="cisco")
+    page = editor.page
+
+    expect(page.locator("#show-icons")).to_be_checked()
+    assert editor.settles(lambda: icon_count(editor) > 0)
+
+    editor.press("Alt+k")
+    expect(page.locator("#show-icons")).not_to_be_checked()
+    assert editor.settles(lambda: icon_count(editor) == 0)
+
+
+def test_the_scratchpad_draws_icons_too(open_editor: OpenEditor) -> None:
+    """The two faces offer the same view controls; a paste is not a lesser page."""
+    editor = open_editor(source=TWO_HOSTS)
+    page = editor.page
+
+    expect(page.locator("#icons-field")).to_be_visible()
+    page.locator("#show-icons").check()
+    expect(page.locator("#status")).to_have_text("ok")
+    assert editor.settles(lambda: icon_count(editor) == 2)
 
 
 def test_the_scratchpad_has_the_context_menu_too(open_editor: OpenEditor) -> None:

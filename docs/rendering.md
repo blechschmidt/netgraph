@@ -733,6 +733,13 @@ Two details are worth knowing:
 `--icons` is ignored, with a warning, by `-f mermaid` and `-f json`: neither has
 a picture to put an icon in.
 
+**In the editor it is a switch, not a flag.**
+[`netgraph web`](commands/web.md#icons) has an **icons** box in its header:
+tick it and the diagram redraws as pictures, untick it and the shapes come back,
+without restarting the server. `--icons` still chooses *which* theme — a
+directory is named on the command line and never by a browser — and now also
+says where the switch starts.
+
 [`src/netgraph/render/iconsets/README.md`](../src/netgraph/render/iconsets/README.md)
 documents the bundled themes from the other side — the naming rule, why each
 kind is present twice, and how to regenerate a PNG after editing its SVG.

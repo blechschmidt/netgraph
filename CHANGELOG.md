@@ -18,6 +18,22 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **Icons are a switch in the editor, not a flag you restart for.** `netgraph web` could
+  draw devices as pictures only if `--icons` had been passed when the server started, which
+  made "what does this look like with icons on" a question you had to stop and restart to
+  answer — while looking at the diagram that prompted it. The header now has an **icons**
+  box, `Alt-K` toggles it, and it is on the canvas context menu beside the layer.
+
+  The split is the point. *Which* themes exist stays the command line's to say, because a
+  theme is a directory of images on the machine running the server: `--icons DIR` puts your
+  own on the list, and the bundled `cisco` set is always on it. *Whether a drawing uses one*
+  is now the browser's, because that is a fact about the picture and about nobody's
+  filesystem. `/api/state` says what is on offer, `?icons=cisco` and `?icons=none` are
+  view parameters like every other, and a request naming anything else — a path above all —
+  is refused with the list it could have named. `--icons` now sets where the switch
+  *starts*: a session opened with it can still turn icons off, and one opened without can
+  still turn them on.
+
 - **`netgraph report` documents network namespaces.** A device page is where an operator
   looks to answer "what is this machine", and since `spec.netns` landed it showed none of
   the stacks a machine runs. It now carries a **Network namespaces** section: the namespace

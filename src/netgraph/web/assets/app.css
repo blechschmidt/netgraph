@@ -200,6 +200,14 @@ header h1 {
   font-size: 12px;
 }
 
+/* A display of its own beats `hidden`, so a control that is only sometimes
+   offered has to say it again here. */
+.field[hidden], .check[hidden] { display: none; }
+
+/* A switch the server has not (yet) offered a theme to. Legible, so it reads as
+   "not available here" rather than as a rendering fault. */
+.check:has(input:disabled) { color: var(--muted); }
+
 select, input[type="text"], button {
   font: inherit;
   font-family: var(--mono);

@@ -105,7 +105,14 @@ from netgraph.web.events import (
     TooManyStreams,
     heartbeat_frame,
 )
-from netgraph.web.preview import Preview, RequestError, ViewOptions, render_source
+from netgraph.web.preview import (
+    Preview,
+    RequestError,
+    ViewOptions,
+    icon_choices,
+    icon_name,
+    render_source,
+)
 from netgraph.web.session import (
     SESSION_BASELINE,
     Conflict,
@@ -345,7 +352,13 @@ class _Handler(LocalHandler):
             return
         try:
             self._get_session(session, path, body=body)
-        except (SessionError, EditError) as exc:
+        except (SessionError, EditError, RequestError) as exc:
+            # ``RequestError`` because a view is named in the *query string* on
+            # this side — an unknown layer, a VLAN out of range, an icon theme
+            # this interface does not offer — and each of those is the client's
+            # mistake with a sentence attached. Left uncaught it became a 500
+            # and a dropped connection, so the page said "failed" and swallowed
+            # the one thing that would have explained it.
             self._refuse(exc, body=body)
 
     @property
@@ -850,6 +863,7 @@ class _Handler(LocalHandler):
                 "undo": 0,
                 "redo": 0,
                 "maxFileBytes": MAX_SOURCE_BYTES,
+                "icons": self._icons_state(),
             }
         query = self._query
         identity = _client_id(query)
@@ -866,7 +880,25 @@ class _Handler(LocalHandler):
                 "since": since,
                 "replay": [event.to_dict() for event in session.events.history(since)],
             }
-        return state
+        return state | {"icons": self._icons_state()}
+
+    def _icons_state(self) -> dict[str, Any]:
+        """Which icon themes this page may ask for, and which it opens with.
+
+        The page has a switch, not a file picker: ``themes`` is the closed set
+        :func:`~netgraph.web.preview.icon_choices` will accept back, ``theme``
+        is the one the switch turns on — whatever ``--icons`` named, or the
+        bundled set when it named nothing — and ``on`` says whether it starts
+        turned on. So a server started with no theme still offers one, and a
+        server started with somebody's own directory offers *that* as
+        ``custom``, without telling the browser where it is.
+        """
+        offered = icon_choices(self.icons)
+        return {
+            "themes": list(offered),
+            "theme": icon_name(self.icons) if self.icons is not None else offered[0],
+            "on": self.icons is not None,
+        }
 
     def _json(self, status: HTTPStatus, payload: Any, *, body: bool = True) -> None:
         self.send_payload(status, json.dumps(payload).encode(), "application/json", body=body)

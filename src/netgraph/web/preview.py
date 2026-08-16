@@ -35,7 +35,7 @@ from typing import Any, Final
 
 from netgraph.config import ValidationConfig
 from netgraph.diff import Drawing, draw
-from netgraph.errors import NetgraphError
+from netgraph.errors import NetgraphError, echo_value
 from netgraph.layout.geometry import Geometry
 from netgraph.loader import Inventory, load_stream
 from netgraph.plan import Plan
@@ -59,6 +59,7 @@ from netgraph.render.aggregate import (
     collapse_targets,
 )
 from netgraph.render.dot import cluster_keys, to_dot, to_image
+from netgraph.render.icons import BUNDLED_THEMES, NO_ICONS
 from netgraph.render.ids import element_ids
 from netgraph.render.jsonexport import annotations_payload
 from netgraph.render.routes import RouteCache, anchors_of, default_routing, fans_of, route_plan
@@ -71,12 +72,15 @@ from netgraph.watch.pipeline import Problem, Status, flatten_problems
 from netgraph.web.svgdoc import prepare
 
 __all__ = [
+    "CUSTOM_ICONS",
     "MAX_PROBLEMS",
     "MAX_VLAN",
     "Preview",
     "ViewOptions",
     "clip_problems",
     "graph_digest",
+    "icon_choices",
+    "icon_name",
     "render_diff",
     "render_inventory",
     "render_source",
@@ -100,6 +104,14 @@ MAX_VLAN: Final = 4094
 #: errors and two thousand notes sends the three errors first, which is the
 #: order somebody reads them in anyway.
 MAX_PROBLEMS: Final = 200
+
+#: What the browser calls the theme ``--icons`` was pointed at, when that was a
+#: directory rather than one of the bundled sets. The page has to be able to ask
+#: for that theme again after switching it off, and the only other name it has
+#: is the directory it was given — which is a path on the machine running the
+#: server, and not something a published page should be handing out. See
+#: :func:`icon_name`.
+CUSTOM_ICONS: Final = "custom"
 
 #: How many namespaces one request may ask to have folded. A collapse is a
 #: triangle somebody clicked on a container header, and a page that has folded
@@ -175,9 +187,17 @@ class ViewOptions:
     title: str | None = None
     #: Promote surviving warnings to errors, as ``--strict`` does elsewhere.
     strict: bool = False
-    #: Icon theme, chosen once on the command line rather than by the browser:
-    #: it names a directory, and a request must not be able to.
-    icons: IconTheme | None = field(default=None, compare=False)
+    #: The pictures the nodes are drawn as, or ``None`` for plain shapes.
+    #:
+    #: *Which* themes exist is the command line's decision, because a theme
+    #: names a directory and a request must never be able to; *whether this
+    #: drawing uses one* is the browser's, because that is a question about the
+    #: picture in front of somebody and not about this machine. So the field is
+    #: compared — two views that differ here are different drawings — and it is
+    #: set from a request only through :func:`_icon_choice`, which resolves a
+    #: name against a closed set and can produce no theme that was not already
+    #: offered.
+    icons: IconTheme | None = None
     #: The stylesheet in force (§22), chosen on the command line for the same
     #: reason as :attr:`icons`: it names a file on this machine.
     theme: Theme | None = field(default=None, compare=False)
@@ -200,10 +220,20 @@ class ViewOptions:
         Every value is checked here rather than trusted: the body arrives from
         a browser, which may be showing a page this server did not write.
 
+        Args:
+            payload: The decoded body.
+            icons: The icon theme this interface starts with — what
+                ``--icons`` resolved to — and what a request that says nothing
+                about icons gets. A request *may* say something, but only one
+                of the names :func:`icon_choices` offers.
+            theme: The stylesheet in force.
+
         Raises:
             RequestError: A field is of the wrong type or out of range.
         """
         values: dict[str, Any] = {"icons": icons, "theme": theme}
+        if "icons" in payload:
+            values["icons"] = _icon_choice(payload["icons"], icons)
         for name in _BOOLEAN_FIELDS:
             if name in payload:
                 values[name] = _boolean(payload[name], name)
@@ -265,6 +295,8 @@ class ViewOptions:
             ]
         if query.get("select"):
             payload["select"] = query["select"][-1]
+        if query.get("icons"):
+            payload["icons"] = query["icons"][-1]
         return cls.from_request(payload, icons=icons, theme=theme)
 
     @property
@@ -999,6 +1031,59 @@ def _query(value: Any) -> str:
     except QueryError as exc:
         raise RequestError(str(exc)) from exc
     return text
+
+
+def icon_name(theme: IconTheme | None) -> str:
+    """What the browser calls ``theme``: a bundled name, ``custom``, or ``none``.
+
+    A theme somebody pointed ``--icons`` at is named after the *directory* it
+    was given, which is a path on the machine running the server. The page has
+    to be able to ask for that theme again after switching it off, and it must
+    not be told a path to do it — so on the wire it is :data:`CUSTOM_ICONS`, and
+    the mapping back is this server's alone.
+    """
+    if theme is None:
+        return NO_ICONS
+    return theme.name if theme.name in BUNDLED_THEMES else CUSTOM_ICONS
+
+
+def icon_choices(default: IconTheme | None = None) -> tuple[str, ...]:
+    """The icon themes a request may name, ``default`` included, then ``none``.
+
+    What the page is offered and what a request is checked against, from one
+    place so the two cannot drift: the themes that ship with netgraph, plus
+    ``custom`` when ``--icons`` was pointed at a directory of somebody's own.
+    """
+    names = list(BUNDLED_THEMES)
+    chosen = icon_name(default)
+    if chosen not in names and chosen != NO_ICONS:
+        names.append(chosen)
+    names.append(NO_ICONS)
+    return tuple(names)
+
+
+def _icon_choice(value: Any, default: IconTheme | None) -> IconTheme | None:
+    """``icons`` as the theme it names, or ``None`` for plain shapes.
+
+    Raises:
+        RequestError: The value is not a string, or names a theme this
+            interface is not offering — a directory path above all, which is
+            the case this closed set exists to refuse.
+    """
+    name = _text(value, "icons").strip()
+    if not name or name == NO_ICONS:
+        return None
+    if default is not None and name == icon_name(default):
+        return default
+    bundled = BUNDLED_THEMES.get(name)
+    if bundled is None:
+        offered = ", ".join(icon_choices(default))
+        raise RequestError(
+            f"unknown icon theme {echo_value(name)}; this interface draws with {offered}. "
+            "A theme of your own is a directory, and is chosen with 'netgraph web --icons DIR' "
+            "rather than by the browser"
+        )
+    return bundled
 
 
 def _text(value: Any, field_name: str) -> str:

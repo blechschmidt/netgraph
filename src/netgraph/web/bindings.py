@@ -886,6 +886,19 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         ),
     ),
     Binding(
+        id="view.icons",
+        title="Toggle icons",
+        section="The view",
+        keys=("Alt-K",),
+        detail=(
+            "Whether each device is drawn as its icon or as a plain shape. The "
+            "theme is the one 'netgraph web --icons' named, or the set that ships "
+            "with netgraph; which of them exist is the command line's to say, "
+            "because a theme is a directory, but whether this drawing uses one is "
+            "a question about the picture."
+        ),
+    ),
+    Binding(
         id="view.strict",
         title="Toggle strict",
         section="The view",
@@ -1172,6 +1185,10 @@ MENUS: Final[tuple[Menu, ...]] = (
             ),
             (
                 MenuItem("view.layer", "Show another layer…"),
+                # Beside the layer because it is the same kind of question —
+                # what am I looking at, drawn how — and because the box in the
+                # header is a long way from the pointer.
+                MenuItem("view.icons", "Toggle icons"),
                 MenuItem("view.fit", "Fit the diagram"),
             ),
             (
