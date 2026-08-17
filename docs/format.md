@@ -450,7 +450,7 @@ come back changed:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/blechschmidt/netviz
-    rev: v0.0.1
+    rev: v0.0.2
     hooks:
       - id: netviz-fmt          # rewrites in place; git add and commit again
 ```

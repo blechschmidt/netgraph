@@ -130,7 +130,7 @@ inputs:
     default: "true"
   version:
     description: >-
-      What to install, as a pip requirement (netviz==0.0.1, a URL, a local
+      What to install, as a pip requirement (netviz==0.0.2, a URL, a local
       path). Empty installs the checkout this action came from, which is what
       pins the tool to the `rev`/`@ref` the workflow already chose.
     required: false

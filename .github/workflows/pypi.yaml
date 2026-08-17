@@ -178,6 +178,37 @@ jobs:
       - name: twine check --strict
         run: twine check --strict dist/*
 
+      # The check above ran the *newest* twine, because the step before it
+      # installed one. The upload will be checked a second time by the twine
+      # inside pypa/gh-action-pypi-publish -- and that is a Docker action, so
+      # pinning it pins its twine, its ``packaging`` and therefore the set of
+      # core-metadata versions it is willing to read.
+      #
+      # v0.0.1 lost a run to exactly that gap. hatchling began emitting
+      # ``Metadata-Version: 2.5``; the newest twine here read it happily, PyPI
+      # accepts it, and the year-old twine in the pinned image called it
+      # ``InvalidDistribution`` at the upload -- the first irreversible step,
+      # after the whole gate had already passed.
+      #
+      # So the artefacts are checked once more by the very image that will check
+      # them at the upload. The pin is read out of this file rather than written
+      # again, so the two cannot drift apart.
+      - name: twine check, with the twine the publisher itself will run
+        run: |
+          set -euo pipefail
+          # ``|| true`` so that "no pin" reaches the message below rather than
+          # aborting the step on pipefail with nothing said.
+          pin="$(grep -om1 'pypa/gh-action-pypi-publish@[0-9a-f]\{40\}' \
+            .github/workflows/pypi.yaml | cut -d@ -f2 || true)"
+          if [ -z "$pin" ]; then
+            echo "::error::no pypa/gh-action-pypi-publish pin found in this workflow"
+            exit 1
+          fi
+          image="ghcr.io/pypa/gh-action-pypi-publish:${pin}"
+          echo "checking dist/ with the twine in ${image}"
+          docker run --rm -v "${PWD}/dist:/dist:ro" --entrypoint twine "$image" \
+            check /dist/*
+
       # A wheel whose file name disagrees with the tag is the failure mode the
       # guard job cannot see: it checks the source, this checks the artefact.
       - name: Confirm the artefacts carry the released version
@@ -417,7 +448,7 @@ jobs:
           path: dist
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1.12.4
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           # Deliberately *not* skip-existing: a version already on PyPI means the
           # release is being run twice and the second run must stop, loudly.
@@ -443,7 +474,7 @@ jobs:
           path: dist
 
       - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1.12.4
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           repository-url: https://test.pypi.org/legacy/
           # Unlike the real upload: dry-running the same version twice is a

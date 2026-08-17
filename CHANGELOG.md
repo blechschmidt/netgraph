@@ -18,6 +18,23 @@ publish a version whose section is missing or empty — see
 
 _Nothing yet._
 
+## [0.0.2] - 2026-08-17
+
+A release-plumbing release. netviz itself is unchanged from 0.0.1 — no schema field, flag,
+rule, output format or exit code differs — but 0.0.1 never reached PyPI, so this is the
+first version installable with `pip install netviz`.
+
+### Fixed
+
+- **The release could not upload a wheel built by a current hatchling.** hatchling began
+  emitting `Metadata-Version: 2.5`, which PyPI accepts, but the release pinned
+  `pypa/gh-action-pypi-publish` to `v1.12.4` — a Docker action, so the pin also froze the
+  `twine` and `packaging` inside it at versions predating 2.5. The upload rejected its own
+  artefacts as `InvalidDistribution` after the entire gate had passed. The pin is now
+  `v1.14.2`, and the `build` job additionally checks `dist/` with the twine from that very
+  image, so a validator this repository does not install can no longer disagree with the one
+  it does.
+
 ## [0.0.1] - 2026-08-16
 
 First release. netviz reads a folder tree of YAML documents describing a network, checks
@@ -1569,5 +1586,6 @@ first-time installer they are simply how netviz behaves.
   would end up never written at all, and stay a cache miss for good. Each writer now has
   its own.
 
-[Unreleased]: https://github.com/blechschmidt/netviz/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/blechschmidt/netviz/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/blechschmidt/netviz/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/blechschmidt/netviz/releases/tag/v0.0.1

@@ -283,7 +283,7 @@ pulling them.
 trailing comment:
 
 ```yaml
-uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011  # v1.12.4
+uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
 ```
 
 `ci.yml` does not, and the difference is deliberate: a compromised action in `ci.yml` can
@@ -295,8 +295,25 @@ without anyone having to remember it. To bump a pin, resolve the tag and replace
 SHA and the comment:
 
 ```bash
-git ls-remote --tags https://github.com/pypa/gh-action-pypi-publish v1.12.4
+git ls-remote --tags https://github.com/pypa/gh-action-pypi-publish v1.14.2
 ```
+
+**Take the `^{}` line, not the other one.** An annotated tag is an object in its own right,
+so that command prints two SHAs: `refs/tags/v1.14.2` is the *tag object* and
+`refs/tags/v1.14.2^{}` is the commit it points at. `uses:` resolves either happily — but
+`pypa/gh-action-pypi-publish` is a **Docker** action, and the runner pulls
+`ghcr.io/pypa/gh-action-pypi-publish:<that ref>` from a registry whose images are published
+per *commit*. Pinned to the tag object it dies on `manifest unknown`, which is how v0.0.1
+lost a run. A 200 from `/repos/<owner>/<repo>/git/tags/<sha>` means the SHA is a tag object
+and is the wrong one; 404 means it is a commit.
+
+Pins go stale in a way that is specific to this action. It carries its own `twine` and its
+own `packaging`, so the pin fixes *which core-metadata versions the upload will accept* —
+independently of the twine this repository installs to check the same files. When those two
+disagree the build is green and the upload is not, which is why the `build` job runs the
+pinned image's twine over `dist/` as well; see the second `twine check` step in
+[`pypi.yaml`](../.github/workflows/pypi.yaml). Bump this pin when a new build backend starts
+emitting a newer `Metadata-Version`.
 
 [`tests/test_release.py`](../tests/test_release.py) fails if any `uses:` in `pypi.yaml`
 names a tag or a branch instead of a 40-character SHA, or if the trailing comment is missing.
@@ -326,32 +343,33 @@ side by side. That check reads this very table, which is therefore not documenta
 the registration but the repository's copy *of* it: change the registration on PyPI and this
 table in the same commit, or the next release stops in its first job.
 
-### Where v0.0.1 stands
+### Where the first release stands
 
-The first release is tagged and built, and everything except the upload has happened. Run
+**The trusted publisher is registered correctly, and the OIDC exchange works.** That was the
+open question for a day and it is closed. Run
 [31980947806](https://github.com/blechschmidt/netviz/actions/runs/31980947806) on `v0.0.1`
-is green through `guard`, the whole of `ci`, `build`, `verify` on all three operating
-systems and `image` — the container is published as `ghcr.io/blechschmidt/netviz:0.0.1`.
-The `pypi` job fails with `invalid-publisher`, and `provenance` and `github release` are
-skipped behind it, because the registration on PyPI still names the pre-rename slug: the
-token carries `repository: blechschmidt/netviz` and the publisher expects `netgraph`.
+shows the transition across its three attempts, all of them replaying the *same* wheel built
+once at attempt 1:
 
-Nothing in this repository can change that. The claims the run prints are already exactly
-the ones the table above describes, and the copy that disagrees lives on a settings page
-only the account holder can open. There is no second route either: the repository holds no
-Actions secret, no variable and no `pypi`-environment secret, so an API-token upload cannot
-stand in for the OIDC exchange. Re-tagging or re-running reproduces the same failure byte
-for byte.
+| Attempt | `pypi` job failed with | Reached |
+|---|---|---|
+| 1, 2 | `invalid-publisher` | the OIDC exchange, and no further |
+| 3 | `InvalidDistribution: '2.5' is not a valid metadata version` | past the exchange, into `twine check` |
 
-To finish the release:
+Attempt 3 got a token. The registration had been corrected between the attempts, and the
+`repository` claim now matches the table above; nothing in this repository changed, and the
+artefacts did not either. What it then tripped over is entirely ours: `pypa/gh-action-pypi-publish`
+was pinned to `v1.12.4`, whose image ships `twine` 6.1.0 and `packaging` 24.2, and hatchling
+had begun emitting `Metadata-Version: 2.5`. PyPI accepts 2.5 — it serves such wheels itself,
+hatchling's own among them — but the year-old validator inside the action refused to read
+one. The pin is now `v1.14.2` (`twine` 7.0.0, `packaging` 26.2), and the `build` job runs the
+pinned image's twine over `dist/` so the two can never disagree unnoticed again. See
+[Pinning](#pinning).
 
-1. On PyPI, open *Your projects → netviz → Publishing* — the publisher is *pending*, since
-   `netviz` has never been published — and change **Repository** from `netgraph` to
-   `netviz`. (`netviz` is unclaimed on PyPI; the `netgraph` name there belongs to an
-   unrelated project, so the package name cannot fall back to it.)
-2. Re-run **only** the failed `pypi` job of that run. The tag, the artefacts and the notes
-   are already right; a fresh tag would spend forty minutes rebuilding the same two files.
-3. `provenance` and `github release` run after it in the same run, and the release is done.
+`v0.0.1` is not coming back. Its container image is published and immutable at
+`ghcr.io/blechschmidt/netviz:0.0.1`, built from a commit that does not carry the fix, so
+moving the tag would leave the image and the tag describing different trees. The fix ships
+as **v0.0.2** instead, and that tag is the first one expected to go all the way through.
 
 Repeat on TestPyPI with the environment `testpypi`. The two GitHub environments of those
 names are what make the mapping specific: without them any workflow in the repository could

@@ -239,7 +239,7 @@ jobs:
           python-version: "3.12"
 
       - id: netviz
-        uses: blechschmidt/netviz/.github/actions/netviz-validate@v0.0.1
+        uses: blechschmidt/netviz/.github/actions/netviz-validate@v0.0.2
         with:
           inventory: inventory
           strict: "true"
@@ -282,7 +282,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: blechschmidt/netviz/.github/actions/netviz-validate@v0.0.1
+      - uses: blechschmidt/netviz/.github/actions/netviz-validate@v0.0.2
         with:
           inventory: inventory
           output-format: github
@@ -813,7 +813,7 @@ Start with validation:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/blechschmidt/netviz
-    rev: v0.0.1
+    rev: v0.0.2
     hooks:
       - id: netviz-validate
         args: [--strict]

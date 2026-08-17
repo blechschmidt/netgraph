@@ -160,7 +160,7 @@ on:
         default: "3.12"
       version:
         description: >-
-          netviz to install, as a pip requirement (netviz==0.0.1, a URL).
+          netviz to install, as a pip requirement (netviz==0.0.2, a URL).
           Empty installs the checkout the action came from.
         type: string
         required: false
@@ -238,7 +238,7 @@ jobs:
           python-version: ${{ inputs.python-version }}
 
       # The review below is netviz's own composite action, and it has to be
-      # the copy that belongs to *this* file: a workflow pinned at v0.0.1 that
+      # the copy that belongs to *this* file: a workflow pinned at v0.0.2 that
       # reached for the action on ``main`` would be pinned in name only.
       # ``github.job_workflow_sha`` is the commit of the reusable workflow being
       # run, which is exactly the ref the caller chose.
