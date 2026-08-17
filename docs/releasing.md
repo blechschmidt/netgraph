@@ -326,6 +326,33 @@ side by side. That check reads this very table, which is therefore not documenta
 the registration but the repository's copy *of* it: change the registration on PyPI and this
 table in the same commit, or the next release stops in its first job.
 
+### Where v0.0.1 stands
+
+The first release is tagged and built, and everything except the upload has happened. Run
+[31980947806](https://github.com/blechschmidt/netviz/actions/runs/31980947806) on `v0.0.1`
+is green through `guard`, the whole of `ci`, `build`, `verify` on all three operating
+systems and `image` — the container is published as `ghcr.io/blechschmidt/netviz:0.0.1`.
+The `pypi` job fails with `invalid-publisher`, and `provenance` and `github release` are
+skipped behind it, because the registration on PyPI still names the pre-rename slug: the
+token carries `repository: blechschmidt/netviz` and the publisher expects `netgraph`.
+
+Nothing in this repository can change that. The claims the run prints are already exactly
+the ones the table above describes, and the copy that disagrees lives on a settings page
+only the account holder can open. There is no second route either: the repository holds no
+Actions secret, no variable and no `pypi`-environment secret, so an API-token upload cannot
+stand in for the OIDC exchange. Re-tagging or re-running reproduces the same failure byte
+for byte.
+
+To finish the release:
+
+1. On PyPI, open *Your projects → netviz → Publishing* — the publisher is *pending*, since
+   `netviz` has never been published — and change **Repository** from `netgraph` to
+   `netviz`. (`netviz` is unclaimed on PyPI; the `netgraph` name there belongs to an
+   unrelated project, so the package name cannot fall back to it.)
+2. Re-run **only** the failed `pypi` job of that run. The tag, the artefacts and the notes
+   are already right; a fresh tag would spend forty minutes rebuilding the same two files.
+3. `provenance` and `github release` run after it in the same run, and the release is done.
+
 Repeat on TestPyPI with the environment `testpypi`. The two GitHub environments of those
 names are what make the mapping specific: without them any workflow in the repository could
 mint an upload token, and with them only a job that names the environment can — which is why
