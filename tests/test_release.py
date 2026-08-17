@@ -219,6 +219,73 @@ def test_a_dry_run_checks_the_version_in_pyproject() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# The trusted publisher's repository slug
+# --------------------------------------------------------------------------- #
+
+#: The shape of the table in docs/releasing.md, reduced to the two rows the
+#: check reads.
+PUBLISHER_TABLE = """\
+| Field | Value |
+|---|---|
+| Owner | `blechschmidt` |
+| Repository | `netviz` |
+| Workflow name | `pypi.yaml` |
+| Environment | `pypi` |
+"""
+
+
+def test_the_registered_slug_is_read_out_of_the_table() -> None:
+    assert release.publisher_slug(PUBLISHER_TABLE) == "blechschmidt/netviz"
+
+
+@pytest.mark.parametrize("dropped", ["| Owner | `blechschmidt` |\n", "| Repository | `netviz` |\n"])
+def test_a_table_missing_a_row_is_refused_rather_than_guessed_at(dropped: str) -> None:
+    with pytest.raises(release.ReleaseError, match="trusted publisher table"):
+        release.publisher_slug(PUBLISHER_TABLE.replace(dropped, ""))
+
+
+def test_the_repository_this_run_belongs_to_may_match_in_any_case() -> None:
+    for spelling in ("blechschmidt/netviz", "Blechschmidt/NetViz"):
+        assert release.check_publisher(PUBLISHER_TABLE, spelling) == "blechschmidt/netviz"
+
+
+def test_a_renamed_repository_stops_the_release_before_anything_is_built() -> None:
+    """The v0.0.1 failure, as a test.
+
+    The repository was renamed from ``netgraph`` to ``netviz`` and the trusted
+    publisher on PyPI was not, so three complete release runs built, tested and
+    signed the artefacts and then died at the upload with ``invalid-publisher``.
+    Caught here, the same mistake costs the guard job.
+    """
+    with pytest.raises(release.ReleaseError, match="invalid-publisher") as excinfo:
+        release.check_publisher(PUBLISHER_TABLE, "blechschmidt/netgraph")
+    # The message has to name both slugs, because the fix is to make one of them
+    # the other and the person reading it is not in either settings page yet.
+    assert "blechschmidt/netgraph" in str(excinfo.value)
+    assert "blechschmidt/netviz" in str(excinfo.value)
+
+
+def test_the_documented_publisher_is_the_repository_this_tree_belongs_to() -> None:
+    """The real table, against the real repository URL in pyproject.toml.
+
+    These are the two places a rename has to reach, and this is the assertion
+    that makes a half-done rename fail on the pull request rather than at the
+    upload. ``project.urls`` is the tree's own record of where it lives.
+    """
+    urls = PYPROJECT.read_text(encoding="utf-8")
+    match = re.search(r'^Repository = "https://github\.com/(?P<slug>[^"]+)"', urls, re.MULTILINE)
+    assert match is not None, "pyproject.toml has no [project.urls] Repository"
+    release.check_publisher(RELEASING_DOC.read_text(encoding="utf-8"), match["slug"])
+
+
+def test_the_release_workflow_passes_the_slug_to_the_guard() -> None:
+    """A check nothing calls is not a check."""
+    workflow = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+    assert "--repository" in workflow
+    assert "${{ github.repository }}" in workflow
+
+
+# --------------------------------------------------------------------------- #
 # The changelog section
 # --------------------------------------------------------------------------- #
 

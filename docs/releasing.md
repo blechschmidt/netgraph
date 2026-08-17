@@ -319,7 +319,12 @@ GitHub repository the moment one happens. This one was renamed from `netgraph` t
 after the project was, which also moved the demo site to
 <https://blechschmidt.github.io/netviz/> and the image to `ghcr.io/blechschmidt/netviz`.
 A publisher still registered against the old slug is a mismatch PyPI reports only at upload
-time, after the version has been built and verified.
+time, after the version has been built and verified — so the `guard` job compares the row
+above against `${{ github.repository }}` before anything is built
+(`python tools/release.py check --repository …`), and refuses the release with the two slugs
+side by side. That check reads this very table, which is therefore not documentation *about*
+the registration but the repository's copy *of* it: change the registration on PyPI and this
+table in the same commit, or the next release stops in its first job.
 
 Repeat on TestPyPI with the environment `testpypi`. The two GitHub environments of those
 names are what make the mapping specific: without them any workflow in the repository could
@@ -349,6 +354,8 @@ the package inherits the repository's visibility.
 `pyproject.toml` is spelled correctly and has a matching, dated, non-empty changelog section;
 that the tag check rejects a mismatch, a missing section, an empty section and an undated
 heading; that `netviz --version` and `netviz version --json` report the package, Python
-and Graphviz versions; and that the release workflow pins its actions, keeps its permissions
-per job, and names the environments the trusted publisher expects. So a release that would
-fail at the gate fails on the pull request instead.
+and Graphviz versions; that the trusted publisher table above names the same repository as
+`[project.urls]` in `pyproject.toml`, and that the workflow actually passes that slug to the
+guard; and that the release workflow pins its actions, keeps its permissions per job, and
+names the environments the trusted publisher expects. So a release that would fail at the
+gate fails on the pull request instead.

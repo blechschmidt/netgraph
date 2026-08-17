@@ -20,6 +20,12 @@ The three facts:
    release body, so it is cut out here and written to a file the workflow
    uploads, rather than reconstructed by shell.
 
+And, when the workflow passes ``--repository``, a fourth that is not about this
+repository at all: **the PyPI trusted publisher still names this repository.**
+That registration lives in a PyPI settings page, so a rename of the GitHub repo
+silently invalidates it, and PyPI only says so at the upload -- the last step of
+the last job. Checking it first turns forty minutes into forty seconds.
+
 Usage::
 
     python tools/release.py check --ref refs/tags/v0.1.0   # the release gate
@@ -50,6 +56,17 @@ from typing import Final
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 PYPROJECT: Final = REPO_ROOT / "pyproject.toml"
 CHANGELOG: Final = REPO_ROOT / "CHANGELOG.md"
+RELEASING: Final = REPO_ROOT / "docs" / "releasing.md"
+
+#: The ``| Owner | `blechschmidt` |`` and ``| Repository | `netviz` |`` rows of
+#: the table under "Registering the trusted publisher" in docs/releasing.md.
+#: That table is the written-down copy of what is on file at PyPI, and PyPI
+#: matches it literally against the OIDC token's ``repository`` claim -- so the
+#: two halves of the release, the one in this repository and the one in a PyPI
+#: settings page, are compared here before anything is built.
+_PUBLISHER_ROW_RE: Final = re.compile(
+    r"^\|\s*(?P<field>Owner|Repository)\s*\|\s*`(?P<value>[^`]+)`\s*\|\s*$", re.MULTILINE
+)
 
 #: ``## [0.1.0] - 2026-07-30`` or ``## [Unreleased]``. The link-reference form of
 #: the version is what Keep a Changelog specifies and what the compare links at
@@ -256,6 +273,48 @@ def check_release(pyproject: str, changelog: str, ref: str | None) -> tuple[str,
     return packaged, find_section(changelog, packaged)
 
 
+def publisher_slug(releasing: str) -> str:
+    """The ``owner/repo`` the trusted publisher is registered against.
+
+    Read out of the table in ``docs/releasing.md`` rather than hard-coded here,
+    because that table is what a human edits when the repository is renamed and
+    what they are told to copy into PyPI's settings page.
+    """
+    rows = {match["field"]: match["value"] for match in _PUBLISHER_ROW_RE.finditer(releasing)}
+    missing = [field for field in ("Owner", "Repository") if field not in rows]
+    if missing:
+        raise ReleaseError(
+            f"docs/releasing.md has no {' and no '.join(missing)} row in the trusted "
+            "publisher table; the release cannot check the slug it uploads under."
+        )
+    return f"{rows['Owner']}/{rows['Repository']}"
+
+
+def check_publisher(releasing: str, repository: str) -> str:
+    """Refuse a release whose repository slug the publisher cannot match.
+
+    ``repository`` is ``${{ github.repository }}`` -- byte for byte the
+    ``repository`` claim PyPI will be handed at upload time. If it disagrees
+    with the registration recorded in ``docs/releasing.md``, the upload fails
+    with ``invalid-publisher`` *after* the whole gate has run and the artefacts
+    have been built, which is a slow and confusing way to learn that a rename
+    was only half done. So it fails here instead, in the first job.
+
+    Comparison is case-insensitive: GitHub slugs are, and PyPI folds them too.
+    """
+    registered = publisher_slug(releasing)
+    if repository.casefold() != registered.casefold():
+        raise ReleaseError(
+            f"this repository is {repository}, but the PyPI trusted publisher in "
+            f"docs/releasing.md is registered against {registered}. PyPI matches that "
+            "slug literally against the OIDC token, so the upload would fail with "
+            "'invalid-publisher'. Update the publisher on PyPI (Your projects -> "
+            "netviz -> Publishing) and the table in docs/releasing.md to agree, then "
+            "re-run this job."
+        )
+    return registered
+
+
 def _write_github_output(**values: str) -> None:
     """Append ``key=value`` lines to ``$GITHUB_OUTPUT``, if there is one.
 
@@ -279,6 +338,9 @@ def _read(path: Path) -> str:
 
 def _command_check(args: argparse.Namespace) -> int:
     version, section = check_release(_read(PYPROJECT), _read(CHANGELOG), args.ref)
+
+    if args.repository:
+        print(f"trusted publisher: {check_publisher(_read(RELEASING), args.repository)}")
 
     notes = Path(args.notes)
     notes.parent.mkdir(parents=True, exist_ok=True)
@@ -335,6 +397,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--notes",
         default="release-notes.md",
         help="where to write the changelog section that becomes the release body",
+    )
+    check.add_argument(
+        "--repository",
+        default=None,
+        help="the 'owner/repo' this run belongs to (github.repository). Checked "
+        "against the trusted publisher recorded in docs/releasing.md, so a renamed "
+        "repository fails here rather than at the PyPI upload.",
     )
     check.set_defaults(func=_command_check)
 

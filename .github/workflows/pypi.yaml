@@ -86,15 +86,27 @@ jobs:
       # On workflow_dispatch there is no tag, so the version in pyproject.toml is
       # taken as the intended one: a dry run then checks exactly what the next
       # tag will check.
+      #
+      # ``--repository`` adds the one fact that is not about this tree. The PyPI
+      # trusted publisher is registered against a repository *slug*, on a PyPI
+      # settings page nothing here can read, and PyPI reports a mismatch only at
+      # the upload -- the last step of the last job, after the whole gate has run
+      # and the artefacts have been built. v0.0.1 lost three complete runs that
+      # way after the netgraph -> netviz rename. So the slug this run actually
+      # carries is compared against the registration written down in
+      # docs/releasing.md, here, before anything is built.
       - name: Check the tag, the version and the changelog agree
         id: check
+        env:
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-            python tools/release.py check --ref "${GITHUB_REF}" --notes release-notes.md
+            python tools/release.py check --ref "${GITHUB_REF}" \
+              --repository "${REPOSITORY}" --notes release-notes.md
           else
             echo "::notice::dry run -- checking the version in pyproject.toml, no tag involved"
-            python tools/release.py check --notes release-notes.md
+            python tools/release.py check --repository "${REPOSITORY}" --notes release-notes.md
           fi
 
       - name: Show the notes that will become the release body
