@@ -692,6 +692,12 @@ jobs:
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This job downloads three artifacts and never checks the repository
+          # out, so ``gh`` has no git remote to infer the repository from and
+          # every command below dies on "fatal: not a git repository" -- which
+          # is what v0.0.3 failed on, after the wheel had already gone to PyPI.
+          # Naming it explicitly is cheaper than a checkout nothing else needs.
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.guard.outputs.tag }}
           VERSION: ${{ needs.guard.outputs.version }}
           PRERELEASE: ${{ needs.guard.outputs.prerelease }}

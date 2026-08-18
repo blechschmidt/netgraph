@@ -905,6 +905,73 @@ def test_every_push_triggered_workflow_names_the_branches_it_runs_on() -> None:
             )
 
 
+#: A ``gh`` *invocation*, as opposed to the word appearing in a string. It has to
+#: be a command's first word, so the position before it is the start of a line or
+#: one of the places a shell begins a command: a pipe, a separator, a
+#: substitution, or one of ``if``/``then``/``else``. That distinction is the whole
+#: point -- ``pypi.yaml`` echoes ``gh attestation verify …`` into the release body
+#: as documentation for whoever downloads the wheel, and that line is text.
+_GH_CALL_RE = re.compile(r"(?:^|[;&|]|\$\(|\bif\s|\bthen\s|\belse\s)\s*gh\s+\S", re.MULTILINE)
+
+
+def steps_invoking_gh() -> list[tuple[str, str, int]]:
+    """``(workflow, job, index)`` for every step that runs the ``gh`` CLI."""
+    found = []
+    for path in workflow_files():
+        parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
+        for job_name, job in (parsed.get("jobs") or {}).items():
+            for index, step in enumerate(job.get("steps") or []):
+                script = step.get("run")
+                if isinstance(script, str) and _GH_CALL_RE.search(script):
+                    found.append((path.name, job_name, index))
+    return found
+
+
+def job_of(workflow: str, job: str) -> dict[Any, Any]:
+    parsed = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / workflow).read_text("utf-8"))
+    return dict(parsed["jobs"][job])
+
+
+def test_some_workflow_step_runs_gh() -> None:
+    """Guards the test below against a regex that has stopped matching."""
+    jobs = {(workflow, job) for workflow, job, _ in steps_invoking_gh()}
+    assert ("pypi.yaml", "github-release") in jobs, jobs
+
+
+@pytest.mark.parametrize(
+    ("workflow", "job", "index"),
+    steps_invoking_gh(),
+    ids=[f"{w}-{j}-{i}" for w, j, i in steps_invoking_gh()],
+)
+def test_every_gh_invocation_knows_which_repository_it_means(
+    workflow: str, job: str, index: int
+) -> None:
+    """``gh`` infers the repository from a git remote, and a job may have none.
+
+    This is not hypothetical and it is not cheap: the ``github-release`` job of
+    ``pypi.yaml`` downloads three artifacts and checks nothing out, so every
+    ``gh release`` in it died on ``fatal: not a git repository`` -- and it is the
+    *last* job of the release, so v0.0.3 failed there having already published
+    the wheel to PyPI, pushed the image and signed both. Nothing about the step
+    is wrong when read on its own; what is missing is a fact about the job around
+    it, which is exactly the shape of defect a workflow file will not show you.
+
+    Either fix is fine. A job that checks the repository out has a remote to
+    infer from; a job that does not says ``GH_REPO`` and needs no checkout for
+    it. What is refused is a job that has neither and works by luck.
+    """
+    steps = job_of(workflow, job)["steps"]
+    if any(str(entry.get("uses", "")).startswith("actions/checkout") for entry in steps):
+        return
+    step = steps[index]
+    name = step.get("name") or f"step {index}"
+    assert "GH_REPO" in (step.get("env") or {}), (
+        f"{workflow}: the {job} job never checks the repository out, so the "
+        f"{name!r} step has no git remote for 'gh' to infer the repository from. "
+        "Give the step 'GH_REPO: ${{ github.repository }}'."
+    )
+
+
 # --------------------------------------------------------------------------- #
 # The version report
 # --------------------------------------------------------------------------- #

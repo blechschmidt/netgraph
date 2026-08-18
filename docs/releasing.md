@@ -202,7 +202,7 @@ happens last:
 | `verify` (Linux, macOS, Windows) | yes | Same. This is the last chance. |
 | `pypi` | **no** | The version is burnt. Do not reuse it: fix, bump the patch, release again. |
 | `image` | mostly | A tag can be re-pushed; a digest cannot be unpublished. |
-| `github-release` | yes | Re-run the job; it creates or updates the release from the same artefacts. |
+| `github-release` | yes | Re-run the job; it creates or updates the release from the same artefacts. But a re-run replays `pypi.yaml` **as it stands at the tag**, so if the fault is in the workflow rather than on the runner, fix it on `main` and create the release by hand from this run's artefacts — see [Where the releases stand](#where-the-releases-stand). |
 
 Deleting and re-pushing a tag is only safe before `pypi` has run. Afterwards the version
 exists in the world and the fix is a new version — PyPI does not allow re-uploading a file,
@@ -229,7 +229,7 @@ and by `workflow_dispatch`.
    without it `build` resolves a backend of its own in a throwaway environment, and the
    backend is what stamps the core-metadata version into the distribution — which is the
    exact mechanism that cost v0.0.1 an irreversible step (see
-   [Where the first release stands](#where-the-first-release-stands)). The SBOM is likewise
+   [Where the releases stand](#where-the-releases-stand)). The SBOM is likewise
    taken from an environment built
    with `uv sync --locked`, so re-running a tag inventories the same closure rather than
    whatever the index published that morning.
@@ -379,7 +379,7 @@ side by side. That check reads this very table, which is therefore not documenta
 the registration but the repository's copy *of* it: change the registration on PyPI and this
 table in the same commit, or the next release stops in its first job.
 
-### Where the first release stands
+### Where the releases stand
 
 **The trusted publisher is registered correctly, and the OIDC exchange works.** That was the
 open question for a day and it is closed. Run
@@ -405,7 +405,24 @@ pinned image's twine over `dist/` so the two can never disagree unnoticed again.
 `v0.0.1` is not coming back. Its container image is published and immutable at
 `ghcr.io/blechschmidt/netviz:0.0.1`, built from a commit that does not carry the fix, so
 moving the tag would leave the image and the tag describing different trees. The fix ships
-as **v0.0.2** instead, and that tag is the first one expected to go all the way through.
+as **v0.0.2** instead.
+
+**`0.0.3` is the version on PyPI**, and the pattern the three attempts made is worth naming:
+each one surfaced exactly one defect, because every job after a failure is skipped and so
+proves nothing. `v0.0.2` died in `build` on a stale twine; `v0.0.3` got through `pypi`,
+`provenance` and `image` — the whole irreversible half — and then failed in `github-release`,
+the last job of the last stage, on
+[32092859310](https://github.com/blechschmidt/netviz/actions/runs/32092859310).
+
+That last one is the case the recovery table now warns about. `github-release` downloads
+three artifacts and checks nothing out, so `gh` had no git remote to infer the repository
+from and every `gh release` in it died on `fatal: not a git repository`. Re-running the job
+would have replayed the same file from the same tag and failed identically; the fix is
+`GH_REPO: ${{ github.repository }}` on the step, on `main`, and the `0.0.3` release itself
+was created by hand from that run's `dist`, `sbom-*` and `release-notes` artifacts with the
+body the run had already assembled. `tests/test_release.py` now refuses a `gh` invocation in
+a job that neither checks the repository out nor names `GH_REPO`, so this one cannot recur in
+another job.
 
 Repeat on TestPyPI with the environment `testpypi`. The two GitHub environments of those
 names are what make the mapping specific: without them any workflow in the repository could
