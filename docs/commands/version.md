@@ -62,7 +62,7 @@ which is usually a `NETVIZ_DOT` pointing at something that is not Graphviz.
 $ netviz version --json
 {
   "schemaVersion": 1,
-  "netviz": "0.0.1",
+  "netviz": "0.0.2",
   "python": {
     "version": "3.12.3",
     "implementation": "CPython",

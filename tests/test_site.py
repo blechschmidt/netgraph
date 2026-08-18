@@ -46,7 +46,7 @@ HAVE_MARKDOWN: Final = importlib.util.find_spec("markdown_it") is not None
 pytestmark = [
     pytest.mark.skipif(
         not HAVE_MARKDOWN,
-        reason="markdown-it-py is not installed; pip install '.[site]' to build the site",
+        reason="markdown-it-py is not installed; uv sync --extra site to build the site",
     ),
 ]
 

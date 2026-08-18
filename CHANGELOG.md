@@ -16,7 +16,35 @@ publish a version whose section is missing or empty — see
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- **Every environment netviz builds now comes out of a committed `uv.lock`.** A contributor's
+  checkout, all six CI jobs, the nightly property run, the published demo site, the container
+  image and the release's own `build`/`twine`/hatchling are installed at exact, recorded
+  versions instead of resolved fresh from dependency ranges. Nothing a user of the package
+  notices changes — the wheel's declared ranges are untouched — but a red CI run is now a
+  statement about a commit rather than about what the index published that hour, and a
+  nightly counterexample can be reproduced a month later.
+
+  Getting a checkout running is now `uv sync --extra dev` (see
+  [`CONTRIBUTING.md`](CONTRIBUTING.md)); `--extra browser`, `--extra site` and
+  `--group icons` are the other three environments. `uv lock --check` runs as CI's first job
+  and as a pre-commit hook, so editing dependencies without re-locking is caught in seconds
+  rather than in six matrix entries.
+
+  Two places deliberately carry no lockfile, and both say so in the file: the three composite
+  actions, which install a released netviz into *other people's* repositories where our pins
+  would be an imposition, and the release's `verify` job, whose whole purpose is to prove the
+  published artefact's own ranges still resolve in an environment that has never seen this
+  repository.
+
+### Fixed
+
+- **The committed artefacts still reported version 0.0.1**, having been left behind by the
+  0.0.2 bump: the documented transcripts for `netviz export`, `netviz report --format json`
+  and `netviz test`; the as-built example report under `docs/example-report/`; the draw.io
+  export fixtures; and three `netviz diff --format json` golden files. Fourteen tests were
+  failing on `main` because of it.
 
 ## [0.0.2] - 2026-08-17
 

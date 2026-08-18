@@ -169,15 +169,35 @@ runs:
         NETVIZ_VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
-        python -m pip install --disable-pip-version-check --upgrade pip
         if [ -n "${NETVIZ_VERSION}" ]; then
-          python -m pip install --disable-pip-version-check "${NETVIZ_VERSION}"
+          target="${NETVIZ_VERSION}"
         else
           # $GITHUB_ACTION_PATH is .github/actions/netviz-render inside the
           # checkout of the repository this action was resolved from, so three
           # levels up is netviz itself -- at exactly the ref the workflow
           # asked for. Installing from PyPI here would silently ignore that.
-          python -m pip install --disable-pip-version-check "${GITHUB_ACTION_PATH}/../../.."
+          target="${GITHUB_ACTION_PATH}/../../.."
+        fi
+
+        # uv when the workflow already has one *and* has a virtualenv active --
+        # the same installer netviz's own CI uses, and roughly ten times faster
+        # on a cold runner. Both halves of the condition are load-bearing: this
+        # action runs in other people's repositories, so it cannot require a tool
+        # they did not ask for, and ``uv pip install`` into a bare system
+        # interpreter is refused on the distributions that mark themselves
+        # externally managed. pip is the fallback and is never wrong.
+        #
+        # Note what is deliberately absent: uv.lock. A lockfile pins *this*
+        # repository's development environment; the caller of this action is
+        # installing a released netviz into an environment of their own, where
+        # our pins would be an imposition and, for the ``version`` input, simply
+        # inapplicable. Reproducibility here comes from the caller pinning
+        # ``version:``, which is the knob they can actually turn.
+        if command -v uv >/dev/null 2>&1 && [ -n "${VIRTUAL_ENV:-}" ]; then
+          uv pip install "${target}"
+        else
+          python -m pip install --disable-pip-version-check --upgrade pip
+          python -m pip install --disable-pip-version-check "${target}"
         fi
         netviz --version
 

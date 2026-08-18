@@ -30,8 +30,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  PIP_NO_INPUT: "1"
+  # Every environment here is built by ``uv sync --locked`` from the committed
+  # uv.lock, so nothing is resolved at install time; ``UV_COMPILE_BYTECODE``
+  # pays the byte-compilation cost once instead of on every invocation below.
+  UV_COMPILE_BYTECODE: "1"
   PYTHONUNBUFFERED: "1"
   FORCE_COLOR: "1"
 
@@ -69,18 +71,23 @@ jobs:
           sudo apt-get install --no-install-recommends --yes graphviz
           dot -V
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      # The same locked environment the push workflow builds. It matters more
+      # here than anywhere: this job searches a thousand examples per property,
+      # and a counterexample is only reproducible if the versions that found it
+      # are written down. ``--locked`` and uv.lock are what write them down.
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
-      - name: Install netviz and its dev extras
+      - name: Install netviz and its dev extras, from uv.lock
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip
-          python -m pip install --editable ".[dev]"
+          uv sync --locked --extra dev
+          uv pip list
 
       # Restored so that yesterday's counterexample is the first thing tried,
       # and saved so that today's is there tomorrow. Shared with the push

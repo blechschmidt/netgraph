@@ -210,6 +210,20 @@ full input and output tables; the two workflows below are the reason it exists.
 `python` must already be on `PATH` — put `actions/setup-python` before it. The
 action deliberately does not pick an interpreter for you.
 
+If [uv](https://docs.astral.sh/uv/) is on `PATH` and a virtualenv is active, all
+three actions install with `uv pip install` instead, which is roughly ten times
+faster on a cold runner. `astral-sh/setup-uv` with `activate-environment: true`
+is the shortest way to arrange both, and is a drop-in for the `setup-python` step
+in every workflow on this page. Neither is required: pip is the fallback and
+behaves identically.
+
+What the actions do **not** carry is netviz's own `uv.lock`. That file pins the
+versions *this* repository develops and tests against; you are installing a
+released netviz into an environment of your own, where our pins would be an
+imposition — and for the `version:` input they would be meaningless. Pin
+`version:` instead. That is the knob with your name on it, and it is the one that
+makes your pipeline reproducible.
+
 ## Workflow: upload SARIF
 
 Findings become code-scanning alerts, with the rule description and the help

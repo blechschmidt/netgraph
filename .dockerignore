@@ -1,13 +1,19 @@
 # The build context, by allowlist.
 #
-# ``Dockerfile`` builds a wheel from four paths and nothing else, so everything
-# is excluded first and those four are let back in. An allowlist rather than a
-# list of exclusions because the failure modes point opposite ways: a forgotten
-# exclusion silently ships a virtualenv, a private inventory or a .git history
-# into the build context, while a forgotten inclusion fails the build loudly.
+# ``Dockerfile`` builds the environment from five paths and nothing else, so
+# everything is excluded first and those five are let back in. An allowlist
+# rather than a list of exclusions because the failure modes point opposite
+# ways: a forgotten exclusion silently ships a virtualenv, a private inventory or
+# a .git history into the build context, while a forgotten inclusion fails the
+# build loudly.
 *
 
 !pyproject.toml
+# The reason the image is reproducible: ``uv sync --locked`` in the build stage
+# reads it, and refuses to proceed if it disagrees with pyproject.toml. Leaving
+# it out of the context does not fall back to an unlocked resolve -- it fails the
+# build, which is the right way round.
+!uv.lock
 !README.md
 !LICENSE
 !src

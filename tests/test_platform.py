@@ -731,7 +731,7 @@ def _complete(tmp_path: Path, line: str) -> dict[str, str]:
     """
     scripts = Path(sysconfig.get_path("scripts"))
     assert (scripts / "netviz").exists() or (scripts / "netviz.exe").exists(), (
-        f"the netviz console script is not in {scripts}; install with 'pip install -e .'"
+        f"the netviz console script is not in {scripts}; install with 'uv sync'"
     )
 
     script = tmp_path / "netviz-completion.ps1"

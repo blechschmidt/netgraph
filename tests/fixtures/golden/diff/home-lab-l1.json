@@ -842,7 +842,7 @@
     "schemaVersion": 1,
     "tool": {
       "name": "netviz",
-      "version": "0.0.1"
+      "version": "0.0.2"
     },
     "source": {
       "kind": "tree",

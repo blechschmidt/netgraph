@@ -417,7 +417,12 @@ def test_the_dockerfile_builds_in_two_stages(dockerfile: str) -> None:
     stages = re.findall(r"^FROM\s+\S+\s+AS\s+(\w+)", dockerfile, re.MULTILINE)
     assert stages == ["build", "runtime"]
     assert "COPY --from=build /opt/netviz /opt/netviz" in dockerfile
-    assert "pip install ." in dockerfile
+    # The build stage installs into /opt/netviz and only that directory crosses
+    # into the runtime stage. ``--no-editable`` is what makes that possible: an
+    # editable install would leave a .pth file pointing at /src, which the
+    # shipped image does not have. See tests/test_reproducibility.py for the
+    # ``--locked`` half of this line.
+    assert "uv sync --locked --no-dev --no-editable" in dockerfile
 
 
 def test_the_image_carries_graphviz_and_a_font(dockerfile: str) -> None:

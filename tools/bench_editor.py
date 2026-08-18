@@ -44,7 +44,7 @@ nobody has touched.
 
 Requires the ``browser`` extra and its Chromium::
 
-    pip install --editable ".[dev,browser]" && playwright install chromium
+    uv sync --extra dev --extra browser && uv run playwright install chromium
 
 Without them it says so and exits 0 with no table: a bench nobody can run is
 not a failure, and pretending to have measured would be worse.
@@ -106,7 +106,7 @@ POLL_MS: Final = 25
 SELECTION: Final = 50
 
 #: What the harness needs and how to get it, said once.
-INSTALL: Final = 'pip install --editable ".[dev,browser]" && python -m playwright install chromium'
+INSTALL: Final = "uv sync --extra dev --extra browser && uv run playwright install chromium"
 
 #: Instrumentation, installed before any of the page's own scripts run. Two
 #: hooks, both passive: a mutation observer that stamps every repaint of the

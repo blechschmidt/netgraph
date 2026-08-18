@@ -71,8 +71,19 @@ other way in — see [docker.md](docker.md).
 netviz needs **Python 3.10 or newer**.
 
 ```bash
-pip install -e .            # from a checkout
-pip install -e '.[dev]'     # including the development tooling
+pip install netviz               # from PyPI
+pipx install netviz              # or, to keep it out of your project environments
+uv tool install netviz           # same idea, faster
+```
+
+From a checkout — which is what you want if you are changing netviz itself —
+use [uv](https://docs.astral.sh/uv/). `uv.lock` is committed, so this builds the
+same environment every CI job builds, down to the patch version:
+
+```bash
+uv sync                          # runtime dependencies, from uv.lock
+uv sync --extra dev              # including the development tooling
+uv run netviz --version          # or activate .venv and drop the prefix
 ```
 
 ### Graphviz is a system prerequisite

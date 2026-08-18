@@ -14,8 +14,8 @@ file and SVG output gets the vector one. See `netviz/render/icons.py`.
 The SVG is the source. After editing one, re-run
 
 ```bash
-pip install cairosvg        # not a netviz dependency; only this tool needs it
-python tools/render_icons.py
+uv sync --group icons       # cairosvg is not a netviz dependency
+uv run python tools/render_icons.py
 ```
 
 to bring its PNG back into step — `--check` reports staleness without writing.

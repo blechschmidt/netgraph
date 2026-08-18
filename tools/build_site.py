@@ -47,7 +47,7 @@ time or at read time. The pages are plain HTML over one stylesheet.
 
 Run it locally with::
 
-    pip install -e '.[site]'
+    uv sync --extra site
     python tools/build_site.py --output site
     python -m http.server -d site
 """
@@ -215,9 +215,7 @@ def markdown() -> object:
     try:
         from markdown_it import MarkdownIt
     except ModuleNotFoundError:  # pragma: no cover - the message is the point
-        raise SystemExit(
-            "building the site needs markdown-it-py: pip install -e '.[site]'"
-        ) from None
+        raise SystemExit("building the site needs markdown-it-py: uv sync --extra site") from None
     return MarkdownIt("commonmark", {"html": True, "linkify": False}).enable(
         ["table", "strikethrough"]
     )

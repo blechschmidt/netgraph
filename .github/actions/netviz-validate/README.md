@@ -83,3 +83,15 @@ permissions:
 `python` must already be on `PATH` — use `actions/setup-python` before this
 action, as the examples do. That is deliberate: the action does not choose an
 interpreter version on your behalf.
+
+If [uv](https://docs.astral.sh/uv/) is on `PATH` and a virtualenv is active, the
+install uses `uv pip install` instead — roughly ten times faster on a cold
+runner. `astral-sh/setup-uv` with `activate-environment: true` arranges both and
+is a drop-in for the `setup-python` step above. Neither is required: pip is the
+fallback and behaves identically.
+
+The action carries no lockfile of its own. netviz's `uv.lock` pins the versions
+*that* repository develops against; here you are installing a released netviz
+into an environment of your own. Pin `version:` — that is the knob with your name
+on it.
+

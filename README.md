@@ -62,11 +62,14 @@ netviz version --json      # the same report, for a bug report
 ```
 
 From a checkout instead, when you are working on netviz itself or want an unreleased
-change:
+change. netviz develops with [uv](https://docs.astral.sh/uv/): `uv.lock` is committed,
+so this installs the exact versions every CI job runs against rather than whatever
+resolves today.
 
 ```bash
-pip install -e .            # from a checkout
-pip install -e '.[dev]'     # including the development tooling
+uv sync                     # runtime dependencies, from uv.lock
+uv sync --extra dev         # including the development tooling
+uv run netviz --version     # or activate .venv and drop the prefix
 ```
 
 The `svg`, `png`, `pdf` and `html` formats are produced by running the Graphviz `dot`

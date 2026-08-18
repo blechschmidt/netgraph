@@ -36,14 +36,65 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # Keep pip quiet and deterministic: no version nag, no interactive prompts,
-  # and no attempt to reach a keyring for the public index.
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  PIP_NO_INPUT: "1"
   PYTHONUNBUFFERED: "1"
   FORCE_COLOR: "1"
+  # Every environment in this workflow is built by ``uv sync --locked`` from the
+  # committed ``uv.lock``, so a job resolves nothing: it installs the exact
+  # versions the lockfile names, on every runner and every interpreter. That is
+  # what makes a red matrix entry a statement about *this* commit rather than
+  # about whatever the index published in the last hour.
+  #
+  # ``--locked`` (rather than a plain ``uv sync``) is the half that matters: it
+  # fails when pyproject.toml and uv.lock disagree instead of quietly relocking,
+  # so a dependency edit that forgot to re-lock stops here. It is written out on
+  # every sync below rather than set as UV_LOCKED here, so that each command is
+  # correct read on its own -- and so tests/test_reproducibility.py can insist on
+  # it. The ``lock`` job below says the same thing once and in seconds.
+  #
+  # A byte-compiled venv costs a few seconds once and saves them on every
+  # ``netviz`` invocation in the steps that follow.
+  UV_COMPILE_BYTECODE: "1"
 
 jobs:
+  # The cheapest job in the file and the one that keeps every other job honest:
+  # if uv.lock has drifted from pyproject.toml, ``--locked`` below fails in the
+  # slowest steps of six different jobs with the same message. This says it once,
+  # first, and in seconds.
+  lock:
+    name: uv.lock is current
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+
+      - name: uv lock --check
+        run: |
+          set -euo pipefail
+          if ! uv lock --check; then
+            echo "::error::uv.lock is out of date with pyproject.toml; run 'uv lock' and commit the result"
+            exit 1
+          fi
+          echo "uv.lock matches pyproject.toml"
+
+      # A lockfile is only reproducibility if what it pins can still be fetched.
+      # ``--frozen`` neither re-locks nor consults pyproject.toml, so this is a
+      # download of the exact closure the matrix is about to install -- every
+      # extra and every group, including the two nothing else in CI installs.
+      #
+      # This is the one job that deliberately asks setup-uv for no cache. A cache
+      # would serve the wheels from the runner instead of the index, which is
+      # precisely the fact this step is checking; a yanked or withdrawn
+      # distribution would then keep passing here until the cache expired.
+      - name: Every pinned distribution still resolves
+        run: uv sync --frozen --all-extras --all-groups --no-install-project
+
+
   test:
     name: test (${{ matrix.os }}, python ${{ matrix.python-version }}, yaml ${{ matrix.yaml-loader }})
     runs-on: ${{ matrix.os }}
@@ -187,19 +238,57 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value $dot.DirectoryName
           & $dot.FullName -V
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      # uv rather than actions/setup-python, and the two are not interchangeable
+      # here. uv is what reads uv.lock, and it also supplies the interpreter --
+      # from the same ``python-version`` this matrix names -- so the Python and
+      # the packages come from one tool with one pin instead of two that can
+      # disagree. ``activate-environment`` puts the project venv on PATH for
+      # every step below, which is why they still say ``pytest`` and ``netviz``
+      # rather than ``uv run pytest``: the shape of this job did not change, only
+      # where its bytes come from. The uv version itself is pinned by
+      # ``[tool.uv] required-version`` in pyproject.toml, which setup-uv reads.
+      - name: Set up uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
-      - name: Install netviz and its dev extras
+      - name: Install netviz and its dev extras, from uv.lock
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip
-          python -m pip install --editable ".[dev]"
-          python -m pip list
+          uv sync --locked --extra dev
+          uv pip list
+
+      # The environment is only reproducible if it is the one the rest of the job
+      # runs in. A stale interpreter on PATH -- the runner image ships several --
+      # would let every step below pass against packages nobody pinned.
+      - name: Confirm the locked environment is the one on PATH
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import pathlib
+          import sys
+
+          # ``normcase`` rather than a plain comparison: on Windows the runner
+          # spells the workspace ``D:\a\...`` and the interpreter may report
+          # ``d:\a\...``, and a job failing over the case of a drive letter would
+          # be a worse lie than the one this step exists to catch.
+          def key(path: pathlib.Path) -> str:
+              return os.path.normcase(str(path.resolve()))
+
+          prefix = pathlib.Path(sys.prefix)
+          expected = pathlib.Path(os.environ["GITHUB_WORKSPACE"]) / ".venv"
+          print(f"sys.prefix={prefix} python={sys.version.split()[0]}")
+          if key(prefix) != key(expected):
+              raise SystemExit(f"::error::running from {prefix}, not the locked env at {expected}")
+          wanted = "${{ matrix.python-version }}"
+          got = f"{sys.version_info.major}.{sys.version_info.minor}"
+          if got != wanted:
+              raise SystemExit(f"::error::the locked env is Python {got}, the matrix asked for {wanted}")
+          PY
 
       # ``dot -V`` above proved the *shell* can find Graphviz. This proves
       # netviz can, which on Windows is a different question: the installer
@@ -445,18 +534,23 @@ jobs:
           sudo apt-get install --no-install-recommends --yes graphviz
           dot -V
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
-      - name: Install netviz, its dev extras and Playwright
+      # Playwright above all: the driver version decides which browser build
+      # ``playwright install`` fetches, so an unpinned driver is a browser that
+      # changes under the accessibility gate overnight. uv.lock pins it, and the
+      # step below downloads exactly the build this driver asks for.
+      - name: Install netviz, its dev extras and Playwright, from uv.lock
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip
-          python -m pip install --editable ".[dev,browser]"
+          uv sync --locked --extra dev --extra browser
+          uv pip list
 
       # ``--with-deps`` installs the shared libraries the headless browser needs,
       # which the runner image does not carry in full. Chromium only: this layer
@@ -587,12 +681,19 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      # The composite action installs netviz itself, into whatever environment it
+      # finds -- that is its contract in somebody else's repository, and this job
+      # exercises it as written. What it needs from here is an interpreter and a
+      # uv on PATH for it to prefer; ``activate-environment`` gives it a venv to
+      # install into rather than the system Python, which on this runner is
+      # externally managed.
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       # Uses the action from this very checkout, so a change to it is tested by
       # the pull request that makes it rather than after the merge.
@@ -691,21 +792,24 @@ jobs:
           sudo apt-get install --no-install-recommends --yes graphviz
           dot -V
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          # The examples are rendered by the shipped console script, so this job
-          # deliberately installs no dev extras -- it checks that a plain
-          # ``pip install netviz`` can draw the documented inventories.
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
-      - name: Install netviz
+      # The examples are rendered by the shipped console script, so this job
+      # deliberately installs no extras and no groups -- it checks that a plain
+      # install of netviz can draw the documented inventories. ``--no-dev`` is
+      # the uv spelling of that: the default group is excluded too, so what ends
+      # up here is exactly the ``dependencies`` list and its closure.
+      - name: Install netviz, from uv.lock
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip
-          python -m pip install --editable .
+          uv sync --locked --no-dev
+          uv pip list
 
       - name: Render every example inventory to SVG
         run: |

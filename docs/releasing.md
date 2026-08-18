@@ -203,13 +203,31 @@ and by `workflow_dispatch`.
    workflow. The same gate a pull request passes: the full matrix, the examples, the
    container. Not a subset, because "it was green on main" is not the same statement as "it
    is green at this tag".
-3. **`build`** — `python -m build` for the sdist and the wheel, `twine check --strict`, and a
-   CycloneDX SBOM of the wheel's dependency closure.
+3. **`build`** — `python -m build --no-isolation` for the sdist and the wheel,
+   `twine check --strict`, and a CycloneDX SBOM of the wheel's dependency closure.
+   `build`, `twine` **and hatchling** come from the `release` dependency group in
+   `pyproject.toml`, installed with `uv sync --locked --only-group release`, so all three are
+   pinned by `uv.lock`. `--no-isolation` is what makes the hatchling pin reach the build:
+   without it `build` resolves a backend of its own in a throwaway environment, and the
+   backend is what stamps the core-metadata version into the distribution — which is the
+   exact mechanism that cost v0.0.1 an irreversible step (see
+   [Where the first release stands](#where-the-first-release-stands)). The SBOM is likewise
+   taken from an environment built
+   with `uv sync --locked`, so re-running a tag inventories the same closure rather than
+   whatever the index published that morning.
 4. **`verify`** — on `ubuntu-latest`, `macos-14` and `windows-latest`: a fresh virtualenv,
-   `pip install` the wheel, and `netviz --version` from the installed console script. Then
-   the same again from the **sdist**, which additionally proves the sdist builds — an sdist
-   that unpacks but does not build is the classic release-day surprise. Neither install uses
-   the checkout, so a missing package or a missing data file fails here.
+   `uv pip install` of the wheel, and `netviz --version` from the installed console script.
+   Then the same again from the **sdist**, which additionally proves the sdist builds — an
+   sdist that unpacks but does not build is the classic release-day surprise. Neither install
+   uses the checkout, so a missing package or a missing data file fails here.
+
+   This is the one job in the repository that **deliberately ignores `uv.lock`**, and the
+   omission is the check. What is being tested is whether the published artefact stands up in
+   an environment that has never seen this repository: its dependency ranges resolving, its
+   console script being generated, its package data being present. A user typing
+   `pip install netviz` has no copy of our lockfile, so handing one to this job would answer a
+   question nobody can ask and would hide a range that no longer resolves.
+   `tests/test_reproducibility.py` asserts both the omission and the sentence explaining it.
 5. **`pypi`** — [Trusted Publishing](https://docs.pypi.org/trusted-publishers/): the runner
    exchanges its OIDC token for a short-lived upload token, so this repository stores no PyPI
    credential of any kind and there is nothing to leak or rotate. On `workflow_dispatch` the
@@ -404,3 +422,10 @@ and Graphviz versions; that the trusted publisher table above names the same rep
 guard; and that the release workflow pins its actions, keeps its permissions per job, and
 names the environments the trusted publisher expects. So a release that would fail at the
 gate fails on the pull request instead.
+
+[`tests/test_reproducibility.py`](../tests/test_reproducibility.py) covers the other half:
+that `uv.lock` is committed and agrees with `pyproject.toml`, that every job that builds an
+environment does so with `--locked`, that the `release` group pins the build backend named in
+`[build-system] requires`, that the SBOM is taken from the locked closure, and that `verify`
+still is not. A pin that quietly stops being a pin is the failure mode all of that exists to
+catch, and it is the failure mode that is invisible on a green run.

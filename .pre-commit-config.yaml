@@ -1,15 +1,19 @@
 # Local mirror of the lint gates in .github/workflows/ci.yml.
 #
-#   pip install pre-commit && pre-commit install
+#   uv sync --extra dev && uv run pre-commit install
 #
-# The hook revisions are pinned; ``pre-commit autoupdate`` moves them. Keep the
-# ruff rev in step with the ``ruff`` pin in pyproject.toml's dev extra, or the
-# hook and CI can disagree about what "formatted" means.
+# The hook revisions are pinned; ``pre-commit autoupdate`` moves them. The ruff
+# rev has to name the *exact* version uv.lock pins, or the hook and CI disagree
+# about what "formatted" means -- a disagreement that shows up as a commit which
+# passed locally and fails in CI, with no diff to explain it. That is not left to
+# a comment: tests/test_reproducibility.py reads both files and fails if they
+# drift, so ``pre-commit autoupdate`` without a matching ``uv lock`` is caught by
+# the suite rather than by the next contributor.
 minimum_pre_commit_version: "3.5.0"
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.0
+    rev: v0.16.3
     hooks:
       # Two deliberate differences from CI, neither of which changes the verdict:
       #
@@ -38,3 +42,20 @@ repos:
         files: ^examples/.*\.ya?ml$
         # examples/*/cables/links.yaml and friends are multi-document.
         args: [--allow-multiple-documents]
+
+  # Editing pyproject.toml's dependencies without re-running ``uv lock`` produces
+  # a commit that fails every job in CI at its install step -- six red matrix
+  # entries for one missing file. This catches it at the commit, in the second it
+  # takes uv to compare the two.
+  #
+  # ``language: system`` because uv is not a Python package here: it is the tool
+  # that would install one. Contributors who have run through docs/getting-started
+  # have it; the hook says what to do when they have not.
+  - repo: local
+    hooks:
+      - id: uv-lock-check
+        name: uv.lock is in step with pyproject.toml
+        entry: uv lock --check
+        language: system
+        pass_filenames: false
+        files: ^(pyproject\.toml|uv\.lock)$

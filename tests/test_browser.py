@@ -44,7 +44,7 @@ Running it
 
 ::
 
-    $ pip install --editable ".[dev,browser]"
+    $ uv sync --extra dev --extra browser
     $ playwright install chromium
     $ pytest tests/test_browser.py --no-cov
 
@@ -199,7 +199,7 @@ pytestmark = [
     pytest.mark.browser,
     pytest.mark.skipif(
         not HAVE_PLAYWRIGHT,
-        reason="Playwright is not installed; pip install '.[browser]' to drive a real browser",
+        reason="Playwright is not installed; uv sync --extra browser to drive a real browser",
     ),
     requires_dot,
 ]
@@ -3264,7 +3264,7 @@ def test_a_crowd_can_be_zoomed_in_far_enough_to_read(open_editor: OpenEditor) ->
 #: Why the axe tests skip when the checker is not installed. The same shape as
 #: the Playwright skip above: never a hard failure for somebody who has one half
 #: of the browser layer and not the other.
-NO_AXE: Final = "axe-core is not installed; pip install '.[browser]' to run the accessibility gate"
+NO_AXE: Final = "axe-core is not installed; uv sync --extra browser to run the accessibility gate"
 
 
 def _violations(editor: Editor, *, include: str | None = None) -> list[Mapping[str, Any]]:

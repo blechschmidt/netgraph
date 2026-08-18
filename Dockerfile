@@ -25,24 +25,45 @@ ARG PYTHON_VERSION=3.12
 # --------------------------------------------------------------------------- #
 FROM python:${PYTHON_VERSION}-slim AS build
 
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_ROOT_USER_ACTION=ignore \
-    PIP_NO_INPUT=1
+# uv, out of Astral's distroless image -- a single static binary, no apt and no
+# bootstrap install script piped from the network. Both a tag and a digest: the
+# tag names the same version ``[tool.uv] required-version`` in pyproject.toml
+# does, so the resolver that wrote uv.lock is the resolver that reads it here and
+# ``uv sync`` refuses outright if the two ever drift; the digest is what makes
+# that a fact rather than a hope, since a tag can be moved. It is the multi-arch
+# index digest, so ``linux/amd64`` and ``linux/arm64`` both resolve from it --
+# ``container.yml`` builds the image for both.
+COPY --from=ghcr.io/astral-sh/uv:0.11.14@sha256:1025398289b62de8269e70c45b91ffa37c373f38118d7da036fb8bb8efc85d97 /uv /uvx /usr/local/bin/
+
+ENV UV_LINK_MODE=copy \
+    UV_NO_CACHE=1 \
+    # The venv this stage produces and the next stage copies. Naming it here is
+    # what lets ``uv sync`` build it in place instead of ``.venv`` under /src.
+    UV_PROJECT_ENVIRONMENT=/opt/netviz \
+    # Byte-compiled once, at build time, rather than on the first run of every
+    # container -- which for a read-only rootfs is never, so the interpreter
+    # would re-parse the whole package on each start.
+    UV_COMPILE_BYTECODE=1
 
 WORKDIR /src
 
-# Only what the wheel is built from. ``README.md`` and ``LICENSE`` are not
+# Only what the environment is built from. ``README.md`` and ``LICENSE`` are not
 # decoration here: pyproject.toml points its ``readme`` and ``license`` at them,
-# so the build fails without them.
-COPY pyproject.toml README.md LICENSE ./
+# so the build fails without them. ``uv.lock`` is what makes the image
+# reproducible -- rebuild this Dockerfile a year from now and it installs the
+# same pydantic, the same PyYAML and the same closure underneath them.
+COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src ./src
 
-# A venv rather than the system interpreter: one directory to copy into the next
-# stage, and nothing of pip's own installed alongside the application.
-RUN python -m venv /opt/netviz \
-    && /opt/netviz/bin/pip install --upgrade pip \
-    && /opt/netviz/bin/pip install . \
+# ``--locked`` rather than a plain sync: a lockfile that disagrees with
+# pyproject.toml fails the build here instead of silently resolving something
+# nobody reviewed into a published image.
+#
+# ``--no-dev`` because nothing in this image runs the test suite, and
+# ``--no-editable`` because the next stage copies /opt/netviz and leaves /src
+# behind -- an editable install would ship a .pth file pointing at a directory
+# that does not exist in the runtime image.
+RUN uv sync --locked --no-dev --no-editable \
     && /opt/netviz/bin/netviz --version
 
 

@@ -14,7 +14,7 @@ The PNGs are committed rather than generated at install time, because
 rasterising needs cairo and netviz does not otherwise depend on it. Run this
 after editing an SVG::
 
-    pip install cairosvg      # not a project dependency; only this tool needs it
+    uv sync --group icons     # not a project dependency; only this tool needs it
     python tools/render_icons.py
 
 ``--check`` reports what is stale without writing anything, which is what a
@@ -50,7 +50,7 @@ def render(source: Path) -> bytes:
     except ImportError:  # pragma: no cover - developer tooling
         raise SystemExit(
             "cairosvg is needed to rasterise the icons and is not installed "
-            "(it is deliberately not a netviz dependency): pip install cairosvg"
+            "(it is deliberately not a netviz dependency): uv sync --group icons"
         ) from None
 
     payload = cairosvg.svg2png(url=str(source), scale=SCALE)

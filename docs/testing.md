@@ -27,8 +27,8 @@ The first two and `tests/test_lsp.py` run under a plain `pytest`.
 never fails for the want of one.
 
 ```console
-$ pip install --editable ".[dev]"
-$ pytest
+$ uv sync --extra dev
+$ uv run pytest
 ```
 
 The suite runs with the parse cache **on**, redirected to a temporary directory
@@ -198,9 +198,9 @@ issued here landing there, a save crossing without either page refetching the
 whole tree.
 
 ```console
-$ pip install --editable ".[dev,browser]"
-$ playwright install chromium
-$ pytest -m browser --no-cov
+$ uv sync --extra dev --extra browser
+$ uv run playwright install chromium
+$ uv run pytest -m browser --no-cov
 ```
 
 `--no-cov` because this layer is deliberately outside the coverage gate: it
@@ -208,8 +208,8 @@ imports very little Python and would only dilute a number that is about the
 package. `-m browser` selects it; `-m 'not browser'` leaves it out of a run that
 wants everything else.
 
-Playwright is in the **`browser` extra rather than in `dev`**, so `pip install
-'.[dev]'` stays what it was. Without it — or with it but without the browser it
+Playwright is in the **`browser` extra rather than in `dev`**, so `uv sync
+--extra dev` stays what it was. Without it — or with it but without the browser it
 drives — the whole module skips and says which command to run. It is never a hard
 failure for a contributor who has neither, and `NETVIZ_INSTALL_BROWSER=1` turns
 the second command above into something the suite does for itself, which is how
@@ -325,8 +325,8 @@ It needs Graphviz and `markdown-it-py`, and skips itself with the command to
 install the second:
 
 ```console
-$ pip install -e '.[site]'
-$ pytest tests/test_site.py
+$ uv sync --extra site
+$ uv run pytest tests/test_site.py
 ```
 
 `.github/workflows/pages.yml` runs the same builder and fails the job if any

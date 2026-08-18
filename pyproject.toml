@@ -90,6 +90,43 @@ browser = [
     "axe-core-python>=0.1",
 ]
 
+# PEP 735 groups, not extras. Nothing here is something a *consumer* of the
+# package can ask for -- ``pip install netviz[release]`` is meaningless -- so it
+# stays out of the published metadata and lives here, where ``uv.lock`` still
+# pins it. That is the whole point: the release pipeline's own tooling is as
+# reproducible as the package's dependencies, and a twine that changes under a
+# tag push is how v0.0.1 lost a run (see the note in .github/workflows/pypi.yaml).
+[dependency-groups]
+release = [
+    "build>=1.2",
+    "twine>=6.1",
+    # The build backend, named a second time. ``[build-system] requires`` above
+    # is what an *isolated* build resolves fresh, which means the backend that
+    # produces a released wheel is whatever the index published that morning --
+    # and the backend decides the core-metadata version stamped into the
+    # distribution. Pinning it here and building with ``--no-isolation`` makes
+    # re-running a release produce the same metadata as the first attempt.
+    "hatchling>=1.21",
+]
+# ``tools/render_icons.py`` only, and only to regenerate the raster icons under
+# src/netviz/render/iconsets. It needs a system cairo, so it is not something a
+# contributor typing ``uv sync`` should have to have -- but the version that
+# rasterises the shipped PNGs is worth pinning, because a different one draws
+# different bytes. ``uv sync --group icons`` when you mean to regenerate them.
+icons = [
+    "cairosvg>=2.7",
+]
+
+[tool.uv]
+# The version of uv itself, and it is not decoration. ``astral-sh/setup-uv``
+# reads this key when no explicit ``version:`` is given, so every job in every
+# workflow installs exactly this uv -- one place to bump instead of six -- and
+# uv refuses to run against a pyproject.toml that names a different one, so a
+# contributor's shell and CI cannot resolve the lockfile with two resolvers.
+# ``uv self update`` alone is therefore not enough: bump this too, re-run
+# ``uv lock`` and commit both.
+required-version = "0.11.14"
+
 [project.urls]
 # The canonical URLs. ``netviz.rules.RULES_DOC_URL`` and the SARIF
 # ``informationUri`` are built from the same repository, so a rename has to
@@ -138,6 +175,12 @@ include = [
     # section for the version in this file, and the release workflow must keep its
     # actions pinned. Neither check can run from an sdist that omits them.
     "/CHANGELOG.md",
+    # tests/test_reproducibility.py resolves both against the tree it is running
+    # in: the lockfile has to agree with the pyproject.toml beside it, and the
+    # workflows have to install from it. An sdist without them would ship those
+    # tests with nothing for them to read.
+    "/uv.lock",
+    "/.python-version",
 ]
 
 [tool.ruff]

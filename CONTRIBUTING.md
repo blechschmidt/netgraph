@@ -34,17 +34,38 @@ sudo apt-get install --no-install-recommends graphviz   # or: brew install graph
 dot -V
 ```
 
-Then a virtual environment and an editable install with the dev extras:
+Then [**uv**](https://docs.astral.sh/uv/), which is how every environment in this
+repository is built — your checkout, all six CI jobs, the published site and the
+container image:
 
 ```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install --editable '.[dev]'
+curl -LsSf https://astral.sh/uv/install.sh | sh    # or: brew install uv, pipx install uv
+uv sync --extra dev
 ```
 
-That pulls in pytest, pytest-cov, ruff, mypy, hypothesis, jsonschema, pre-commit,
-the `graphviz` wrapper (used by the tests as an independent second opinion on the
-layout) and `types-PyYAML`. Check the console script is wired up:
+That one command creates `.venv`, fetches the interpreter named in
+`.python-version`, and installs **the exact versions recorded in `uv.lock`** —
+pytest, pytest-cov, ruff, mypy, hypothesis, jsonschema, pre-commit, the
+`graphviz` wrapper (used by the tests as an independent second opinion on the
+layout) and `types-PyYAML`. Exact, not "compatible with": the lockfile is what
+makes a failure on your machine and a failure in CI the same failure. Run things
+through it with `uv run`, or activate `.venv` and forget uv is there:
+
+```bash
+uv run pytest              # or: . .venv/bin/activate && pytest
+```
+
+The other environments are one flag away — `--extra browser` for the Playwright
+suite, `--extra site` for the documentation build, `--group icons` for the
+rasteriser. `uv sync` is exact in both directions, so switching between them
+removes what the new set does not need.
+
+**Editing dependencies?** Change `pyproject.toml`, run `uv lock`, and commit both
+files. CI's first and fastest job is `uv lock --check`, and the pre-commit hook
+of the same name catches it a minute earlier. Every install in CI uses
+`--locked`, which fails rather than quietly resolving something nobody reviewed.
+
+Check the console script is wired up:
 
 <!-- run: cwd=examples/quickstart -->
 ```console
@@ -58,7 +79,7 @@ becoming dead code. If you touch `loader/documents.py` or the model layer, run
 your tests both ways:
 
 ```bash
-NETVIZ_YAML_LOADER=python pytest
+NETVIZ_YAML_LOADER=python uv run pytest
 ```
 
 It also runs the whole suite on `windows-latest` and `macos-14`, on 3.12 each.
@@ -139,9 +160,9 @@ CI also has four jobs beyond `test`: `discover-examples` and `validate-examples`
 run the composite action, the SARIF upload and the annotation format over every
 inventory under `examples/` (so a broken integration breaks here rather than in
 somebody else's pipeline), `render-examples` installs netviz **without** the
-dev extras and renders every example to SVG, checking that a plain
-`pip install netviz` can draw the documented inventories, and `docker` builds
-the image and drives all three services of `docker-compose.yml` — the CLI, the
+dev extras (`uv sync --locked --no-dev`) and renders every example to SVG,
+checking that a plain install of netviz can draw the documented inventories, and
+`docker` builds the image and drives all three services of `docker-compose.yml` — the CLI, the
 editor and the live preview — because a compose file that parses is not a compose
 file that works. See [docs/ci.md](docs/ci.md) and [docs/docker.md](docs/docker.md).
 
@@ -151,8 +172,8 @@ file that works. See [docs/ci.md](docs/ci.md) and [docs/docker.md](docs/docker.m
 optional but saves a round trip:
 
 ```bash
-pre-commit install
-pre-commit run --all-files
+uv run pre-commit install
+uv run pre-commit run --all-files
 ```
 
 Two deliberate differences from CI, neither of which changes the verdict: the
@@ -160,12 +181,19 @@ ruff hooks run with `--fix` because locally a repair is more useful than a
 report, and they add `markdown` to `types_or` because CI runs `ruff check .` /
 `ruff format --check .` over everything and ruff handles Python embedded in
 Markdown. Everything else comes from `[tool.ruff]` in `pyproject.toml`, so the
-rule set cannot drift between the two. Keep the `ruff` rev in
-`.pre-commit-config.yaml` in step with the `ruff` pin in the `dev` extra, or the
-hook and CI can disagree about what "formatted" means.
+rule set cannot drift between the two. The `ruff` rev in
+`.pre-commit-config.yaml` has to name the exact version `uv.lock` pins, or the
+hook and CI disagree about what "formatted" means — a commit that was formatted
+locally and is not in CI, with no diff to explain it.
+`tests/test_reproducibility.py` reads both files and fails if they drift, so
+`pre-commit autoupdate` without a matching `uv lock` is caught by the suite.
 
-There is also a `check-yaml` hook over `examples/`, because a YAML syntax error
-in an inventory otherwise surfaces as a loader failure well after the commit.
+Two more hooks: `check-yaml` over `examples/`, because a YAML syntax error in an
+inventory otherwise surfaces as a loader failure well after the commit; and
+`uv-lock-check`, which runs `uv lock --check` whenever `pyproject.toml` or
+`uv.lock` is staged. Editing dependencies without re-locking otherwise fails
+every job in CI at its install step — six red matrix entries for one missing
+file.
 
 Do not confuse `.pre-commit-config.yaml` with `.pre-commit-hooks.yaml`: the
 latter is what netviz *publishes*, the `netviz-validate` hook that other
@@ -264,8 +292,8 @@ since Graphviz cannot read an SVG image in its cairo-backed outputs. After
 editing one, re-run the rasteriser — `--check` reports staleness without writing:
 
 ```bash
-pip install cairosvg                     # only this tool needs it
-python tools/render_icons.py
+uv sync --group icons                    # only this tool needs cairosvg
+uv run python tools/render_icons.py
 ```
 
 **The published site** is built the same way, from `docs/` and `examples/`, and
@@ -275,9 +303,9 @@ locally when you have changed a page, an example or the builder:
 
 <!-- norun: writes ./site and then serves it until interrupted -->
 ```bash
-pip install -e '.[site]'
-python tools/build_site.py --output site
-python -m http.server -d site 8000
+uv sync --extra site
+uv run python tools/build_site.py --output site
+uv run python -m http.server -d site 8000
 ```
 
 The build fails if any example stops rendering or any link points at nothing
