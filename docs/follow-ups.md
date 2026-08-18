@@ -366,6 +366,12 @@ path. Should the threshold ever need raising for a platform rather than for a
 regression, raising it here and recording it in this entry is the intended fix,
 not deleting the test.
 
+**The libyaml threshold is no longer 1.70, and the "checked in both directions"
+above is why it took two moves to find that out.** It is `2.00` on every
+platform since 2026-08-18; the seventy-sample harvest that set it, and why the
+row can no longer catch a revert of this entry either, are at the end of entry
+12.
+
 ### Measured and rejected
 
 Four candidates were profiled and not taken. Recorded with their numbers so the
@@ -1445,6 +1451,60 @@ reads 11.6 there and one of `models/interface.py` reads 17.5 — so both pieces 
 sharp copy catches are still caught, the first of them only just. That last
 margin is the reason 9.5 stays on the other five jobs instead of everyone moving
 up to 11.0.
+
+**2026-08-18: the *load* guard's Linux row was never the sharp one, and
+eighty-four samples say so.** "What to watch" above asked for exactly this and
+named this entry as where the number gets written down, so: CI read **1.72** on `ce7f68b`,
+`ubuntu-24.04` 3.11, against the 1.70 set here — on a commit whose whole diff was
+six documents' version strings and a changelog heading.
+
+The `[perf]` line makes the population readable rather than the failure, and this
+is the whole of it — the seven CI runs of 2026-08-16 to -18, `40a0a47` through
+`ce7f68b`, two samples per job (the suite's own, under coverage with the tracer
+paused, and the `--no-cov` step that writes the run summary):
+
+| job | load/floor | samples | median | spread |
+|---|---|---|---|---|
+| ubuntu-24.04 3.10 / 3.11 / 3.12, libyaml | 1.48–1.72 | 42 | 1.60 | 15 % |
+| macos-14 3.12, libyaml | 1.49–1.55 | 14 | 1.51 | 4 % |
+| windows-latest 3.12, libyaml | 1.67–1.80 | 14 | 1.73 | 7 % |
+| ubuntu-24.04 3.12, pure Python | 1.07–1.11 | 14 | 1.10 | 4 % |
+
+Rebuild it with the runs API rather than by hand — `/actions/runs?event=push`
+filtered to `CI`, then each `test (…)` job's log grepped for `^\[perf\]`.
+
+**Linux is the widest of the four, not the tightest.** The claim this entry made
+above — "the three Linux libyaml jobs agree within 0.04" — was true of the six
+samples it was read from and is false of forty-two: `ubuntu-24.04` 3.10 reads
+1.57 and 1.65 twice in the same job, and `ubuntu-24.04` 3.11 reads 1.57 on
+2026-08-17 and 1.72 on -18. So the Linux/elsewhere split is deleted, not
+re-tuned: there is no platform left whose figures a sharp copy would belong to.
+`MAX_LOAD_RATIO_LIBYAML = 2.00` now covers the parser everywhere, 11 % above the
+worst of the seventy that go through libyaml, which is the trade
+`MAX_VALIDATE_RATIO_WINDOWS` documents.
+
+The physics were diagnosed correctly here and applied to the wrong axis. It is
+not that Linux is stable and the other two are not; it is that *no* host cancels
+out of this ratio, because its two halves are not the same kind of work — the
+floor reads forty files through a C parser, the numerator adds pydantic on top,
+so the ratio measures how one host balances filesystem against interpreter. The
+pure-Python row is the control that settles it: both of *its* halves are
+interpreter-bound, and it spans 4 % across the same fleet that moves the libyaml
+row 15 %.
+
+Two things were checked before blunting rather than de-noising. The estimator is
+not the problem — 120 interleaved rounds locally, resampled, put `min/min` at a
+0.06 spread over eight samples and 0.03 over twenty-four, and it holds under
+three busy cores (0.035), so more samples would buy 0.03 of a 0.24 problem. And
+the alternatives are worse: the minimum of the per-round ratios has a long low
+tail (a stalled floor round halves it), and their median has a long high one.
+
+What that costs: an entry-5-sized regression is now invisible here. A full revert
+reads 1.79 on a median host, inside what the fleet does with nothing changed at
+all, so no threshold both catches it and survives. The guard is a
+catastrophic-regression guard on every platform now, which is what the
+pure-Python row has always honestly been, and `validate` — 7.2–8.7 against 9.5,
+9.5 being the number that has held — remains the sharp one.
 
 ---
 

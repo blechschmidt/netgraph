@@ -31,40 +31,57 @@ differs by a factor of eight between the two:
 =============  ===============  ==========  =========
 Parser         Before entry 5   Today       Threshold
 =============  ===============  ==========  =========
-libyaml        1.78-1.79        1.58-1.60   1.70
-pure Python    1.16             1.10-1.12   1.25
+libyaml        1.78-1.79        1.48-1.80   2.00
+pure Python    1.16             1.07-1.11   1.25
 =============  ===============  ==========  =========
 
-The libyaml row is the guard that does the work, and it was checked in both
-directions: it passed on the commit that set it and failed on its parent,
-quoting 1.79. The margin either side is real but not generous — 6 % of headroom
-above today and 12 % below a full revert — which is the price of a guard sharp
-enough to notice anything.
+**The libyaml row used to be the guard that did the work, and it is not.** It
+was set at 1.70, checked in both directions — it passed on the commit that set
+it and failed on its parent, quoting 1.79 — and that 6 % of headroom was
+described here as the price of a guard sharp enough to notice anything. It was
+the price of a guard that fails runs which have regressed nothing. It did so on
+``ce7f68b``, a commit that changed six documents' version strings, quoting 1.72.
 
-That sharpness is why the libyaml threshold is **1.70 on Linux and 1.95
-elsewhere**, and the difference is not a concession, it is the premise failing.
-Machine speed cancels out of a ratio only when both halves are the same kind of
-work, and here they are not: the floor reads forty files and runs a C parser
-over them, the numerator adds pydantic on top, and the balance between
-filesystem and interpreter is the thing that differs most between the runners.
-One commit, all six CI jobs:
+What went wrong is not the estimator, it is what the number was calibrated from:
+six samples off one commit. The ``[perf]`` line exists to make that recoverable,
+and eighty-four samples — the seven CI runs of 2026-08-16 to -18, two prints per
+job because the suite measures once under coverage and the step that writes the
+run summary measures again with ``--no-cov`` — say what six could not:
 
-===================================  ==========  =========  ========
-Job                                  load/floor  validate   headroom
-===================================  ==========  =========  ========
-ubuntu-24.04 3.10 libyaml            1.59        7.31       7 %
-ubuntu-24.04 3.11 libyaml            1.56        7.54       8 %
-ubuntu-24.04 3.12 libyaml            1.60        7.48       6 %
-ubuntu-24.04 3.12 pure Python        1.09        7.31       13 %
-macos-14 3.12 libyaml                1.46        7.04       25 %
-windows-latest 3.12 libyaml          1.76        8.48       10 %
-===================================  ==========  =========  ========
+=============================  ===========  ==========  =======  =======
+Job                            load/floor   samples     median   spread
+=============================  ===========  ==========  =======  =======
+ubuntu-24.04, three libyaml    1.48-1.72    42          1.60     15 %
+macos-14 3.12                  1.49-1.55    14          1.51     4 %
+windows-latest 3.12            1.67-1.80    14          1.73     7 %
+ubuntu-24.04 3.12 pure Python  1.07-1.11    14          1.10     4 %
+=============================  ===========  ==========  =======  =======
 
-The three Linux libyaml jobs agree within 0.04; Windows is 0.16 above them and
-macOS 0.13 below, which puts both *inside* the 1.60-to-1.79 band this row exists
-to discriminate within. So the Linux copy stays sharp, and the other two get the
-blunter 1.95: an entry-5-sized regression is invisible to them, a catastrophic
-one is not.
+Linux is the **widest** of the four, not the tightest. "The three Linux libyaml
+jobs agree within 0.04" was true of the six samples it was read from and is not
+true of forty-two: ``ubuntu-24.04`` 3.10 reads 1.57 and 1.65 twice in the same
+job, and ``ubuntu-24.04`` 3.11 reads 1.57 on 2026-08-17 and 1.72 on -18. There
+is no Linux row to keep sharp, so the split between Linux and everywhere else is
+gone and one number covers the parser.
+
+That the ratio moves 15 % between two hosts of the same fleet is the ratio's
+premise failing, not noise, and the pure-Python row is the control that proves
+it. Machine speed cancels out of a ratio only when both halves are the same kind
+of work. Through libyaml they are not — the floor reads forty files and runs a C
+parser over them, the numerator adds pydantic on top, so the ratio is really a
+measurement of how a given host balances filesystem against interpreter.
+Through the pure-Python parser both halves *are* interpreter-bound, the host
+does cancel, and that row spans 4 % across the same runners.
+
+**So the whole guard is now the blunt kind**, on the terms the pure-Python row
+has always been kept: 2.00 is 11 % above the worst of the seventy that go
+through libyaml, which is the same trade the Windows ``validate`` row documents
+below. An entry-5-sized
+regression is invisible to it — a full revert reads 1.79 on a median host, inside
+what the fleet does on its own — and a catastrophic one, anything that doubles
+what netviz adds to a parse, is not. Do not set this number from one run's
+worth of samples again; entry 12 of ``docs/follow-ups.md`` has the harvest and
+says how to rebuild it from the runs API.
 
 The ``validate`` column was read for a long time as needing no such split — both
 of its halves run over an inventory already in memory, so the parser does not
@@ -208,25 +225,12 @@ HARNESS = REPO_ROOT / "tools" / "bench_pipeline.py"
 
 #: ``full / floor`` ceilings, keyed by whether libyaml is the parser in use.
 #: See the module docstring for where the numbers come from.
-MAX_LOAD_RATIO_LIBYAML = 1.70
+#:
+#: One number per parser, and no platform split: the seventy-sample harvest in
+#: the docstring puts Linux's spread (1.48-1.72) *around* both Windows' and
+#: macOS', so there is no platform whose figures the sharp copy would belong to.
+MAX_LOAD_RATIO_LIBYAML = 2.00
 MAX_LOAD_RATIO_PURE_PYTHON = 1.25
-
-#: What the libyaml ceiling becomes off the platform it was calibrated on.
-#:
-#: The premise of a ratio is that machine speed cancels out, and for the two
-#: halves of the *validate* guard it does. It does not here, because the two
-#: halves are not the same kind of work: the floor reads forty files and runs a C
-#: parser over them, the numerator adds pydantic on top, and the balance between
-#: filesystem and interpreter is exactly what differs most between an
-#: ubuntu-24.04 runner and a windows-latest one. Measured 1.58-1.60 on Linux and
-#: 1.72 on Windows, on the same commit — inside the 1.60-to-1.79 band this guard
-#: exists to discriminate within, so on Windows it was not discriminating, it was
-#: failing.
-#:
-#: Blunter off Linux, deliberately, and for the same reason the pure-Python row
-#: is blunter: an entry-5-sized regression is not visible here, and a
-#: catastrophic one still is. The sharp copy runs on all four Linux jobs.
-MAX_LOAD_RATIO_LIBYAML_ELSEWHERE = 1.95
 
 #: ``validate / address-walk floor`` ceiling. Parser-independent — both halves
 #: run over an inventory that is already in memory — but *not* platform
@@ -455,12 +459,7 @@ def test_loading_costs_no_more_than_its_budget_above_the_parse(
     ratio = full / floor
 
     libyaml_in_use = HAVE_LIBYAML and StrictSafeLoader.__name__ == "CStrictSafeLoader"
-    if not libyaml_in_use:
-        budget = MAX_LOAD_RATIO_PURE_PYTHON
-    elif sys.platform.startswith("linux"):
-        budget = MAX_LOAD_RATIO_LIBYAML
-    else:
-        budget = MAX_LOAD_RATIO_LIBYAML_ELSEWHERE
+    budget = MAX_LOAD_RATIO_LIBYAML if libyaml_in_use else MAX_LOAD_RATIO_PURE_PYTHON
     report(capsys, "load", ratio=ratio, budget=budget)
 
     assert ratio <= budget, (
