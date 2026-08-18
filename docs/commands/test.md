@@ -216,7 +216,7 @@ $ netviz -q -i inventory test -F json
 {
   "schemaVersion": 1,
   "kind": "TestReport",
-  "tool": { "name": "netviz", "version": "0.0.2" },
+  "tool": { "name": "netviz", "version": "0.0.3" },
   "inventory": "/home/ops/net/inventory",
   "summary": {
     "suites": 1, "assertions": 10,
@@ -266,7 +266,7 @@ $ netviz -i tests/fixtures/testsuite test -F junit
   <testsuite name="netviz test" tests="5" failures="4" errors="0" skipped="0">
     <properties>
       <property name="inventory" value="tests/fixtures/testsuite"/>
-      <property name="netviz" value="0.0.2"/>
+      <property name="netviz" value="0.0.3"/>
     </properties>
     <testcase classname="netviz.test.office" name="both desks reach the router" file="tests.yaml" line="8"/>
     <testcase classname="netviz.test.office" name="the two desks cannot see each other" file="tests.yaml" line="13">

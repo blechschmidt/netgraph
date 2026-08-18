@@ -23,7 +23,7 @@ a live diagram at **<https://blechschmidt.github.io/netviz/demo/>** — switch l
 filter by VLAN, hover a node for its interfaces and addresses. Those pages are the output
 of `netviz render -f html`, not a demo built to look like it.
 
-> **Status: early development (0.0.2).** The schema, loader, validator, renderers and CLI
+> **Status: early development (0.0.3).** The schema, loader, validator, renderers and CLI
 > work end to end; the schema may still change before 1.0. See
 > [§12 of the specification](docs/schema.md#12-compatibility-policy).
 
