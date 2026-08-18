@@ -46,6 +46,18 @@ publish a version whose section is missing or empty — see
   export fixtures; and three `netviz diff --format json` golden files. Fourteen tests were
   failing on `main` because of it.
 
+- **Six more documents kept saying 0.0.1 with nothing to catch them.** `docs/home-lab.html`
+  is deliberately not compared byte for byte — its drawing depends on the installed Graphviz
+  — and the transcripts in `docs/commands/cache.md` and `docs/commands/version.md` are marked
+  `norun` because every value in them belongs to the reader's machine, so no test re-derived
+  any of the three. The `tool` block in the JSON examples in `docs/ci.md`,
+  `docs/commands/impact.md` and `docs/commands/review.md` is hand-written and was never
+  re-derived either. All six now name the running version, and `tests/test_release.py`
+  checks every family of committed artefact that prints a version against `pyproject.toml`,
+  so the next bump that forgets one fails on the commit rather than at the tag. The full
+  list of regenerators is in [`docs/releasing.md`](docs/releasing.md#1-prepare-the-version),
+  and a test keeps that list and the checked families in step.
+
 ## [0.0.2] - 2026-08-17
 
 A release-plumbing release. netviz itself is unchanged from 0.0.1 — no schema field, flag,

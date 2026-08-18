@@ -39,7 +39,7 @@ version comes from actually running `dot -V` on the binary
 <!-- norun: the Graphviz, Python and dependency versions are properties of the reader's machine -->
 ```console
 $ netviz --version
-netviz 0.0.1
+netviz 0.0.2
 Python       3.12.3 (CPython) at /usr/local/bin/python3.12
 Graphviz     2.43.0 at /usr/bin/dot
 Platform     Linux-6.8.0-generic-x86_64-with-glibc2.39

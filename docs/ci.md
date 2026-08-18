@@ -94,7 +94,7 @@ $ netviz -q -i inventory validate -F json
 ```json
 {
   "schemaVersion": 1,
-  "tool": { "name": "netviz", "version": "0.0.1" },
+  "tool": { "name": "netviz", "version": "0.0.2" },
   "inventory": { "root": "/home/ops/net/inventory", "prefix": "inventory" },
   "summary": { "error": 1, "warning": 0, "info": 0, "total": 1 },
   "failed": true,

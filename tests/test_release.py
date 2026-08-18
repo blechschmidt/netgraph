@@ -7,7 +7,7 @@ So the checks that stand in front of it are asserted here rather than only in th
 workflow -- a guard exercised solely by the release it guards is not a guard, it
 is a hope.
 
-Five things are checked:
+Six things are checked:
 
 * ``tools/release.py`` refuses a tag that disagrees with ``pyproject.toml``, a
   missing changelog section, an empty one and an undated heading, and extracts
@@ -24,6 +24,10 @@ Five things are checked:
 * The package still imports on the interpreters ``requires-python`` and the
   classifiers claim -- which is not the one this suite runs on, and is a claim
   a release makes to everybody who installs it.
+* Every committed artefact that prints a version prints *this* one, and the
+  checklist in ``docs/releasing.md`` names the command that rewrites each -- so
+  a version bump cannot leave the old number behind in a file no other test
+  re-derives.
 """
 
 from __future__ import annotations
@@ -395,6 +399,144 @@ def test_the_changelog_is_linked_from_the_documentation_index() -> None:
     index = (REPO_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
     assert "CHANGELOG.md" in index
     assert "releasing.md" in index
+
+
+# --------------------------------------------------------------------------- #
+# The committed artefacts that print the version
+# --------------------------------------------------------------------------- #
+#
+# A version bump is not one line in ``pyproject.toml``. Two dozen committed files
+# print the running version -- a report footer, a draw.io ``agent=`` attribute, a
+# diff's ``tool`` block, an HTML ``<meta name="generator">`` -- and each has to be
+# rewritten by the command that produced it. v0.0.2 was tagged without that, and
+# fourteen tests went red at the tag, which is the one place a failure costs a
+# release rather than a push.
+#
+# Most of those artefacts are re-derived by a test that runs the emitter again, so
+# they say so themselves. Six files are not, and they are why this guard is worth
+# its lines: ``docs/home-lab.html`` is deliberately *not* compared byte for byte,
+# because the drawing in it comes from whatever Graphviz is installed; the
+# transcripts in ``docs/commands/cache.md`` and ``docs/commands/version.md`` are
+# marked ``norun``, because every value in them is a property of the reader's
+# machine; and the ``tool`` block in the JSON examples in ``docs/ci.md``,
+# ``docs/commands/impact.md`` and ``docs/commands/review.md`` is written by hand.
+# All six sat at 0.0.1 through two version bumps without a test noticing.
+
+
+@dataclasses.dataclass(frozen=True)
+class Artefact:
+    """A family of committed files that spells the running version out."""
+
+    #: Relative to the repository root, as ``Path.glob`` reads it.
+    glob: str
+    #: The command that rewrites the family, short enough to name in a failure
+    #: and to grep for in the release checklist -- which is what keeps the two
+    #: from drifting apart.
+    command: str
+
+
+VERSION_STAMPED_ARTEFACTS: tuple[Artefact, ...] = (
+    Artefact("docs/example-report/**/*.md", "tools/gen_example_report.py"),
+    Artefact("docs/*.md", "tools/check_examples.py --update"),
+    Artefact("docs/commands/*.md", "tools/check_examples.py --update"),
+    Artefact("docs/home-lab.html", "-o docs/home-lab.html"),
+    Artefact("tests/fixtures/drawio/*.drawio", "tools/gen_drawio_fixtures.py"),
+    Artefact("tests/fixtures/drawio/*.json", "--regen-golden"),
+    Artefact("tests/fixtures/golden/diff/*.json", "--regen-golden"),
+)
+
+#: Files the globs above pick up whose version numbers are not stamps of the
+#: running version, and why. An exemption that stops being needed is a failure
+#: of its own, below -- so this stays a decision rather than a leftover.
+EXEMPT_FROM_THE_VERSION_STAMP: MappingProxyType[str, str] = MappingProxyType(
+    {
+        "docs/releasing.md": "the document about versions; every number in it is an example",
+    }
+)
+
+#: The two shapes an emitter writes the stamp in: the word beside the number, and
+#: a JSON ``tool`` block that puts the two on separate lines. Both insist on three
+#: dotted components, which is what keeps ``10.0.0.1`` and a ``schemaVersion`` of
+#: ``1`` out of the results.
+VERSION_STAMP_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r'netviz(?:"\s*:)?[ \t]+"?(\d+\.\d+\.\d+[0-9a-zA-Z.+-]*)'),
+    re.compile(r'"name":\s*"netviz",\s*"version":\s*"(\d+\.\d+\.\d+[0-9a-zA-Z.+-]*)"'),
+)
+
+
+def version_stamps(path: Path) -> set[str]:
+    """Every netviz version ``path`` prints, or an empty set if it prints none.
+
+    The trailing dot is stripped because a transcript ends the sentence it is in
+    -- ``# netviz 0.0.2. Re-run the command`` -- and a PEP 440 version never ends
+    in one.
+    """
+    text = path.read_text(encoding="utf-8")
+    return {
+        match.group(1).rstrip(".")
+        for pattern in VERSION_STAMP_PATTERNS
+        for match in pattern.finditer(text)
+    }
+
+
+def stamped_files(artefact: Artefact) -> list[Path]:
+    """The files of ``artefact`` that carry a stamp, exemptions removed."""
+    return [
+        path
+        for path in sorted(REPO_ROOT.glob(artefact.glob))
+        if path.is_file()
+        and path.relative_to(REPO_ROOT).as_posix() not in EXEMPT_FROM_THE_VERSION_STAMP
+        and version_stamps(path)
+    ]
+
+
+@pytest.mark.skipif(__version__ == "0.0.0.dev0", reason="the tree was never installed")
+@pytest.mark.parametrize("artefact", VERSION_STAMPED_ARTEFACTS, ids=lambda artefact: artefact.glob)
+def test_every_committed_artefact_names_the_running_version(artefact: Artefact) -> None:
+    stale = {
+        path.relative_to(REPO_ROOT).as_posix(): sorted(version_stamps(path) - {__version__})
+        for path in stamped_files(artefact)
+        if version_stamps(path) != {__version__}
+    }
+    assert not stale, (
+        f"this tree is netviz {__version__}, but {stale} still says otherwise. "
+        f"Rewrite it with the command under 'Prepare the version' in "
+        f"docs/releasing.md that says `{artefact.command}` -- and note that a "
+        f"`norun` block is run by no generator, so it is edited by hand."
+    )
+
+
+@pytest.mark.parametrize("artefact", VERSION_STAMPED_ARTEFACTS, ids=lambda artefact: artefact.glob)
+def test_every_listed_artefact_still_carries_a_stamp(artefact: Artefact) -> None:
+    """A family that stopped printing the version should leave this list.
+
+    Otherwise the guard above passes by matching nothing, which is the failure
+    mode every allowlist eventually has.
+    """
+    assert stamped_files(artefact), f"nothing under {artefact.glob} names a version any more"
+
+
+def test_every_exemption_is_still_earning_its_place() -> None:
+    for name, reason in EXEMPT_FROM_THE_VERSION_STAMP.items():
+        path = REPO_ROOT / name
+        assert path.is_file(), f"{name} is exempted and does not exist"
+        assert version_stamps(path), f"{name} names no version; drop the exemption ({reason})"
+
+
+def test_the_release_checklist_names_every_regenerator() -> None:
+    """The checklist a person follows has to list what the guard checks.
+
+    The bump that produced this section regenerated one of the five families,
+    because that was the only one the checklist mentioned.
+    """
+    doc = RELEASING_DOC.read_text(encoding="utf-8")
+    start = doc.index("### 1. Prepare the version")
+    section = doc[start : doc.index("\n### ", start + 1)]
+    for command in sorted({artefact.command for artefact in VERSION_STAMPED_ARTEFACTS}):
+        assert command in section, (
+            f"docs/releasing.md does not tell the releaser to run `{command}`, "
+            f"and tests/test_release.py says a committed artefact needs it"
+        )
 
 
 # --------------------------------------------------------------------------- #

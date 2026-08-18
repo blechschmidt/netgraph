@@ -125,14 +125,29 @@ local Docker login — the workflow publishes, and it authenticates with OIDC.
 
 ### 1. Prepare the version
 
+<!-- norun: it rewrites the reader's checkout -- these are the steps of a bump, not a demo -->
 ```bash
 # 1. Decide the number from the Unreleased section: any Changed/Removed entry -> minor.
 # 2. Set it in pyproject.toml.
 # 3. Rename '## [Unreleased]' to '## [X.Y.Z] - YYYY-MM-DD' and open a fresh Unreleased
 #    above it, then update the two link definitions at the bottom of CHANGELOG.md.
-# 4. Regenerate the committed artefacts that name the version:
-python tools/gen_example_report.py   # docs/example-report/ carries it on every page
+# 4. Regenerate the committed artefacts that name the version -- all five families:
+python tools/gen_example_report.py       # docs/example-report/, on every page
+python tools/gen_drawio_fixtures.py      # the agent= attribute in tests/fixtures/drawio/
+python tools/check_examples.py --update  # the transcripts in docs/, where a command prints it
+pytest tests/test_diff.py tests/test_drawio.py --regen-golden   # the tool block in two goldens
+netviz render -f html --layer l1 --layer l2 --layer l3 \
+    --title "home-lab — every layer" -o docs/home-lab.html      # its <meta> generator
 ```
+
+Two of those need watching. `check_examples.py --update` rewrites a hand-elided `...` block
+into the whole output, so read its diff before believing it — and it skips `norun` blocks
+entirely, which is exactly where a stale version hides longest, so grep for the old number
+afterwards. The `render` command is run from the `examples/home-lab` directory, or with
+`-i examples/home-lab` from the root.
+
+`tests/test_release.py` checks all five families against `pyproject.toml`, so a bump that
+misses one fails on the commit rather than at the tag.
 
 Check it locally before pushing anything — this is the same code the workflow's first job
 runs, so a failure here is a failure there:
