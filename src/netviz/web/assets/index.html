@@ -104,7 +104,8 @@
   <section class="pane diagram" aria-label="Diagram">
     <div class="pane-head">
       <span>diagram</span>
-      <span class="hint">hover or focus a node for details &middot; drag or arrow keys to move &middot; scroll to zoom</span>
+      <span class="hint">hover or focus a node for details &middot; drag to select &middot;
+        Pan or Alt-drag to move &middot; scroll to zoom</span>
       <span class="spacer"></span>
       <!-- One selector language: what is typed here is what `netviz query`
            answers, what `--select` narrows a render with, and what an
@@ -122,6 +123,17 @@
       <button id="timeline-toggle" type="button" class="ghost" hidden
         aria-expanded="false" aria-controls="timeline"
         title="Scrub the inventory across the commits that changed it (Ctrl-Shift-H)">History</button>
+      <!-- What a left-drag on the canvas means. Two answers and no way to
+           guess which one is wanted from the gesture alone, so it is a mode:
+           an arrow selects, a hand moves the paper. Radio buttons in spirit,
+           written as two buttons with aria-pressed because they are a toolbar
+           and not a form -- and the cursor over the canvas says which is up. -->
+      <span class="tools" role="group" aria-label="Pointer tool">
+        <button id="tool-select" type="button" class="ghost tool" aria-pressed="true"
+          title="Selection tool (V): drag the paper for a rubber band, a shape to move it">Select</button>
+        <button id="tool-pan" type="button" class="ghost tool" aria-pressed="false"
+          title="Pan tool (H): drag anywhere to move the diagram">Pan</button>
+      </span>
       <button id="fit" type="button" class="ghost">Fit</button>
     </div>
     <div id="canvas" class="canvas" tabindex="0" aria-label="Network diagram">

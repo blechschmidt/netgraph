@@ -427,6 +427,8 @@ menu, untouched.
 | New namespace… | New namespace… — *palette only* | `--write` |
 | New note | Add a note to the diagram… — `Shift-N` | `--write` |
 | Paste here | Paste — `Ctrl-V` | `--write` |
+| Selection tool | Selection tool — `v` | — |
+| Pan tool | Pan tool — `h` | — |
 | Show another layer… | Switch layer… — *palette only* | — |
 | Toggle icons | Toggle icons — `Alt-K` | — |
 | Fit the diagram | Fit the diagram — `0` | — |
@@ -462,7 +464,43 @@ that also runs it.
 A chord written `Ctrl-…` means the platform's command modifier: ⌘ on a Mac. A
 single letter is a *canvas* gesture and fires only while the diagram has focus —
 `n` creates a device there and types an `n` in the YAML pane, which is the
-distinction the **Where** column makes.
+distinction the **Where** column makes. `v` and `h` are the two exceptions:
+which [pointer tool](#the-pointer-tool) is up is a question about the mouse, not
+about what the keyboard last landed on, so they answer from anywhere but a text
+field.
+
+### The pointer tool
+
+A drag across the paper means two things and both are right: to one person it is
+a region being selected, to the next it is the paper being moved. Nothing in the
+gesture tells them apart, so — as in every drawing tool — it is a **mode**, and
+the toolbar above the canvas says which one:
+
+| Tool | Key | A left-drag |
+|---|---|---|
+| **Select** (default) | `v` | Draws a rubber band on the paper; moves a shape, a note, a namespace frame or a bend that can be moved; pans when it started on something none of those claim. |
+| **Pan** | `h` | Moves the diagram, wherever it started. Nothing in the drawing can be nudged out of place by a press that was meant to scroll. |
+
+The cursor is the other half of the answer: an arrow under the selection tool, an
+open hand under the pan tool, closed while the pan is happening. It is the hand
+everywhere inside the canvas — over a switch and over a bend handle as much as
+over the paper — because that is exactly where the two tools differ.
+
+Neither is ever more than a modifier away, which is what keeps the mode from
+being a trap:
+
+* **Hold `Alt`** and the *other* tool takes that one gesture. `Alt`-drag bands
+  while the hand is up and pans while the arrow is; the tool is where you left
+  it when you let go. (This is the same `Alt`-drag that panned before there was
+  a mode, so nothing anybody's fingers already knew has changed.)
+* **The middle button always pans**, whichever tool is chosen.
+* **Clicking still selects** under either tool. Only *dragging* is the mode —
+  and a pan that actually travelled swallows the click behind it, so letting go
+  over a switch does not open it.
+
+Right-clicking the canvas offers both tools, because the press that wanted the
+other one has already happened over the diagram and the toolbar is at the far
+corner of it.
 
 ### Driving the diagram
 
@@ -523,7 +561,7 @@ Most of the editor acts on a **selection**, and a selection is a set:
 
 | Gesture | What it does |
 |---|---|
-| drag on the paper | A rubber band. Everything it encloses is selected; hold `Shift` to add to what was already there rather than replace it. A drag that starts *on* a shape still pans. |
+| drag on the paper | A rubber band. Everything it encloses is selected; hold `Shift` to add to what was already there rather than replace it. A drag that starts *on* a shape moves it, or pans when it cannot be moved. Needs the [selection tool](#the-pointer-tool), which is the default — hold `Alt` to band under the pan tool. |
 | `Shift`- or `Ctrl`-click | Adds one element, or takes it back out. Works on the outline entries too. |
 | `Ctrl-A` | Everything the current view draws — including whatever is culled off screen. Only on the canvas: `Ctrl-A` in the YAML pane is still the text. |
 | `Shift`-arrow | Extends along the same neighbour search the arrow keys use, so a trunk and everything hanging off it is collected without a pointer. |
@@ -690,6 +728,8 @@ cable it, undo both — without dispatching a single mouse event.
 | `End` | Last element | the diagram | — | The last element of the outline. |
 | `Enter` | Open the inspector | the diagram | a focused element | Everything known about the focused element, and — in a session — the document that declares it, opened at its line. |
 | `Space` | Pin the inspector | the diagram | a focused element | Keeps the inspector up, and tells the other tabs what this one is looking at. |
+| `v` | Selection tool | anywhere | — | The default cursor: a drag on the paper draws a rubber band, and a drag on a shape moves it. Hold Alt to pan without leaving it. |
+| `h` | Pan tool | anywhere | — | The hand cursor: a drag anywhere moves the diagram, over a shape or a handle as readily as over the paper, so nothing can be nudged by accident while it is being read. Hold Alt to band without leaving it. |
 | `Ctrl-G` | Go to element… | anywhere | — | The palette, opened over element addresses alone. |
 | `Ctrl-O` | Open file… | anywhere | a folder | The palette, opened over the inventory's file paths alone. |
 | `Ctrl-F` / `/` | Search with a query | anywhere | — | The selector language: 'kind = switch and not has vrf', 'within 2 hops of fw-edge', 'interface[address in 10.20.0.0/16]'. A bare word is a name match, as it always was. See docs/query.md. |
@@ -813,8 +853,9 @@ everything it touches are lifted out of the diagram while the box is open; click
 to pin the box, click again or press `Esc` to let go.
 
 Beyond that: the layer, the VLAN filter and the display toggles are in the header
-and apply on the next render; the canvas pans with a drag and zooms with the
-wheel; and the splitter between the panes moves.
+and apply on the next render; the canvas zooms with the wheel and pans with a
+drag under the [pan tool](#the-pointer-tool), the middle button, or `Alt`; and
+the splitter between the panes moves.
 
 **Broken text still draws.** `netviz render` refuses an inventory with errors
 unless `--force`, because a diagram that disagrees with the files misinforms

@@ -382,19 +382,32 @@ window.netvizSelect = (function () {
 
   /* ------------------------------------------------------- the rubber band */
 
-  /* A drag on the paper is a band; a drag on a shape is still a pan. That split
-   * is deliberate and it is the one draw.io users expect the other way round —
-   * but the shapes on this canvas are not draggable yet (that is the *next*
-   * task), and a canvas where dragging a node did nothing at all would be worse
-   * than one where it pans. When direct manipulation lands, the shape branch
-   * becomes "move it" and this one does not change. */
+  /* A drag on the paper is a band; a drag on a shape is a move where the shape
+   * can be moved (see containers.js and notes.js) and a pan where it cannot —
+   * a canvas where dragging a node did nothing at all would be worse than one
+   * where it pans.
+   *
+   * None of it is reached while the hand tool is up: app.js decides that before
+   * asking anything here, because "the pan tool pans" has to be true of every
+   * press and not only of the ones nothing else wanted. */
+
+  /** Is this press on the paper rather than on anything drawn on it?
+   *
+   * Exported because the pan tool needs the same answer for a different
+   * reason: a press that goes nowhere is a click, and a click on the paper
+   * clears the selection whichever tool made it. One hit test, so the two
+   * tools cannot come to disagree about where the paper is.
+   */
+  function onPaper(event) {
+    var target = event.target;
+    return !!el && !(
+      target && target.closest && target.closest("g.node, g.edge, .nv-handle, .nv-link-hit")
+    );
+  }
 
   /** Does this press start a band? Called before the pan arms itself. */
   function grab(event) {
-    if (!el || event.button !== 0) { return false; }
-    if (event.target.closest && event.target.closest("g.node, g.edge, .nv-handle, .nv-link-hit")) {
-      return false;
-    }
+    if (!el || event.button !== 0 || !onPaper(event)) { return false; }
     band = {
       from: { x: event.clientX, y: event.clientY },
       to: { x: event.clientX, y: event.clientY },
@@ -621,6 +634,7 @@ window.netvizSelect = (function () {
     all: all,
     extend: extend,
     fromFocus: fromFocus,
+    onPaper: onPaper,
     grab: grab,
     move: move,
     release: release,

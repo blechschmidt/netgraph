@@ -4476,6 +4476,207 @@ def test_a_selection_of_a_thousand_devices_stays_workable(open_editor: OpenEdito
 
 
 # --------------------------------------------------------------------------- #
+#
+# The pointer tool. A left-drag on the canvas means two things and the gesture
+# cannot say which, so it is a mode — and a mode is only assertable here: every
+# claim below is about what a real press did and what the cursor looked like
+# while it was down.
+
+
+def transform(editor: Editor) -> str:
+    """Where the diagram has been panned to, as the compositor has it."""
+    return str(editor.page.evaluate("() => document.getElementById('viewport').style.transform"))
+
+
+def cursor_over(editor: Editor, locator: Locator | None = None) -> str:
+    """The cursor the browser has resolved for the canvas, or for one shape in it.
+
+    Computed rather than read off a class, because the whole of what the tool
+    shows is this value: a rule that lost a specificity fight would leave the
+    class on and the pointer an arrow, and only the resolved style says so.
+    """
+    if locator is None:
+        return str(
+            editor.page.evaluate("() => getComputedStyle(document.getElementById('canvas')).cursor")
+        )
+    return str(locator.evaluate("node => getComputedStyle(node).cursor"))
+
+
+def tool_of(editor: Editor) -> str:
+    """Which of the two buttons is pressed, as the page states it to a reader."""
+    pressed = [
+        name
+        for name in ("select", "pan")
+        if editor.page.locator(f"#tool-{name}").get_attribute("aria-pressed") == "true"
+    ]
+    assert len(pressed) == 1, f"exactly one tool is up, not {pressed}"
+    return pressed[0]
+
+
+def test_the_pan_tool_moves_the_diagram_where_the_selection_tool_bands(
+    open_editor: OpenEditor,
+) -> None:
+    """The feature, both halves, with one gesture repeated under each tool."""
+    editor = arranged(open_editor)
+    over = ["hosts/srv-nas", "routers/rtr-home"]
+
+    # The default. The same drag that is about to move the paper picks things up.
+    assert tool_of(editor) == "select"
+    parked = transform(editor)
+    sweep(editor, over=over)
+    assert selected(editor), "the selection tool has to band"
+    assert transform(editor) == parked, "a band must not also pan"
+
+    editor.page.locator("#tool-pan").click()
+    assert tool_of(editor) == "pan"
+    editor.page.locator("#canvas").click(position={"x": 4, "y": 4})
+    assert selected(editor) == []
+
+    sweep(editor, over=over)
+    assert transform(editor) != parked, "the pan tool has to move the diagram"
+    assert selected(editor) == [], "the pan tool must not band"
+    assert editor.page.locator(".rubber").count() == 0
+    assert not editor.console.unexpected
+
+
+def test_the_cursor_says_which_tool_is_up(open_editor: OpenEditor) -> None:
+    """An arrow points at things and a hand moves them, and that is the whole hint.
+
+    Over a *shape* as much as over the paper: the pan tool's promise is that
+    nothing in the drawing can be nudged out of place, so a switch under the
+    hand has to look like paper rather than like something to click.
+    """
+    editor = arranged(open_editor)
+    node = editor.shape("switches/sw-home")
+    assert cursor_over(editor) == "default"
+    assert cursor_over(editor, node) == "pointer"
+
+    editor.page.locator("#tool-pan").click()
+    assert cursor_over(editor) == "grab"
+    assert cursor_over(editor, node) == "grab"
+
+    # And closed while the button is down, which is the only feedback a pan that
+    # has nothing left to scroll to would otherwise give.
+    frame = editor.page.locator("#canvas").bounding_box()
+    assert frame is not None
+    editor.page.mouse.move(frame["x"] + 20, frame["y"] + 20)
+    editor.page.mouse.down()
+    try:
+        assert cursor_over(editor) == "grabbing"
+        assert cursor_over(editor, node) == "grabbing"
+    finally:
+        editor.page.mouse.up()
+    assert cursor_over(editor) == "grab"
+
+
+def test_alt_borrows_the_other_tool_for_one_gesture(open_editor: OpenEditor) -> None:
+    """The escape hatch that keeps the mode from being a trap, in both directions."""
+    editor = arranged(open_editor)
+    over = ["hosts/srv-nas", "routers/rtr-home"]
+
+    # Under the arrow, Alt pans — which is exactly what Alt-drag did before
+    # there was a mode at all.
+    parked = transform(editor)
+    editor.page.keyboard.down("Alt")
+    sweep(editor, over=over)
+    editor.page.keyboard.up("Alt")
+    assert transform(editor) != parked
+    assert selected(editor) == []
+
+    editor.page.locator("#tool-pan").click()
+    moved = transform(editor)
+    editor.page.keyboard.down("Alt")
+    sweep(editor, over=over)
+    editor.page.keyboard.up("Alt")
+    assert selected(editor), "Alt under the hand has to band"
+    assert transform(editor) == moved, "a borrowed band must not also pan"
+    assert tool_of(editor) == "pan", "borrowing the other tool must not keep it"
+
+
+def test_v_and_h_choose_the_tool_from_anywhere_but_a_text_field(
+    open_editor: OpenEditor,
+) -> None:
+    """Two letters, the way every drawing tool spells them — and not in the YAML."""
+    editor = arranged(open_editor)
+    editor.page.locator("#canvas").focus()
+
+    editor.press("h")
+    assert tool_of(editor) == "pan"
+    expect(editor.page.locator("#announcer")).to_have_text("pan tool")
+    editor.press("v")
+    assert tool_of(editor) == "select"
+
+    # From a button, which is where the focus is the moment after the toolbar
+    # was used, and the one place a canvas-scoped binding would be dead.
+    editor.page.locator("#fit").focus()
+    editor.press("h")
+    assert tool_of(editor) == "pan"
+
+    # And never from the text pane: `h` is a letter there and nothing else.
+    editor.page.locator('.doc[data-address="switches/sw-home"]').first.click()
+    editor.page.locator("#source").click()
+    before = editor.page.locator("#source").input_value()
+    editor.press("v")
+    assert tool_of(editor) == "pan", "a letter in the YAML pane is a letter"
+    assert editor.page.locator("#source").input_value() != before
+
+
+def test_the_pan_tool_will_not_move_a_bend(open_editor: OpenEditor) -> None:
+    """What choosing the hand buys: a press on a handle scrolls instead of editing.
+
+    The bend handle is the sharpest case — it is the smallest grabbable thing on
+    the canvas and the one most easily hit by somebody who meant to scroll.
+    """
+    editor = arranged(open_editor)
+    assert editor.session is not None
+    press_on(editor, band(editor))
+    handle = editor.page.locator(".nv-handle-bend").first
+    expect(handle).to_be_attached(timeout=TIMEOUT_MS)
+    original = bends(editor)
+    assert original, "this cable is pinned through bends, or there is nothing to grab"
+
+    editor.page.locator("#tool-pan").click()
+    revision = editor.session.revision
+    parked = transform(editor)
+    start = _centre(handle)
+    mouse = editor.page.mouse
+    mouse.move(*start)
+    mouse.down()
+    mouse.move(start[0] + 30, start[1] + 20)
+    mouse.move(start[0] + 60, start[1] + 40)
+    mouse.up()
+
+    assert transform(editor) != parked, "the press on the handle had to pan"
+    assert bends(editor) == original, "the pan tool moved a bend"
+    assert editor.session.revision == revision, "the pan tool wrote to the tree"
+
+
+def test_a_pan_that_travelled_does_not_open_what_it_ended_on(
+    open_editor: OpenEditor,
+) -> None:
+    """The click the browser sends after a drag is not a click on the diagram.
+
+    But a press that went nowhere still is: the hand tool selects with a click
+    exactly as the arrow does, or half the editor would be behind a mode switch.
+    """
+    editor = arranged(open_editor)
+    editor.page.locator("#tool-pan").click()
+    node = editor.shape("switches/sw-home")
+    start = _centre(node)
+
+    mouse = editor.page.mouse
+    mouse.move(*start)
+    mouse.down()
+    mouse.move(start[0] - 40, start[1] + 30)
+    mouse.move(start[0] - 80, start[1] + 60)
+    mouse.up()
+    assert selected(editor) == [], "the pan's own click selected the node it ended on"
+
+    press_on(editor, editor.shape("switches/sw-home"))
+    assert selected(editor) == ["switches/sw-home"], "a click is still a click"
+
+
+# --------------------------------------------------------------------------- #
 # The style inspector (§22)
 # --------------------------------------------------------------------------- #
 

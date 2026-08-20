@@ -39,6 +39,10 @@
 
   /** How long the editor has to settle before a render is asked for. */
   var DEBOUNCE_MS = 450;
+  /** How far a pan has to travel before it counts as one rather than as a
+   *  click that wobbled. Below this the click behind it is left alone, so
+   *  pressing a node with the hand tool still opens it. */
+  var PAN_SLOP = 4;
   /** Zoom bounds. Below the first the diagram is a smudge; above the second a pixel. */
   var MIN_SCALE = 0.1;
   var MAX_SCALE = 12;
@@ -84,6 +88,8 @@
     search: document.getElementById("search"),
     searchFilter: document.getElementById("search-filter"),
     searchStatus: document.getElementById("search-status"),
+    toolSelect: document.getElementById("tool-select"),
+    toolPan: document.getElementById("tool-pan"),
     fit: document.getElementById("fit"),
     splitter: document.getElementById("splitter"),
     files: document.getElementById("files"),
@@ -169,6 +175,8 @@
   var queued = false;
   var pinned = null;
   var view = { x: 0, y: 0, k: 1, placed: false };
+  /** What a left-drag on the canvas means: "select" or "pan". See setTool. */
+  var tool = "select";
   /** How far this drawing may be zoomed in. See READABLE_SCALE. */
   var maxScale = MAX_SCALE;
   /** "stream" until /api/state says otherwise. */
@@ -195,8 +203,12 @@
   var failure = { on: false, element: null };
   /** Element addresses somebody else has selected, drawn faintly. */
   var remote = {};
-  /** Set when a rubber band has just finished, so the click that follows the
-   *  mouseup does not undo what the band selected. Cleared by that click. */
+  /** Set when a drag has just finished, so the click the browser sends after
+   *  the mouseup is swallowed rather than read as a click on whatever the
+   *  pointer came to rest over. Two gestures need it: a rubber band, whose
+   *  selection would otherwise be replaced by that one element, and a pan,
+   *  which must not pin the inspector on the node it happened to end on.
+   *  Cleared by the click it swallows. */
   var banded = false;
 
   /** The icon theme the switch turns on, as /api/state named it, or "" while
@@ -1141,36 +1153,92 @@
     zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.12 : 1 / 1.12);
   }, { passive: false });
 
-  /* One mouse, two things it can be doing: moving the whole canvas, or moving
-   * one grab handle inside it. The handle wins -- a drag that started on a
-   * bend is never a pan -- which is why links.js is asked first and the pan is
-   * not armed at all when it says yes. */
+  /* ---------------------------------------------------------- the tool */
+
+  /* What a left-drag on the canvas means. There are two honest answers -- a
+   * drag across the paper is a region somebody is selecting to one person and
+   * the paper being moved to the next -- and no way to tell them apart from
+   * the gesture, so it is a mode, exactly as it is in every drawing tool. The
+   * toolbar says which is up and so does the cursor: an arrow points at things,
+   * a hand moves them.
+   *
+   * Neither tool is ever more than a modifier away. Alt borrows the other one
+   * for a single gesture, and the middle button pans whatever is chosen -- so
+   * "I am selecting, but this one drag is a pan" costs no trip to the toolbar
+   * and leaves the tool where it was.
+   */
+
+  /** Is this press a pan? The tool, unless Alt is asking for the other one. */
+  function wantsPan(event) {
+    return event.altKey ? tool !== "pan" : tool === "pan";
+  }
+
+  /** Choose the tool, and show it. Pass `quiet` to skip the announcement. */
+  function setTool(next, options) {
+    tool = next === "pan" ? "pan" : "select";
+    el.canvas.classList.toggle("pan-tool", tool === "pan");
+    el.toolSelect.setAttribute("aria-pressed", String(tool === "select"));
+    el.toolPan.setAttribute("aria-pressed", String(tool === "pan"));
+    if (options && options.quiet) { return; }
+    netvizA11y.announce(tool === "pan" ? "pan tool" : "selection tool", false);
+  }
+
+  el.toolSelect.addEventListener("click", function () { setTool("select"); });
+  el.toolPan.addEventListener("click", function () { setTool("pan"); });
+
+  /* One mouse, several things it can be doing: moving the whole canvas, or
+   * moving one shape or one grab handle inside it. Which of them a press starts
+   * is decided here and nowhere else, in the order below. */
   (function draggable() {
     var origin = null;
+
+    /** Arm the pan. `origin` is where the drawing has to stay under the mouse. */
+    function arm(event) {
+      origin = {
+        x: event.clientX - view.x,
+        y: event.clientY - view.y,
+        from: { x: event.clientX, y: event.clientY },
+        moved: false,
+        // A press that turns out to go nowhere is a click, and a click on the
+        // paper clears the selection. Under the arrow the band answers that
+        // (see netvizSelect.release); under the hand nothing else would, and a
+        // tool you cannot deselect with is a tool you have to leave.
+        paper: netvizSelect.onPaper(event) &&
+          !(event.shiftKey || event.ctrlKey || event.metaKey)
+      };
+      el.canvas.classList.add("panning");
+    }
+
     el.canvas.addEventListener("mousedown", function (event) {
-      // Three things a press can start, in the order they win. A bend handle
-      // beats everything; the paper draws a rubber band; anything else pans.
-      // The middle button pans wherever it is pressed, which is the escape
-      // hatch for somebody who wants to move a diagram they have selected in.
+      // The middle button pans wherever it is pressed and whichever tool is
+      // chosen: the escape hatch for somebody who wants to move a diagram they
+      // have selected into. Every other button but the left one is the menu's.
+      // Defaulted away because the browser's own answer to a middle press is
+      // autoscroll, which is the same gesture done worse and on top of ours.
+      if (event.button === 1) { event.preventDefault(); arm(event); return; }
+      if (event.button !== 0) { return; }
+      // The hand takes the gesture before anything in the drawing can claim it,
+      // and that is the whole of what choosing it buys: a press on a bend, a
+      // note or a namespace frame moves the paper rather than the thing under
+      // the pointer, so nothing can be nudged out of place by somebody who is
+      // reading rather than editing.
+      if (wantsPan(event)) { arm(event); return; }
+      // Otherwise, in the order they win. A bend handle beats everything.
       if (netvizLinks.grab(event)) { event.preventDefault(); return; }
-      // Between the two: a note is a shape somebody is moving, so it beats the
-      // rubber band and the pan, and loses to a bend handle that is on top of it.
-      if (event.button === 0 && netvizNotes.grab(event)) { event.preventDefault(); return; }
+      // Then a note, which is a shape somebody is moving: it beats the rubber
+      // band and the pan, and loses to a bend handle that is on top of it.
+      if (netvizNotes.grab(event)) { event.preventDefault(); return; }
       // Then the containers: a shape being dragged towards a namespace box, a
       // fold triangle, or a frame's own border. Claims nothing at all when the
-      // drawing is not grouped by namespace, which is what leaves a plain drag
-      // panning the canvas exactly as it did before containers existed.
-      if (event.button === 0 && netvizContainers.grab(event)) {
-        event.preventDefault();
-        return;
-      }
-      if (event.button === 0 && !event.altKey && netvizSelect.grab(event)) {
-        event.preventDefault();
-        return;
-      }
-      if (event.button !== 0 && event.button !== 1) { return; }
-      origin = { x: event.clientX - view.x, y: event.clientY - view.y };
-      el.canvas.classList.add("panning");
+      // drawing is not grouped by namespace, which is what leaves the two
+      // gestures below meaning exactly what they did before containers existed.
+      if (netvizContainers.grab(event)) { event.preventDefault(); return; }
+      // Then the paper, which draws a rubber band.
+      if (netvizSelect.grab(event)) { event.preventDefault(); return; }
+      // And a press on a shape that nothing above wanted still pans, which is
+      // what makes a diagram nobody may edit draggable by the thing under the
+      // pointer rather than only by the gaps between them.
+      arm(event);
     });
     window.addEventListener("mousemove", function (event) {
       if (netvizLinks.dragging()) { netvizLinks.move(event); return; }
@@ -1178,6 +1246,10 @@
       if (netvizContainers.dragging()) { netvizContainers.move(event); return; }
       if (netvizSelect.dragging()) { netvizSelect.move(event); return; }
       if (!origin) { return; }
+      if (Math.abs(event.clientX - origin.from.x) > PAN_SLOP ||
+          Math.abs(event.clientY - origin.from.y) > PAN_SLOP) {
+        origin.moved = true;
+      }
       view.x = event.clientX - origin.x;
       view.y = event.clientY - origin.y;
       applyView();
@@ -1187,6 +1259,12 @@
       netvizNotes.release();
       netvizContainers.release();
       if (netvizSelect.release()) { banded = true; }
+      // A pan that went anywhere swallows the click behind it: the diagram was
+      // being moved, not clicked, and ending the gesture over a node is not a
+      // request to open it. One that went nowhere is that click, and on the
+      // paper it means "nothing".
+      if (origin && origin.moved) { banded = true; }
+      else if (origin && origin.paper) { netvizSelect.clear({ quiet: true }); }
       origin = null;
       el.canvas.classList.remove("panning");
     });
@@ -1294,6 +1372,13 @@
       }
     });
     K.define("element.goto", { run: function () { K.palette("elements", ""); } });
+
+    /* The pointer, from the keyboard. Spelled the way every drawing tool spells
+     * it -- V for the arrow, H for the hand -- and global rather than canvas-only
+     * so the tool can be changed from the toolbar button that just took the
+     * focus, which is precisely when somebody is thinking about it. */
+    K.define("tool.select", { run: function () { setTool("select"); } });
+    K.define("tool.pan", { run: function () { setTool("pan"); } });
 
     /* Routing a cable. Each is the keyboard's way in to a gesture the pointer
      * also has, so a diagram can be arranged without a mouse; links.js owns
@@ -1616,6 +1701,12 @@
 
   el.commands.addEventListener("click", function () { netvizKeys.palette(null, ""); });
   el.shortcuts.addEventListener("click", function () { netvizKeys.reference(); });
+
+  // The arrow, said once from here rather than trusted to the markup: the
+  // canvas class, the two aria-pressed attributes and `tool` have to agree, and
+  // three places that each start out right separately is three places that can
+  // stop agreeing.
+  setTool("select", { quiet: true });
 
   /* The bindings are the page's own contract with the keyboard, so they are
    * fetched before anything else: a page that draws before it can be driven is

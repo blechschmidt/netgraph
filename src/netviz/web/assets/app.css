@@ -322,6 +322,35 @@ main {
   font-weight: 600;
 }
 
+/* The pointer tool, as two buttons that behave as one control: a radio group in
+ * everything but markup. Joined into a single pill so it reads as "one of
+ * these", and the chosen one is filled rather than merely coloured -- which of
+ * the two is up decides what every drag on the canvas means, so it has to be
+ * legible from the corner of an eye and in greyscale. */
+.tools { display: inline-flex; }
+
+.tools .tool {
+  border-color: var(--edge);
+  border-radius: 0;
+  padding: .1rem .45rem;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.tools .tool:first-child { border-radius: 4px 0 0 4px; }
+.tools .tool:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
+
+.tools .tool[aria-pressed="true"] {
+  background: var(--selected);
+  border-color: var(--selected);
+  color: var(--bg);
+  font-weight: 700;
+  /* Above its neighbour, so the joined border is the pressed one's. */
+  position: relative;
+  z-index: 1;
+}
+
 .problems-head { border-top: 1px solid var(--edge); }
 
 #source {
@@ -524,12 +553,31 @@ main {
   position: relative;
   flex: 1 1 auto;
   overflow: hidden;
-  cursor: grab;
+  /* The selection tool, which is what the page starts in: an arrow points at
+     things, and a hand that is not going to move the paper is a lie. */
+  cursor: default;
   background:
     radial-gradient(circle at 1px 1px, var(--edge) 1px, transparent 0) 0 0 / 22px 22px;
 }
 
+/* The pan tool. The cursor is the whole of the feedback -- the drawing is
+   unchanged and the toolbar is at the far corner of it -- so it is the hand
+   everywhere inside the canvas, over a shape and a bend handle as much as over
+   the paper, because that is exactly where the tool differs. */
+.canvas.pan-tool { cursor: grab; }
 .canvas.panning { cursor: grabbing; }
+/* Every cursor the drawing sets for itself, overruled while the hand is up.
+   `:is()` takes the weight of its heaviest branch, so one rule outranks the
+   eight below it -- including the `not-allowed` an anchored note carries, which
+   is about a drag that would move it and not about one that moves the paper.
+   The alternative is restating each of them at a weight that beats it, which is
+   eight chances to miss one. */
+.canvas.pan-tool :is(.viewport svg g.node, .viewport svg g.edge, svg .nv-handle,
+  svg .nv-link-hit, svg .nv-anno-band, svg .nv-anno-handle,
+  svg .nv-container-handle, svg [data-toggle]) { cursor: grab; }
+.canvas.pan-tool.panning :is(.viewport svg g.node, .viewport svg g.edge, svg .nv-handle,
+  svg .nv-link-hit, svg .nv-anno-band, svg .nv-anno-handle,
+  svg .nv-container-handle, svg [data-toggle]) { cursor: grabbing; }
 
 /* The rubber band. A plain <div> over the canvas rather than a rectangle inside
  * the SVG: it is a gesture, not part of the drawing, so it lives in client

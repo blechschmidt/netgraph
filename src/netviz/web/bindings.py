@@ -343,6 +343,34 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         where="canvas",
         needs="focus",
     ),
+    # -- the two things a left-drag can mean -------------------------------
+    #
+    # A drag across the paper is a selection to one person and a pan to the
+    # next, and neither reading is wrong — so it is a mode, the way it is in
+    # every drawing tool, shown on the toolbar and in the cursor. Holding Alt
+    # borrows the other one for a single gesture, and the middle button always
+    # pans, so neither tool is ever more than a modifier away.
+    Binding(
+        id="tool.select",
+        title="Selection tool",
+        section="Moving around",
+        keys=("v",),
+        detail=(
+            "The default cursor: a drag on the paper draws a rubber band, and a "
+            "drag on a shape moves it. Hold Alt to pan without leaving it."
+        ),
+    ),
+    Binding(
+        id="tool.pan",
+        title="Pan tool",
+        section="Moving around",
+        keys=("h",),
+        detail=(
+            "The hand cursor: a drag anywhere moves the diagram, over a shape or a "
+            "handle as readily as over the paper, so nothing can be nudged by "
+            "accident while it is being read. Hold Alt to band without leaving it."
+        ),
+    ),
     Binding(
         id="element.goto",
         title="Go to element…",
@@ -1182,6 +1210,14 @@ MENUS: Final[tuple[Menu, ...]] = (
                 # its anchor: the fragment lands where the pointer was rather
                 # than offset from wherever it was copied.
                 MenuItem("clipboard.paste", "Paste here"),
+            ),
+            (
+                # What the pointer is, asked with the pointer. The toolbar has
+                # the same pair, but the toolbar is at the far corner of the
+                # canvas and the press that wanted the other tool has already
+                # happened here.
+                MenuItem("tool.select", "Selection tool"),
+                MenuItem("tool.pan", "Pan tool"),
             ),
             (
                 MenuItem("view.layer", "Show another layer…"),
