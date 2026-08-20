@@ -26,6 +26,7 @@ This whole documentation set is also published, with those demos beside it, at
 | check subnet utilisation, find free space, hunt overlaps | [ipam.md](ipam.md) |
 | find out how two machines reach each other | [paths.md](paths.md) |
 | ask "every access switch in site north with no uplink" — once, and everywhere | [query.md](query.md) |
+| ask "every interface with an address, and what it is attached to" — as data | [nql.md](nql.md) |
 | keep the YAML in one canonical form | [format.md](format.md) |
 | change the inventory safely, from a script or an editor | [editing.md](editing.md) |
 | get completion, inline errors and rename in your editor | [lsp.md](lsp.md) |
@@ -122,6 +123,10 @@ This whole documentation set is also published, with those demos beside it, at
   vocabulary, the traversal forms and a cookbook of ten worked queries. One expression
   answers `netviz query`, `--select` on six commands, an `assert: query` and the
   editor's search box.
+* **[nql.md](nql.md)** — the relational language, for the questions a predicate cannot
+  ask: joins along the schema, and answers shaped as objects and arrays of objects.
+  Why it is EdgeQL-shaped rather than SQL- or Cypher-shaped, its grammar, its type
+  graph, and a cookbook.
 * **[schema-reference.md](schema-reference.md)** — every field of every kind, with types,
   defaults and its YANG counterpart. Generated from the models.
 * **[validation-rules.md](validation-rules.md)** — every rule, with what triggers it, why

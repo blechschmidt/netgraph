@@ -235,7 +235,7 @@ report.txt` both do what they look like they do.
 | [`netviz path`](docs/commands/path.md) | Trace how two elements reach each other, hop by hop. | [path.md](docs/commands/path.md) |
 | [`netviz impact`](docs/commands/impact.md) | Simulate a failure: blast radius, single points of failure, promises. | [impact.md](docs/commands/impact.md) |
 | [`netviz list`](docs/commands/list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](docs/commands/list.md) |
-| [`netviz query`](docs/commands/query.md) | Select elements with one selector language, and print what matched. | [query.md](docs/commands/query.md) |
+| [`netviz query`](docs/commands/query.md) | Ask a question about the network, in either of two query languages. | [query.md](docs/commands/query.md) |
 | [`netviz ipam`](docs/commands/ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](docs/commands/ipam.md) |
 | [`netviz export`](docs/commands/export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](docs/commands/export.md) |
 | [`netviz report`](docs/commands/report.md) | Write the as-built documentation: a page per site and per device. | [report.md](docs/commands/report.md) |

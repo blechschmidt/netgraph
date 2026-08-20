@@ -103,6 +103,7 @@ from netviz.completion import (
     complete_node,
     complete_profile,
     complete_query,
+    complete_query_type,
     complete_rule,
     complete_test_suite,
     completion_script,
@@ -252,6 +253,16 @@ from netviz.loader import (
 )
 from netviz.models import DOCUMENT_KINDS, KINDS, Element, Medium
 from netviz.models.layout import LAYOUT_VIEWS, ROUTING_STYLES
+from netviz.nql import Result as QueryAnswer
+from netviz.nql import build_world as build_query_world
+from netviz.nql import describe as describe_type
+from netviz.nql import execute as execute_relational
+from netviz.nql import explain as explain_relational
+from netviz.nql import is_relational
+from netviz.nql import parse as parse_relational
+from netviz.nql.format import headings as query_headings
+from netviz.nql.format import payload as query_payload
+from netviz.nql.format import table as query_table
 from netviz.plan import (
     PLAN_FORMATS,
     Plan,
@@ -6515,6 +6526,10 @@ def _open_browser(app: AppContext, url: str) -> None:
 #: which is the answer when the question was about one.
 QUERY_SUBJECTS: Final[tuple[str, ...]] = ("elements", "interfaces", "links")
 
+#: How a relational answer may be printed. ``table`` and ``csv`` flatten a
+#: nested field into one cell; ``json`` and ``yaml`` carry it whole.
+QUERY_FORMATS: Final[tuple[str, ...]] = ("table", "json", "yaml", "csv")
+
 
 def _query_matches(app: AppContext, inventory: Inventory, select: str) -> tuple[str, ...]:
     """The elements ``select`` picks out, across every layer that holds one.
@@ -6558,6 +6573,18 @@ def _query_flags(command: _Command) -> _Command:
         "sub-objects an interface[...] or link[...] scope matched inside them."
     ),
 )
+@click.option(
+    "-F",
+    "--output-format",
+    "output_format",
+    type=click.Choice(QUERY_FORMATS),
+    default="table",
+    show_default=True,
+    help=(
+        "How to print a relational answer. table and csv flatten a nested field "
+        "into one cell; json and yaml carry it whole."
+    ),
+)
 @click.option("--json", "as_json", is_flag=True, default=False, help="Report as JSON.")
 @click.option(
     "--count",
@@ -6572,8 +6599,21 @@ def _query_flags(command: _Command) -> _Command:
     is_flag=True,
     default=False,
     help=(
-        "Print the grammar and the attribute vocabulary instead of running a query, "
-        "and — with the filter flags — the query they are sugar for."
+        "Print the selector grammar and the attribute vocabulary instead of running "
+        "a query, and — with the filter flags — the query they are sugar for."
+    ),
+)
+@click.option(
+    "--describe",
+    "describe",
+    metavar="[TYPE]",
+    is_flag=False,
+    flag_value="",
+    default=None,
+    shell_complete=complete_query_type,
+    help=(
+        "Print the relational language instead of running a query: with no value "
+        "its grammar, types and functions; with a type name, that type's members."
     ),
 )
 @_query_flags
@@ -6583,26 +6623,39 @@ def query_command(
     /,
     expression: str | None,
     subject: str,
+    output_format: str,
     as_json: bool,
     count_only: bool,
     explain: bool,
+    describe: str | None,
     **_options: Any,
 ) -> None:
-    """Select elements with one selector language, and print what matched.
+    """Ask a question about the network, in either of two query languages.
 
-    QUERY is a kind filter, attribute predicates over the resolved model, and
-    optional graph traversal, combined with and/or/not and grouping:
+    A QUERY beginning with 'select' or 'with' is relational: it walks the schema,
+    joins by following links, and returns whatever shape it is asked for — a
+    value, an object, or an array of objects.
+
+    \b
+    netviz query 'select interface { name, parent: { fqn }, addresses: { address } }
+                  filter exists .addresses'
+    netviz query "select (server filter .name = 'srv-01').addresses.address"
+    netviz query 'select broadcast_domain { name, interfaces: { fqn, parent: { name } } }'
+    netviz query 'select { devices := count(device), subnets := count(subnet) }' -F json
+
+    Anything else is a selector: a predicate that picks elements, and the same
+    language that answers --select on render, watch, show, list, export and
+    report, an 'assert: query' in a test suite, and the editor's search box.
 
     \b
     netviz query 'kind = switch and label.role = access'
     netviz query 'interface[address in 10.20.0.0/16 and not has vrf]' --print interfaces
     netviz query 'within 2 hops of fw-edge'
-    netviz query 'kind in (switch, router) and not has address' --count
 
-    The same language answers ``--select`` on render, watch, show, list, export
-    and report, an ``assert: query`` in a test suite, and the editor's search
-    box. ``--explain`` prints the grammar and the attributes; with the filter
-    flags it prints the query those flags are sugar for.
+    --describe prints the relational grammar, its types and its functions, or one
+    type's members; --explain prints the selector's grammar and attributes.
+    --layer and --print scope a selector and have no meaning for a relational
+    query, which reads the whole inventory.
 
     Exits 1 when nothing matched, so a query is usable as a check in a script.
     """
@@ -6610,17 +6663,57 @@ def query_command(
     console = app.console()
     params = ctx.params
 
+    if describe is not None:
+        _describe_query_schema(console, describe)
+        return
     if explain:
         _explain_query(console, _filter_spec(params), expression)
         return
     if expression is None:
-        raise click.UsageError("give a query, or --explain to print the grammar")
+        raise click.UsageError(
+            "give a query, --describe to print the relational language, or --explain "
+            "to print the selector grammar"
+        )
+    if as_json:
+        output_format = "json"
+
+    if is_relational(expression):
+        _answer_relational(ctx, app, expression, output_format=output_format, count_only=count_only)
+        return
+    if output_format not in ("table", "json"):
+        raise click.UsageError(
+            f"--output-format {output_format} is only available for a relational query, "
+            "one that begins with 'select' or 'with'"
+        )
 
     try:
         query = parse_query(expression, source="query")
     except QueryError as exc:
         raise click.BadParameter(str(exc), ctx=ctx, param_hint="'QUERY'") from exc
 
+    inventory = _query_inventory(app, console, params)
+    layer = Layer(params["layers"][-1])
+    graph = _build_graph(app, inventory, layer=layer, spec=_filter_spec_without_query(params))
+    result = evaluate(query, graph)
+    _report_query(
+        console,
+        result,
+        subject=subject,
+        as_json=output_format == "json",
+        count_only=count_only,
+    )
+    if not result.nodes:
+        raise click.exceptions.Exit(EXIT_NO_MATCH)
+
+
+def _query_inventory(app: AppContext, console: Console, params: Mapping[str, Any]) -> Inventory:
+    """Load and validate the tree a query is about, refusing a broken one.
+
+    An answer computed from documents that did not load is a lie of omission:
+    the query would report what is left rather than what is declared, and
+    nothing in the output would say so. ``--force`` is how a reader says they
+    know.
+    """
     inventory = app.load()
     _warn_about_load_errors(console, inventory)
     findings = _run_validation(app, inventory, strict=bool(params["strict"]))
@@ -6631,13 +6724,82 @@ def query_command(
             "pass --force to answer it anyway"
         )
         raise click.exceptions.Exit(EXIT_INVALID)
+    return inventory
 
-    layer = Layer(params["layers"][-1])
-    graph = _build_graph(app, inventory, layer=layer, spec=_filter_spec_without_query(params))
-    result = evaluate(query, graph)
-    _report_query(console, result, subject=subject, as_json=as_json, count_only=count_only)
-    if not result.nodes:
+
+def _answer_relational(
+    ctx: click.Context,
+    app: AppContext,
+    expression: str,
+    *,
+    output_format: str,
+    count_only: bool,
+) -> None:
+    """Parse, run and print a relational query.
+
+    Parsing happens before the inventory is loaded — every name is checked
+    against the schema and not against the data — so a typo costs a
+    millisecond rather than a full parse of the tree.
+    """
+    console = app.console()
+    for flag, what in (("layers", "--layer"), ("subject", "--print")):
+        given = ctx.get_parameter_source(flag)
+        if given is not None and given is not click.core.ParameterSource.DEFAULT:
+            raise click.UsageError(
+                f"{what} scopes a selector query and has no meaning for a relational "
+                "one, which reads the whole inventory"
+            )
+    try:
+        query = parse_relational(expression, source="query")
+    except QueryError as exc:
+        raise click.BadParameter(str(exc), ctx=ctx, param_hint="'QUERY'") from exc
+
+    inventory = _query_inventory(app, console, ctx.params)
+    result = execute_relational(query, build_query_world(inventory))
+    _report_relational(console, result, output_format=output_format, count_only=count_only)
+    if not result:
         raise click.exceptions.Exit(EXIT_NO_MATCH)
+
+
+def _report_relational(
+    console: Console, result: QueryAnswer, *, output_format: str, count_only: bool
+) -> None:
+    """Print a relational answer in one of the four shapes.
+
+    ``--count`` composes with each of them, as it does for a selector: the JSON
+    document is the same one minus its ``results``, and the human formats print
+    the number alone.
+    """
+    if output_format in ("json", "yaml"):
+        console.print(
+            _serialise(query_payload(result, count_only=count_only), output_format).rstrip("\n")
+        )
+        return
+    if count_only:
+        console.print(str(len(result)))
+        return
+    rows, aligns = query_table(result)
+    headers = query_headings(result)
+    if output_format == "csv":
+        console.print(_csv(headers, rows))
+        return
+    console.table(headers, rows, aligns=aligns, empty="nothing matched")
+
+
+def _describe_query_schema(console: Console, type_name: str) -> None:
+    """Print the relational language, or one of its types."""
+    if not type_name:
+        for line in explain_relational():
+            console.print(line)
+        return
+    lines = describe_type(type_name)
+    if not lines:
+        raise click.BadParameter(
+            f"{type_name!r} is not a type; run 'netviz query --describe' to see them all",
+            param_hint="'--describe'",
+        )
+    for line in lines:
+        console.print(line)
 
 
 def _filter_spec_without_query(params: Mapping[str, Any]) -> FilterSpec:

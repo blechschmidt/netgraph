@@ -1,12 +1,20 @@
 # `netviz query`
 
-`netviz query` answers the selector language: it prints the elements a query
-selects, and nothing else. It is the language's home, but not its only use —
-the same expression narrows a render with `--select`, grades a network with
-`assert: query`, and drives the editor's search box.
+`netviz query` answers **two** query languages, and reads the first word of the
+argument to tell them apart.
 
-[`docs/query.md`](../query.md) is the grammar reference and the cookbook. This
-page is the command.
+A query beginning with `select` or `with` is
+[**relational**](../nql.md): it walks the schema, joins by following links and
+returns whatever shape it is asked for — a value, an object, or an array of
+nested objects.
+
+Anything else is the [**selector**](../query.md): a predicate that prints the
+elements it picks, and nothing else. That is the language's home but not its
+only use — the same expression narrows a render with `--select`, grades a
+network with `assert: query`, and drives the editor's search box.
+
+[`docs/nql.md`](../nql.md) and [`docs/query.md`](../query.md) are the two
+references. This page is the command.
 
 ---
 
@@ -17,6 +25,37 @@ page is the command.
 netviz [GLOBAL OPTIONS] query [OPTIONS] QUERY
 ```
 <!-- /generated -->
+
+---
+
+## Two languages, one command
+
+<!-- norun: three forms of the same question, shown without their answers -->
+```console
+$ netviz query 'kind = switch'                       # selector: which elements?
+$ netviz query 'select switch.name'                  # relational: the same list
+$ netviz query 'select switch { name, ports := count(.interfaces) }'
+```
+
+The selector is a predicate and answers with names. The relational language
+joins and projects, so it answers with structure — and it takes `-F json`,
+`-F yaml` and `-F csv`, which the selector does not.
+
+`--layer` and `--print` scope a *selector* query. They have no meaning for a
+relational one, which reads the whole inventory, so passing either with one is a
+usage error rather than a silently ignored flag.
+
+`--describe` prints the relational language: with no value its grammar, its
+types and its functions; with a type name, that type's members and their
+cardinalities. `--explain` does the same for the selector.
+
+<!-- norun: the whole listing is thirteen lines; the page shows its head -->
+```console
+$ netviz query --describe address
+address -- One configured IP address, and where it is configured.
+  also spelled: ip
+  …
+```
 
 ---
 
@@ -219,9 +258,11 @@ inventory is an answer about a network that is not the one described.
 |---|---|---|---|
 | `--layer` | `[physical\|l1\|l2\|l3\|ipam\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; ipam draws the address plan — the same prefixes without the devices, nested inside the blocks they came out of and showing how full each is; overlay draws the tunnels; routing draws the BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the feeds into everything they power; identity draws the users and groups; netns opens each machine up into the network stacks inside it, joined by their veth pairs; security draws the firewall zones and what the policy lets cross between them. Repeatable for -f html, which draws each layer and puts a switcher over them. |
 | `--print` | `[elements\|interfaces\|links]` | `elements` | elements prints what the query selected; interfaces and links print the sub-objects an interface[...] or link[...] scope matched inside them. |
+| `-F`, `--output-format` | `[table\|json\|yaml\|csv]` | `table` | How to print a relational answer. table and csv flatten a nested field into one cell; json and yaml carry it whole. |
 | `--json` | — | off | Report as JSON. |
 | `--count` | — | off | Print how many matched, and nothing else. |
-| `--explain` | — | off | Print the grammar and the attribute vocabulary instead of running a query, and — with the filter flags — the query they are sugar for. |
+| `--explain` | — | off | Print the selector grammar and the attribute vocabulary instead of running a query, and — with the filter flags — the query they are sugar for. |
+| `--describe` | `[TYPE]` | — | Print the relational language instead of running a query: with no value its grammar, types and functions; with a type name, that type's members. |
 | `--namespace` | `NS` | — | Keep only elements in this namespace or below it. Repeatable. |
 | `--vlan` | `VID` | — | Keep only elements participating in this VLAN. Repeatable. |
 | `--kind` | `[switch\|router\|firewall\|hub\|computer\|server\|adapter\|patchpanel\|pdu\|user\|group]` | — | Keep only elements of this kind. Repeatable. |
@@ -237,7 +278,9 @@ inventory is an answer about a network that is not the one described.
 
 ## See also
 
-- [`docs/query.md`](../query.md) — the grammar, the attributes and a cookbook.
+- [`docs/nql.md`](../nql.md) — the relational language: why it looks like this, its
+  grammar, its type graph and a cookbook.
+- [`docs/query.md`](../query.md) — the selector: the grammar, the attributes and a cookbook.
 - [`netviz list`](list.md) — the same `--select`, over the tabular subjects.
 - [`netviz render`](render.md) — `--select` beside the other view filters.
 - [`netviz test`](test.md) — the same query as an executable assertion.

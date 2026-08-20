@@ -17,6 +17,11 @@ every query terminates, none of them can change anything, and the same
 expression is safe to run in a pre-commit hook, in a browser on every keystroke,
 and inside an assertion nobody will read again for a year.
 
+**It also cannot join or project.** When the question is "which interfaces, and
+what are they attached to, and what addresses do they have" — a join followed by
+a structured answer — that is the [relational language](nql.md), which the same
+`netviz query` command runs when the query begins with `select` or `with`.
+
 - [Grammar](#grammar)
 - [Terms](#terms)
 - [Operators](#operators)
@@ -446,6 +451,7 @@ See [`docs/testing.md`](testing.md) for how a suite is run and reported.
 
 ## See also
 
+- [`docs/nql.md`](nql.md) — the relational language, for the questions a predicate cannot ask.
 - [`netviz query`](commands/query.md) — the command, its flags and its exit codes.
 - [`docs/rendering.md`](rendering.md) — `--select` beside the other filters.
 - [`docs/testing.md`](testing.md) — `assert: query` among the assertions.

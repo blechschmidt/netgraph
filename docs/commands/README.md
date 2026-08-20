@@ -46,7 +46,7 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netviz path`](path.md) | Trace how two elements reach each other, hop by hop. | [path.md](path.md) |
 | [`netviz impact`](impact.md) | Simulate a failure: blast radius, single points of failure, promises. | [impact.md](impact.md) |
 | [`netviz list`](list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](list.md) |
-| [`netviz query`](query.md) | Select elements with one selector language, and print what matched. | [query.md](query.md) |
+| [`netviz query`](query.md) | Ask a question about the network, in either of two query languages. | [query.md](query.md) |
 | [`netviz ipam`](ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](ipam.md) |
 | [`netviz export`](export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](export.md) |
 | [`netviz report`](report.md) | Write the as-built documentation: a page per site and per device. | [report.md](report.md) |

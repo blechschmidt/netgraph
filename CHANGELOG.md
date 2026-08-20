@@ -18,6 +18,43 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **A relational query language, and `netviz query` now answers two.** A query that begins
+  with `select` or `with` walks the schema, joins by following links, and returns the shape
+  it is asked for — a value, an object, or an array of nested objects. Anything else is the
+  selector, unchanged.
+
+  ```console
+  $ netviz query 'select interface { fqn, parent: { fqn, kind }, addresses: { address } }
+                  filter exists .addresses'
+  $ netviz query "select (server filter .name = 'srv-01').addresses.address"
+  $ netviz query 'select { devices := count(device), subnets := count(subnet) }' -F json
+  ```
+
+  The language is EdgeQL-shaped rather than SQL- or Cypher-shaped, and
+  [`docs/nql.md`](docs/nql.md) says why: netviz's inventory is already a typed object graph,
+  so path navigation replaces joins and `{ … }` shapes replace `collect()`. Two functions
+  are borrowed from Cypher's traversal — `neighbors` and `reachable` — for the questions no
+  fixed number of named steps can answer.
+
+  Twenty-four types are queryable: every declared kind of §3, the sub-objects a device holds
+  (`interface`, `address`, `vlan`, `netns`, `zone`, `route`), and four derived ones
+  (`subnet`, `broadcast_domain`, `link`, `rack`) that come from the same functions a diagram
+  is drawn with, so a query and a picture cannot disagree. Every name is checked against the
+  schema *before* an inventory is read, so a misspelling is a diagnostic with a suggestion
+  rather than an empty answer.
+
+  Whether a field comes back as an array is decided by the schema's cardinality and not by
+  how many values happened to match, so a device with one interface still projects a
+  one-element array and a script never has to sniff.
+
+- **`netviz query --describe [TYPE]`** — the relational language's grammar, types and
+  functions, or one type's members with their cardinalities. Generated from the same table
+  the parser checks against, so the help cannot drift from what is accepted.
+
+- **`netviz query -F table|json|yaml|csv`** for a relational answer. `table` and `csv`
+  flatten a nested field into one cell; `json` and `yaml` carry it whole. `--count` composes
+  with all four, and the command still exits 1 when nothing matched.
+
 - **An `ipam` view: the address plan as a diagram, at `--layer ipam`.** Everything
   [`netviz ipam`](docs/ipam.md) prints as a table is now also a picture — one box per prefix,
   with a utilisation bar, the counts, and the free blocks left in it. The devices are left

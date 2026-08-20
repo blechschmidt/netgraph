@@ -58,6 +58,7 @@ from netviz.errors import NetvizError, count_text
 from netviz.export import EXPORTERS
 from netviz.models import DOCUMENT_KINDS
 from netviz.models.fielddocs import KIND_NOTES
+from netviz.nql.schema import SCHEMA as NQL_SCHEMA
 from netviz.query import ATTRIBUTES, DOMAINS, Domain, attribute_names
 from netviz.render import RENDERERS, Layer
 from netviz.rules import RULES, WILDCARD, resolve_rule_id
@@ -76,6 +77,7 @@ __all__ = [
     "complete_node",
     "complete_profile",
     "complete_query",
+    "complete_query_type",
     "complete_rule",
     "complete_test_suite",
     "completion_script",
@@ -367,6 +369,18 @@ def complete_query(
         )
     )
     return _items(((prefix + word, note) for word, note in offered), incomplete)
+
+
+def complete_query_type(
+    ctx: click.Context, param: click.Parameter, incomplete: str
+) -> list[CompletionItem]:
+    """The relational language's types, for ``netviz query --describe``.
+
+    Read straight off :data:`~netviz.nql.schema.SCHEMA`, so a type added to the
+    table is offered here without a second edit — the same discipline
+    :func:`complete_query` follows for the selector's attributes.
+    """
+    return _items(((one.name, one.summary) for one in NQL_SCHEMA), incomplete)
 
 
 def complete_rule(

@@ -227,7 +227,7 @@ SUMMARY: Final[dict[str, str]] = {
     "path": "Trace how two elements reach each other, hop by hop.",
     "impact": "Simulate a failure: blast radius, single points of failure, promises.",
     "list": "Tabulate devices, cables, tunnels, VLANs, BSSs or subnets.",
-    "query": "Select elements with one selector language, and print what matched.",
+    "query": "Ask a question about the network, in either of two query languages.",
     "ipam": "Report utilisation, free space, overlaps and aggregates.",
     "export": "Emit hosts files, DNS zones, Ansible, Prometheus, cable lists.",
     "report": "Write the as-built documentation: a page per site and per device.",
