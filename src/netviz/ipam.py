@@ -62,11 +62,12 @@ from typing import Final, TypeAlias
 from netviz.config import ValidationConfig
 from netviz.loader.inventory import Inventory
 from netviz.models import GLOBAL_VRF
-from netviz.subnets import IPNetwork, Subnet, subnets_of
+from netviz.subnets import IPNetwork, Subnet, SubnetKey, subnets_of
 from netviz.validate import Finding
 from netviz.validate import validate as run_validation
 
 __all__ = [
+    "BAR_WIDTH",
     "DEFAULT_SIZE",
     "IPAM_RULES",
     "IPAddress",
@@ -76,6 +77,7 @@ __all__ = [
     "allocations_within",
     "build_report",
     "conflicts",
+    "format_bar",
     "format_capacity",
     "format_utilisation",
     "free_space",
@@ -114,6 +116,18 @@ IPAM_RULES: Final[tuple[str, ...]] = (
 #: also the point past which the exact number stops being information: nobody
 #: reads "18446744073709551615" as anything other than "a /64".
 _POWER_OF_TWO_ABOVE: Final = 20
+
+#: Cells in the bar :func:`format_bar` draws. Sixteen because the bar is read
+#: beside a percentage rather than instead of one: it exists to make "nearly
+#: full" and "nearly empty" separable at a glance across a page of prefixes, and
+#: sixteen cells is one sixteenth resolution in the width of a prefix.
+BAR_WIDTH: Final = 16
+
+#: The two cells of :func:`format_bar`. Full and light blocks rather than ``#``
+#: and ``-``: they are the same width in every monospaced font, they line up
+#: into an unbroken bar, and Graphviz, HTML and JSON all carry them as text.
+_BAR_FULL: Final = "█"
+_BAR_EMPTY: Final = "░"
 
 #: Default block size for :func:`next_free`, per family. A ``/24`` is the unit
 #: an IPv4 plan is carved into, and RFC 4291 §2.5.4 makes the ``/64`` the unit
@@ -171,6 +185,31 @@ def format_utilisation(assigned: int, capacity: int) -> str:
     return f"{percent:.1f}%"
 
 
+def format_bar(assigned: int, capacity: int, *, width: int = BAR_WIDTH) -> str:
+    """Render ``assigned``/``capacity`` as a bar of ``width`` cells.
+
+    A picture of a prefix has room for the one fact a table gives a column to,
+    and "how full is it" is that fact. The bar is text — block characters, not a
+    drawn rectangle — so every backend carries it: the Graphviz label, the
+    Mermaid caption, the HTML tooltip and the JSON record all say the same thing,
+    and none of them needs a vocabulary for painting.
+
+    A prefix holding anything at all keeps **at least one** full cell, for the
+    reason :func:`format_utilisation` prints ``<0.1%``: two hosts in a ``/64``
+    round to nothing, and an empty bar beside them would say the prefix is
+    unused when it is the one thing it is not. A prefix that is genuinely full
+    keeps no empty cell, so a full bar means full.
+    """
+    if capacity <= 0 or width <= 0:  # pragma: no cover - capacity is never 0
+        return ""
+    if assigned <= 0:
+        return _BAR_EMPTY * width
+    filled = min(width, max(1, round(assigned * width / capacity)))
+    if filled == width and assigned < capacity:
+        filled = width - 1
+    return _BAR_FULL * filled + _BAR_EMPTY * (width - filled)
+
+
 # --------------------------------------------------------------------------- #
 # Utilisation
 # --------------------------------------------------------------------------- #
@@ -199,6 +238,16 @@ class Utilisation:
     #: row's capacity is the sum of its children's and not
     #: ``usable_addresses`` of the supernet — see :func:`aggregate`.
     capacity: int = 0
+
+    @property
+    def key(self) -> SubnetKey:
+        """What identifies this row: its instance and its prefix.
+
+        Spelled the same way :attr:`netviz.subnets.Subnet.key` is, so a row and
+        the subnet it was sized from can be looked up against each other without
+        either side re-deriving the pair.
+        """
+        return (self.vrf, self.network)
 
     @property
     def version(self) -> int:

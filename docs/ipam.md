@@ -21,6 +21,7 @@ different stories.
 ## Contents
 
 - [Utilisation](#utilisation)
+- [The same plan as a diagram](#the-same-plan-as-a-diagram)
 - [Free space](#free-space)
 - [Finding the next block](#finding-the-next-block)
 - [Aggregation](#aggregation)
@@ -112,6 +113,26 @@ them means the prefix can be reclaimed.
 two elements is one address two elements are fighting over, and it occupies one
 slot either way. The fight itself is reported as a
 [conflict](#conflicts).
+
+---
+
+## The same plan as a diagram
+
+Everything `netviz ipam` prints is a table. The same numbers are also a *picture*:
+`--layer ipam` ([`docs/rendering.md`](rendering.md#ipam-the-address-plan-and-where-the-room-is))
+draws one box per prefix, nested inside the block it was carved out of, each
+with a utilisation bar and the free blocks left in it.
+
+<!-- norun: writes a diagram into the reader's directory -->
+```console
+$ netviz -i examples/docker render --layer ipam -f svg -o plan.svg
+rendered 13 node(s) and 2 edge(s) as svg at layer ipam to plan.svg
+```
+
+It is the same derivation — this module sizes the prefixes and the renderer
+draws what it says — so the diagram and this report cannot disagree. The layer
+is offered by `netviz web` in its switcher, by `render -f html` behind the same
+switcher as every other layer, and by `netviz report --layer ipam`.
 
 ---
 

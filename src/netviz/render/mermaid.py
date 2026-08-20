@@ -157,9 +157,16 @@ _DOTTED: Final = ("-.-", "-. {label} .-")
 #:
 #: ``poe`` is dashed for the same reason a tunnel is: the power rides on a run the
 #: diagram draws elsewhere. An ``outlet`` feed is a cord of its own and stays
-#: solid.
+#: solid. An ``allocation`` carries nothing at all — it says one block was
+#: carved out of another — so it is dashed here as it is in DOT.
 _LOGICAL_EDGE_KINDS: Final[frozenset[EdgeKind]] = frozenset(
-    {EdgeKind.TUNNEL, EdgeKind.ENCAPSULATION, EdgeKind.OSPF, EdgeKind.POE}
+    {
+        EdgeKind.TUNNEL,
+        EdgeKind.ENCAPSULATION,
+        EdgeKind.OSPF,
+        EdgeKind.POE,
+        EdgeKind.ALLOCATION,
+    }
 )
 
 _INDENT: Final = "    "
@@ -459,6 +466,23 @@ def _degradations(views: AnnotationViews) -> list[str]:
 
 
 def _node_text(node: Node, options: RenderOptions, layer: Layer) -> str:
+    if node.ipam is not None:
+        # Before the subnet below, which a prefix of the address plan also is:
+        # here the box is not "who is in this subnet" but "how much of this block
+        # is left", and the caption is the only place Mermaid can say so. The
+        # bar the DOT record draws comes through as the text it already is.
+        plan = [
+            node.name,
+            f"[{node.ipam.family} {node.ipam.noun}]",
+            node.ipam.bar,
+            *node.ipam.describe(),
+        ]
+        if options.show_vlans and node.vlans:
+            plan.append(f"vlans: {_compact_ids(node.vlans)}")
+        if node.ipam.free_blocks:
+            plan.append(f"next: {node.ipam.free_blocks[0]}")
+        return "\n".join(plan)
+
     subnet = node.subnet
     if subnet is not None:
         vrf = f", vrf {subnet.vrf}" if subnet.vrf else ""

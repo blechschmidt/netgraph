@@ -135,7 +135,7 @@ DEMOS: Final[tuple[Demo, ...]] = (
             "West core. The one to open namespace collapsing, the routing layer "
             "and the security layer on."
         ),
-        layers=("l1", "l2", "l3", "routing", "security"),
+        layers=("l1", "l2", "l3", "ipam", "routing", "security"),
     ),
     Demo(
         name="overlay",
@@ -162,7 +162,7 @@ DEMOS: Final[tuple[Demo, ...]] = (
             "sixteen namespaces nested up to three deep, a swarm overlay, two networks "
             "that use no veth pair at all, and the firewall zones that decide what crosses."
         ),
-        layers=("l1", "l3", "netns", "overlay", "security"),
+        layers=("l1", "l3", "ipam", "netns", "overlay", "security"),
     ),
 )
 

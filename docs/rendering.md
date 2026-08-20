@@ -18,10 +18,11 @@ labelled links](images/home-lab.svg)
 
 ## Contents
 
-- [Layers: one inventory, eleven questions](#layers-one-inventory-eleven-questions)
+- [Layers: one inventory, twelve questions](#layers-one-inventory-twelve-questions)
   - [`physical` and `l1`: the cabling record and the network](#physical-and-l1-the-cabling-record-and-the-network)
   - [`l2`: the same graph, annotated with VLANs](#l2-the-same-graph-annotated-with-vlans)
   - [`l3`: prefixes and who is addressed in them](#l3-prefixes-and-who-is-addressed-in-them)
+  - [`ipam`: the address plan, and where the room is](#ipam-the-address-plan-and-where-the-room-is)
   - [`overlay`: tunnels and what runs inside what](#overlay-tunnels-and-what-runs-inside-what)
   - [`routing`: sessions, adjacencies and VRFs](#routing-sessions-adjacencies-and-vrfs)
   - [`rack`: a front elevation per cabinet](#rack-a-front-elevation-per-cabinet)
@@ -51,10 +52,11 @@ labelled links](images/home-lab.svg)
 ---
 
 <a id="layers-one-inventory-ten-questions"></a>
+<a id="layers-one-inventory-eleven-questions"></a>
 
-## Layers: one inventory, eleven questions
+## Layers: one inventory, twelve questions
 
-One inventory, ten questions. `--layer` picks which one the diagram answers.
+One inventory, twelve questions. `--layer` picks which one the diagram answers.
 
 | Layer | Nodes | Edges | Annotations | Reach for it when |
 |---|---|---|---|---|
@@ -62,6 +64,7 @@ One inventory, ten questions. `--layer` picks which one the diagram answers.
 | `l1` | devices and adapters | one per cable, one per adapter attachment, one per tunnel; a run through a patch panel is **one** edge | medium, link rate, cable label, length; encapsulation on a tunnel | You are standing at the rack. "Which port is this patched into, and with what?" |
 | `l2` | the same | the same | VLAN membership per node and per link, port mode | "Is this host in VLAN 10 all the way to the gateway?" Broadcast domains, trunk pruning, a VLAN that stops one switch short. |
 | `l3` | the elements that hold a routable address, **plus one node per IP prefix** | one per address: element ↔ the subnet it is addressed in, labelled with the interface and the address | VLANs the prefix is reachable in | "Why can these two not reach each other?" The addressing plan, gateways, a subnet mask that is one bit off. |
+| `ipam` | one node per **prefix of the address plan** — no hardware at all — clustered by routing instance | one per containment: the block ↔ what was carved out of it (dashed teal) | a utilisation bar, how many addresses are used of how many, how many are free, how many elements are in it, and the widest free blocks left | "Where does the next subnet go, and is anything nearly full?" The plan itself, rather than who is in it. |
 | `overlay` | the elements that terminate a tunnel, **plus one node per tunnel** | one per endpoint, plus one per `over` — this tunnel runs inside that one | encapsulation stack, VNI, MTU budget, what encrypts | "Is this traffic actually protected, and what carries it?" VPNs, VXLAN fabrics, a cleartext overlay somebody assumed was private. |
 | `routing` | the elements that take part in routing — anything declaring `routing`, `routes` or `vrfs` — grouped into one cluster per VRF | one per BGP session (solid, labelled with the AS pair) and one per OSPF adjacency (dotted, labelled with the area) | AS number, router id, area, the instances and static routes each device holds | "Who peers with whom, and in which table?" An iBGP mesh with a gap in it, an AS number typed twice, a VRF nothing is bound to. |
 | `rack` | one node per rack named by a `metadata.location` | none — a cable says nothing about where either end is bolted | a front elevation: one row per unit, occupied and empty alike, each occupant annotated with what it draws | "How much room is left in that cabinet, and what is above the UPS?" |
@@ -168,6 +171,63 @@ reports both:
 `render --layer l3 -f json` exports it with a `type` discriminator on every node
 (`element` or `subnet`) so a consumer can tell a derived prefix from a declared
 device.
+
+### `ipam`: the address plan, and where the room is
+
+`ipam` draws the same prefixes `l3` derives and **leaves the devices off**. That
+is the whole difference, and it is the point: a picture with the hosts on it
+answers "who is in this subnet", which layer 3 already answers, and the hosts
+bury the two things an address plan is opened for — how full each block is, and
+where the next one goes.
+
+![The address plan of the docker example: thirteen prefixes, each box carrying a
+utilisation bar and its counts, with a summarised /23 joined by dashed lines to
+the two /24s that fill it](images/ipam.svg)
+
+<sub>`netviz -i examples/docker render --layer ipam --rankdir LR --title "docker — address plan" -f svg -o docs/images/ipam.svg`.
+Every box is one prefix; the dashed lines say which block it was carved out
+of.</sub>
+
+Each box carries what [`netviz ipam`](ipam.md) prints for that row — the same
+numbers, derived once — plus the two facts a table has no column for:
+
+* **A utilisation bar**, sixteen cells wide, above the counts. Across a page of
+  prefixes it is what the eye scans; the numbers under it are there because a bar
+  cannot tell 3 % from 5 % and an address plan is a document people do arithmetic
+  with. A prefix holding anything at all keeps at least one full cell, for the
+  same reason the percentage says `<0.1%` rather than `0.0%`: two hosts in a
+  `/64` is not an unused prefix.
+* **The free blocks**, widest first, on a block something is carved out of. The
+  three widest are named on the box and the rest are counted off; the tooltip
+  holds all of them. A *leaf* prefix names none — the gaps between three hosts in
+  a `/24` are not blocks anybody hands out, and the free count above them is the
+  answer.
+
+Three kinds of box are drawn, and the subtitle says which:
+
+| Subtitle | What it is |
+|---|---|
+| `[ipv4 prefix]` | A prefix something is addressed in, with nothing carved out of it. |
+| `[ipv4 block, holds 3]` | A prefix something is addressed in that **also** contains three narrower prefixes of the plan — a router holding `10.0.0.1/16` over three `/24`s. |
+| `[ipv4 block, summarised]` | A prefix **nothing declares**, drawn because the blocks below it fill it exactly: two `/25`s that between them are a `/24` mean the plan holds a `/24`. This is [aggregation](ipam.md#aggregation), and it is the only box here no document writes down. |
+
+Nothing else is invented. A `/16` the inventory has one `/24` of is *not* drawn
+around that `/24`, because nobody allocated it; and two host routes are never
+summarised into the `/31` they happen to be adjacent in, because at that size the
+supernet is an artefact of two addresses being next to each other rather than a
+block anyone carved.
+
+A **VRF** is an address space of its own ([`docs/schema.md`
+§16.1](schema.md#161-vrfs--routing-instances)), so the prefixes of each routing
+instance are framed in a box of their own and containment never crosses between
+them: `10.0.0.0/24` in `blue` is not inside a `10.0.0.0/16` in the global table.
+
+`render --layer ipam -f json` gives every box an `ipam` object — the utilisation
+row, the parent, the children and the free blocks — beside the `subnet` object
+layer 3 gives it, so a dashboard reads the plan without re-deriving it. The
+editor offers the layer in its switcher like any other, `-f html` puts it behind
+the same switcher as every other layer, and `netviz report --layer ipam` puts it
+in an as-built document.
 
 ### `overlay`: tunnels and what runs inside what
 

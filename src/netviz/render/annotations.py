@@ -124,6 +124,7 @@ _LINK_LABELS: Final[dict[str, str]] = {
     "cleartext-tunnel": "tunnel (cleartext)",
     "attachment": "adapter attachment",
     "subnet": "subnet membership",
+    "allocation": "carved out of",
     "membership": "group membership",
     "poe": "power over ethernet",
     "outlet": "outlet feed",

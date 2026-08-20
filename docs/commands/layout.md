@@ -165,7 +165,7 @@ a list of what moved.
 <!-- generated: options layout -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | `l1` | Which view to arrange. Repeatable; each view is arranged separately. |
+| `--layer` | `[physical\|l1\|l2\|l3\|ipam\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | `l1` | Which view to arrange. Repeatable; each view is arranged separately. |
 | `--engine` | `[dot\|neato\|fdp\|sfdp\|circo\|twopi]` | `dot` | Graphviz engine to lay the diagram out with when seeding. dot is the hierarchical layout netviz draws with; circo suits a ring, fdp and neato a flat mesh. |
 | `--write` | — | off | Run the layout once and store the result, making the arrangement editable. |
 | `--clear` | — | off | Drop the stored arrangement, so the view is laid out from scratch again. |

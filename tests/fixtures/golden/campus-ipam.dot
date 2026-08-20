@@ -1,0 +1,393 @@
+graph netviz {
+  graph [
+    rankdir=TB,
+    splines=true,
+    overlap=false,
+    nodesep=0.5,
+    ranksep=0.7,
+    fontname="Helvetica,Arial,sans-serif",
+    fontsize=12,
+    label="Campus, address plan",
+    labelloc=t,
+    fontsize=16,
+  ];
+  node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
+  edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
+
+  "subnet:10.1.0.0/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.1.0.0/30 [ipv4 prefix]\nprefix 10.1.0.0/30: 2 elements, 2 addresses\naddresses: 10.1.0.1/30, 10.1.0.2/30\nelements: sites/north/core/rtr-north-core-01, sites/north/distribution/sw-north-dist-01\n2 of 2 used (100.0%), 0 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.1.0.0/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.1.10.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.1.10.0/24 [ipv4 prefix]\nprefix 10.1.10.0/24: 3 elements, 3 addresses\naddresses: 10.1.10.1/24, 10.1.10.51/24, 10.1.10.52/24\nelements: sites/north/distribution/sw-north-dist-01, sites/north/hosts/pc-north-01, sites/north/hosts/pc-north-02\n3 of 254 used (1.2%), 251 free\nvlans: 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.1.10.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  1.2%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">3 of 254</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">251</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">3 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">10</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.1.20.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.1.20.0/24 [ipv4 prefix]\nprefix 10.1.20.0/24: 2 elements, 2 addresses\naddresses: 10.1.20.1/24, 10.1.20.11/24\nelements: sites/north/distribution/sw-north-dist-01, sites/north/hosts/srv-north-01\n2 of 254 used (0.8%), 252 free\nvlans: 20", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.1.20.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  0.8%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 254</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">252</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">20</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.2.0.0/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.2.0.0/30 [ipv4 prefix]\nprefix 10.2.0.0/30: 2 elements, 2 addresses\naddresses: 10.2.0.1/30, 10.2.0.2/30\nelements: sites/south/core/rtr-south-core-01, sites/south/distribution/sw-south-dist-01\n2 of 2 used (100.0%), 0 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.2.0.0/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.2.10.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.2.10.0/24 [ipv4 prefix]\nprefix 10.2.10.0/24: 3 elements, 3 addresses\naddresses: 10.2.10.1/24, 10.2.10.51/24, 10.2.10.52/24\nelements: sites/south/distribution/sw-south-dist-01, sites/south/hosts/pc-south-01, sites/south/hosts/pc-south-02\n3 of 254 used (1.2%), 251 free\nvlans: 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.2.10.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  1.2%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">3 of 254</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">251</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">3 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">10</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.2.20.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.2.20.0/24 [ipv4 prefix]\nprefix 10.2.20.0/24: 2 elements, 2 addresses\naddresses: 10.2.20.1/24, 10.2.20.11/24\nelements: sites/south/distribution/sw-south-dist-01, sites/south/hosts/srv-south-01\n2 of 254 used (0.8%), 252 free\nvlans: 20", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.2.20.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  0.8%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 254</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">252</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">20</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.3.0.0/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.3.0.0/30 [ipv4 prefix]\nprefix 10.3.0.0/30: 2 elements, 2 addresses\naddresses: 10.3.0.1/30, 10.3.0.2/30\nelements: sites/west/core/rtr-west-core-01, sites/west/distribution/sw-west-dist-01\n2 of 2 used (100.0%), 0 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.3.0.0/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.3.10.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.3.10.0/24 [ipv4 prefix]\nprefix 10.3.10.0/24: 3 elements, 3 addresses\naddresses: 10.3.10.1/24, 10.3.10.51/24, 10.3.10.52/24\nelements: sites/west/distribution/sw-west-dist-01, sites/west/hosts/pc-west-01, sites/west/hosts/pc-west-02\n3 of 254 used (1.2%), 251 free\nvlans: 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.3.10.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  1.2%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">3 of 254</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">251</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">3 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">10</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.3.20.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.3.20.0/24 [ipv4 prefix]\nprefix 10.3.20.0/24: 2 elements, 2 addresses\naddresses: 10.3.20.1/24, 10.3.20.11/24\nelements: sites/west/distribution/sw-west-dist-01, sites/west/hosts/srv-west-01\n2 of 254 used (0.8%), 252 free\nvlans: 20", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.3.20.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  0.8%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 254</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">252</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">20</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:192.0.2.1/32" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="192.0.2.1/32 [ipv4 prefix]\nprefix 192.0.2.1/32: 1 element, 1 address\naddresses: 192.0.2.1/32\nelements: sites/north/core/rtr-north-core-01\n1 of 1 used (100.0%), 0 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>192.0.2.1/32</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">1 of 1</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">1 element</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:192.0.2.2/32" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="192.0.2.2/32 [ipv4 prefix]\nprefix 192.0.2.2/32: 1 element, 1 address\naddresses: 192.0.2.2/32\nelements: sites/south/core/rtr-south-core-01\n1 of 1 used (100.0%), 0 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>192.0.2.2/32</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">1 of 1</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">1 element</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:192.0.2.3/32" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="192.0.2.3/32 [ipv4 prefix]\nprefix 192.0.2.3/32: 1 element, 1 address\naddresses: 192.0.2.3/32\nelements: sites/west/core/rtr-west-core-01\n1 of 1 used (100.0%), 0 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>192.0.2.3/32</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">1 of 1</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">1 element</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:198.51.100.0/29" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="198.51.100.0/29 [ipv4 block]\nprefix 198.51.100.0/29: 3 elements, 4 addresses\naddresses: 198.51.100.1/30, 198.51.100.2/30, 198.51.100.5/30, 198.51.100.6/30\nelements: sites/north/core/rtr-north-core-01, sites/south/core/rtr-south-core-01, sites/west/core/rtr-west-core-01\n4 of 4 used (100.0%), 0 free\nsummary: nothing declares this block; the prefixes below it fill it\nholds: 198.51.100.0/30, 198.51.100.4/30\nlinks (2):\n  subnet:198.51.100.0/30  (allocation)\n  subnet:198.51.100.4/30  (allocation)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>198.51.100.0/29</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 block, summarised]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">4 of 4</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">4 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:198.51.100.0/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="198.51.100.0/30 [ipv4 prefix]\nprefix 198.51.100.0/30: 2 elements, 2 addresses\naddresses: 198.51.100.1/30, 198.51.100.2/30\nelements: sites/north/core/rtr-north-core-01, sites/south/core/rtr-south-core-01\n2 of 2 used (100.0%), 0 free\ncarved out of 198.51.100.0/29\nlinks (1):\n  subnet:198.51.100.0/29  (allocation)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>198.51.100.0/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:198.51.100.4/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="198.51.100.4/30 [ipv4 prefix]\nprefix 198.51.100.4/30: 2 elements, 2 addresses\naddresses: 198.51.100.5/30, 198.51.100.6/30\nelements: sites/south/core/rtr-south-core-01, sites/west/core/rtr-west-core-01\n2 of 2 used (100.0%), 0 free\ncarved out of 198.51.100.0/29\nlinks (1):\n  subnet:198.51.100.0/29  (allocation)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>198.51.100.4/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:198.51.100.8/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="198.51.100.8/30 [ipv4 prefix]\nprefix 198.51.100.8/30: 2 elements, 2 addresses\naddresses: 198.51.100.10/30, 198.51.100.9/30\nelements: sites/north/core/rtr-north-core-01, sites/west/core/rtr-west-core-01\n2 of 2 used (100.0%), 0 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>198.51.100.8/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8::1/128" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8::1/128 [ipv6 prefix]\nprefix 2001:db8::1/128: 1 element, 1 address\naddresses: 2001:db8::1/128\nelements: sites/north/core/rtr-north-core-01\n1 of 1 used (100.0%), 0 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8::1/128</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">1 of 1</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">1 element</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8::2/128" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8::2/128 [ipv6 prefix]\nprefix 2001:db8::2/128: 1 element, 1 address\naddresses: 2001:db8::2/128\nelements: sites/south/core/rtr-south-core-01\n1 of 1 used (100.0%), 0 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8::2/128</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">1 of 1</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">1 element</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8::3/128" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8::3/128 [ipv6 prefix]\nprefix 2001:db8::3/128: 1 element, 1 address\naddresses: 2001:db8::3/128\nelements: sites/west/core/rtr-west-core-01\n1 of 1 used (100.0%), 0 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8::3/128</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">████████████████  100.0%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">1 of 1</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">1 element</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:1::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:1::/64 [ipv6 prefix]\nprefix 2001:db8:1::/64: 2 elements, 2 addresses\naddresses: 2001:db8:1::1/64, 2001:db8:1::2/64\nelements: sites/north/core/rtr-north-core-01, sites/north/distribution/sw-north-dist-01\n2 of 2^64 used (<0.1%), 2^64 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:1::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:1:10::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:1:10::/64 [ipv6 prefix]\nprefix 2001:db8:1:10::/64: 3 elements, 3 addresses\naddresses: 2001:db8:1:10::1/64, 2001:db8:1:10::51/64, 2001:db8:1:10::52/64\nelements: sites/north/distribution/sw-north-dist-01, sites/north/hosts/pc-north-01, sites/north/hosts/pc-north-02\n3 of 2^64 used (<0.1%), 2^64 free\nvlans: 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:1:10::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">3 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">3 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">10</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:1:20::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:1:20::/64 [ipv6 prefix]\nprefix 2001:db8:1:20::/64: 2 elements, 2 addresses\naddresses: 2001:db8:1:20::1/64, 2001:db8:1:20::11/64\nelements: sites/north/distribution/sw-north-dist-01, sites/north/hosts/srv-north-01\n2 of 2^64 used (<0.1%), 2^64 free\nvlans: 20", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:1:20::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">20</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:2::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:2::/64 [ipv6 prefix]\nprefix 2001:db8:2::/64: 2 elements, 2 addresses\naddresses: 2001:db8:2::1/64, 2001:db8:2::2/64\nelements: sites/south/core/rtr-south-core-01, sites/south/distribution/sw-south-dist-01\n2 of 2^64 used (<0.1%), 2^64 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:2::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:2:10::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:2:10::/64 [ipv6 prefix]\nprefix 2001:db8:2:10::/64: 3 elements, 3 addresses\naddresses: 2001:db8:2:10::1/64, 2001:db8:2:10::51/64, 2001:db8:2:10::52/64\nelements: sites/south/distribution/sw-south-dist-01, sites/south/hosts/pc-south-01, sites/south/hosts/pc-south-02\n3 of 2^64 used (<0.1%), 2^64 free\nvlans: 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:2:10::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">3 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">3 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">10</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:2:20::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:2:20::/64 [ipv6 prefix]\nprefix 2001:db8:2:20::/64: 2 elements, 2 addresses\naddresses: 2001:db8:2:20::1/64, 2001:db8:2:20::11/64\nelements: sites/south/distribution/sw-south-dist-01, sites/south/hosts/srv-south-01\n2 of 2^64 used (<0.1%), 2^64 free\nvlans: 20", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:2:20::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">20</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:3::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:3::/64 [ipv6 prefix]\nprefix 2001:db8:3::/64: 2 elements, 2 addresses\naddresses: 2001:db8:3::1/64, 2001:db8:3::2/64\nelements: sites/west/core/rtr-west-core-01, sites/west/distribution/sw-west-dist-01\n2 of 2^64 used (<0.1%), 2^64 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:3::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:3:10::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:3:10::/64 [ipv6 prefix]\nprefix 2001:db8:3:10::/64: 3 elements, 3 addresses\naddresses: 2001:db8:3:10::1/64, 2001:db8:3:10::51/64, 2001:db8:3:10::52/64\nelements: sites/west/distribution/sw-west-dist-01, sites/west/hosts/pc-west-01, sites/west/hosts/pc-west-02\n3 of 2^64 used (<0.1%), 2^64 free\nvlans: 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:3:10::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">3 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">3 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">10</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:3:20::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:3:20::/64 [ipv6 prefix]\nprefix 2001:db8:3:20::/64: 2 elements, 2 addresses\naddresses: 2001:db8:3:20::1/64, 2001:db8:3:20::11/64\nelements: sites/west/distribution/sw-west-dist-01, sites/west/hosts/srv-west-01\n2 of 2^64 used (<0.1%), 2^64 free\nvlans: 20", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:3:20::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">20</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:ff:1::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:ff:1::/64 [ipv6 prefix]\nprefix 2001:db8:ff:1::/64: 2 elements, 2 addresses\naddresses: 2001:db8:ff:1::1/64, 2001:db8:ff:1::2/64\nelements: sites/north/core/rtr-north-core-01, sites/south/core/rtr-south-core-01\n2 of 2^64 used (<0.1%), 2^64 free", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:ff:1::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:ff:2::/63" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:ff:2::/63 [ipv6 block]\nprefix 2001:db8:ff:2::/63: 3 elements, 4 addresses\naddresses: 2001:db8:ff:2::1/64, 2001:db8:ff:2::2/64, 2001:db8:ff:3::2/64, 2001:db8:ff:3::1/64\nelements: sites/south/core/rtr-south-core-01, sites/west/core/rtr-west-core-01, sites/north/core/rtr-north-core-01\n4 of 2^65 used (<0.1%), 2^65 free\nsummary: nothing declares this block; the prefixes below it fill it\nholds: 2001:db8:ff:2::/64, 2001:db8:ff:3::/64\nlinks (2):\n  subnet:2001:db8:ff:2::/64  (allocation)\n  subnet:2001:db8:ff:3::/64  (allocation)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:ff:2::/63</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 block, summarised]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">4 of 2^65</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^65</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">4 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:ff:2::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:ff:2::/64 [ipv6 prefix]\nprefix 2001:db8:ff:2::/64: 2 elements, 2 addresses\naddresses: 2001:db8:ff:2::1/64, 2001:db8:ff:2::2/64\nelements: sites/south/core/rtr-south-core-01, sites/west/core/rtr-west-core-01\n2 of 2^64 used (<0.1%), 2^64 free\ncarved out of 2001:db8:ff:2::/63\nlinks (1):\n  subnet:2001:db8:ff:2::/63  (allocation)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:ff:2::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:ff:3::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:ff:3::/64 [ipv6 prefix]\nprefix 2001:db8:ff:3::/64: 2 elements, 2 addresses\naddresses: 2001:db8:ff:3::2/64, 2001:db8:ff:3::1/64\nelements: sites/north/core/rtr-north-core-01, sites/west/core/rtr-west-core-01\n2 of 2^64 used (<0.1%), 2^64 free\ncarved out of 2001:db8:ff:2::/63\nlinks (1):\n  subnet:2001:db8:ff:2::/63  (allocation)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:ff:3::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 prefix]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  &lt;0.1%</TD></TR>
+      <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">2 of 2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">2^64</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">2 elements</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+
+  subgraph cluster_vrf_0 {
+    label="vrf mgmt";
+    tooltip="vrf mgmt\n3 elements: 3 subnets\nvlans: 99";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "subnet:mgmt/10.1.99.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.1.99.0/24 (vrf mgmt) [ipv4 prefix]\nvrf mgmt\nprefix 10.1.99.0/24: 4 elements, 4 addresses\naddresses: 10.1.99.11/24, 10.1.99.12/24, 10.1.99.13/24, 10.1.99.1/24\nelements: sites/north/access/sw-north-acc-01, sites/north/access/sw-north-acc-02, sites/north/access/sw-north-acc-03, sites/north/distribution/sw-north-dist-01\n4 of 254 used (1.6%), 250 free\nvlans: 99", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.1.99.0/24 (vrf mgmt)</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  1.6%</TD></TR>
+        <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">4 of 254</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">250</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">4 elements</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">99</TD><TD ALIGN="LEFT"></TD></TR>
+      </TABLE>
+    >];
+    "subnet:mgmt/10.2.99.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.2.99.0/24 (vrf mgmt) [ipv4 prefix]\nvrf mgmt\nprefix 10.2.99.0/24: 3 elements, 3 addresses\naddresses: 10.2.99.11/24, 10.2.99.12/24, 10.2.99.1/24\nelements: sites/south/access/sw-south-acc-01, sites/south/access/sw-south-acc-02, sites/south/distribution/sw-south-dist-01\n3 of 254 used (1.2%), 251 free\nvlans: 99", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.2.99.0/24 (vrf mgmt)</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  1.2%</TD></TR>
+        <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">3 of 254</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">251</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">3 elements</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">99</TD><TD ALIGN="LEFT"></TD></TR>
+      </TABLE>
+    >];
+    "subnet:mgmt/10.3.99.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="10.3.99.0/24 (vrf mgmt) [ipv4 prefix]\nvrf mgmt\nprefix 10.3.99.0/24: 3 elements, 3 addresses\naddresses: 10.3.99.11/24, 10.3.99.12/24, 10.3.99.1/24\nelements: sites/west/access/sw-west-acc-01, sites/west/access/sw-west-acc-02, sites/west/distribution/sw-west-dist-01\n3 of 254 used (1.2%), 251 free\nvlans: 99", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.3.99.0/24 (vrf mgmt)</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 prefix]</TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">█░░░░░░░░░░░░░░░  1.2%</TD></TR>
+        <TR><TD ALIGN="LEFT">used</TD><TD ALIGN="LEFT">3 of 254</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD ALIGN="LEFT">free</TD><TD ALIGN="LEFT">251</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD ALIGN="LEFT">in use by</TD><TD ALIGN="LEFT">3 elements</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD ALIGN="LEFT">vlan</TD><TD ALIGN="LEFT">99</TD><TD ALIGN="LEFT"></TD></TR>
+      </TABLE>
+    >];
+  }
+
+  "annotation:note-why-fibre" [shape=note, style=filled, fillcolor="#fef3c7", color="#8b856d", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">The backbone is <B>single-mode fibre</B>: 4.2 km between sites, which is past what copper does at any speed.</TD></TR>
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">&#8226; <FONT FACE="monospace">os2</FONT>, LC, 10Gbps</TD></TR>
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">&#8226; the ring survives one break</TD></TR>
+    </TABLE>
+  >];
+
+  "subnet:198.51.100.0/29" -- "subnet:198.51.100.0/30" [color="#0f766e", style=dashed, tooltip="allocation subnet:198.51.100.0/29#allocates:198.51.100.0/30\nsubnet:198.51.100.0/29 — subnet:198.51.100.0/30"];
+  "subnet:198.51.100.0/29" -- "subnet:198.51.100.4/30" [color="#0f766e", style=dashed, tooltip="allocation subnet:198.51.100.0/29#allocates:198.51.100.4/30\nsubnet:198.51.100.0/29 — subnet:198.51.100.4/30"];
+  "subnet:2001:db8:ff:2::/63" -- "subnet:2001:db8:ff:2::/64" [color="#0f766e", style=dashed, tooltip="allocation subnet:2001:db8:ff:2::/63#allocates:2001:db8:ff:2::/64\nsubnet:2001:db8:ff:2::/63 — subnet:2001:db8:ff:2::/64"];
+  "subnet:2001:db8:ff:2::/63" -- "subnet:2001:db8:ff:3::/64" [color="#0f766e", style=dashed, tooltip="allocation subnet:2001:db8:ff:2::/63#allocates:2001:db8:ff:3::/64\nsubnet:2001:db8:ff:2::/63 — subnet:2001:db8:ff:3::/64"];
+}

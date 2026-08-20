@@ -136,6 +136,19 @@ CASES = (
         options=RenderOptions(group_by_namespace=True, title="Campus, layer 3"),
     ),
     Case(
+        # The address plan: the same prefixes as the case above with the
+        # devices left off, the two supernets the plan fills exactly, and the
+        # management VRF as a cluster. Held in all three formats because every
+        # backend has to say how full a prefix is -- the DOT record in columns,
+        # the Mermaid caption in lines, the JSON in an ``ipam`` object -- and a
+        # bar that moved by one cell is exactly the sort of change a snapshot is
+        # for.
+        name="campus-ipam",
+        example="campus",
+        layer=Layer.IPAM,
+        options=RenderOptions(title="Campus, address plan"),
+    ),
+    Case(
         # The control plane: an iBGP mesh, six OSPF adjacencies nobody declared,
         # and the management VRF as a cluster. ``group_by_namespace`` is on to
         # pin down that the layer's own grouping wins over it (§16.8).
@@ -560,6 +573,12 @@ def test_the_json_golden_parses_and_carries_the_envelope(case: Case) -> None:
         # them, as slots, rather than beside them as nodes.
         assert types == {"rack"}
         assert all(node["rack"]["slots"] for node in payload["nodes"])
+    elif case.layer is Layer.IPAM:
+        # The address plan holds prefixes and nothing else, and every one
+        # of them says how full it is -- which is the whole reason the layer is
+        # not layer 3 with the devices filtered out.
+        assert types == {"subnet"}
+        assert all(node["ipam"]["capacity"] for node in payload["nodes"])
     else:
         # Below the overlay layer a tunnel is an edge, unless it joins more than
         # two endpoints and has no line shape to take. A collapsed namespace is

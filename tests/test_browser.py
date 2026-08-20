@@ -703,6 +703,37 @@ def test_the_page_boots_and_draws_the_inventory(open_editor: OpenEditor) -> None
     expect(page.locator("#file-list")).to_contain_text("sw-home.yaml")
 
 
+def test_the_layer_menu_switches_to_the_address_plan(open_editor: OpenEditor) -> None:
+    """The address plan in the editor: pick ``ipam`` and the boxes become prefixes.
+
+    The layer is offered by the same ``<select>`` every other view is, so what
+    this asserts is the half a unit test cannot: that the server answers for it,
+    that the answer draws, and that the box carries the plan — the bar and the
+    counts — rather than the layer-3 prefix node it otherwise is.
+    """
+    editor = open_editor()
+    page = editor.page
+    expect(page.locator("#viewport g.node").first).to_be_attached()
+
+    page.select_option("#layer", "ipam")
+    plan = editor.api("/api/graph?" + PAGE_QUERY.replace("view=physical", "view=ipam"))
+    prefixes = [record for record in plan["details"].values() if record.get("ipam")]
+    assert prefixes, "the home-lab is addressed; the plan cannot be empty"
+
+    expect(page.locator("#viewport g.node")).to_have_count(len(prefixes))
+    # The bar is text in the label, so it survives every backend; this is the
+    # one place it is asserted to reach a real browser.
+    expect(page.locator("#viewport")).to_contain_text("░")
+    expect(page.locator("#viewport")).to_contain_text("used")
+    expect(page.locator("#status")).to_have_text("ok")
+
+    # And the info box says the same thing the label does.
+    identifier = next(key for key, record in plan["details"].items() if record.get("ipam"))
+    page.locator(f'#viewport [id="{identifier}"]').hover()
+    expect(page.locator("#info")).to_be_visible()
+    expect(page.locator("#info")).to_contain_text("used")
+
+
 def test_typing_in_the_text_pane_re_renders_the_diagram(open_editor: OpenEditor) -> None:
     """The scratchpad's whole contract: text in, diagram out, no save anywhere."""
     editor = open_editor(source=TWO_HOSTS)

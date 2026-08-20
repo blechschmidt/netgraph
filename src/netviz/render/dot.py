@@ -157,6 +157,7 @@ from netviz.render.graph import (
     Edge,
     EdgeKind,
     Graph,
+    IpamView,
     Layer,
     Node,
     RackSlot,
@@ -1773,6 +1774,11 @@ def _expand(template: Linker, graph: Graph, fqn: str, *, kind: str) -> str | Non
 
 def _subtitle(node: Node) -> str:
     """The bracketed line under a node's name: what sort of thing it is."""
+    if node.ipam is not None:
+        # Checked before the subnet below, which every prefix of the plan also
+        # is: at this layer what distinguishes one box from the next is whether
+        # it is a block holding other blocks or a leaf holding hosts.
+        return f"[{node.ipam.family} {node.ipam.noun}]"
     if node.subnet is not None:
         vrf = f", vrf {node.subnet.vrf}" if node.subnet.vrf else ""
         return f"[{node.subnet.family} subnet{vrf}]"
@@ -1865,6 +1871,9 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
     be a column of port names burying the two ports that carry an address, and
     the ports a cable lands on are named on the edge already.
     """
+    if node.ipam is not None:
+        return _ipam_rows(node.ipam, options)
+
     if node.subnet is not None:
         if options.show_vlans and node.vlans:
             return (_Row(port=f"vlan {compact_ids(node.vlans)}", spans=True),)
@@ -2622,6 +2631,44 @@ def _power_rows(view: PowerNode) -> tuple[_Row, ...]:
     reader is looking when they ask which one it is.
     """
     return tuple(_Row(port=_inline(line), spans=True) for line in view.describe())
+
+
+#: Free blocks named under a prefix before the rest are counted off. Three,
+#: because the question they answer — "where does the next subnet go?" — is
+#: answered by the widest one and its two alternatives; a ``/16`` with a stray
+#: host in it has seventeen free blocks and sixteen of them are fragments.
+_MAX_FREE_BLOCKS: Final = 3
+
+
+def _ipam_rows(view: IpamView, options: RenderOptions) -> tuple[_Row, ...]:
+    """The address plan's card for one prefix: how full, how much left, where.
+
+    The bar spans the table and comes first: across a page of prefixes it is what
+    a reader scans, and a column of percentages is not. Everything under it is
+    the same fact in numbers, because a bar sixteen cells wide cannot tell 3 %
+    from 5 % and an address plan is a document people do arithmetic with.
+
+    The free *blocks* are named only for a prefix something is carved out of.
+    For a leaf the count above them is the whole answer — the gaps between three
+    hosts in a ``/24`` are not blocks anybody hands out — and naming them would
+    turn every leaf into a wall of ``/31``s.
+    """
+    rows = [
+        _Row(port=f"{view.bar}  {view.percent}", spans=True),
+        _Row(port="used", addresses=f"{view.assigned} of {view.capacity_text}"),
+    ]
+    if view.free:
+        rows.append(_Row(port="free", addresses=view.free_text))
+    if view.devices:
+        rows.append(_Row(port="in use by", addresses=count_text(view.devices, "element")))
+    if options.show_vlans and view.utilisation.vlans:
+        rows.append(_Row(port="vlan", addresses=compact_ids(view.utilisation.vlans)))
+    for index, block in enumerate(view.free_blocks[:_MAX_FREE_BLOCKS]):
+        rows.append(_Row(port="next" if index == 0 else "", addresses=_inline(block)))
+    hidden = len(view.free_blocks) - _MAX_FREE_BLOCKS
+    if hidden > 0:
+        rows.append(_Row(port=f"(+{count_text(hidden, 'more free block')})", spans=True))
+    return tuple(rows)
 
 
 def _rack_rows(view: RackView) -> tuple[_Row, ...]:

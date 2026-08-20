@@ -212,6 +212,14 @@ POE_STYLE: Final[tuple[str, str]] = ("#ca8a04", "dashed")
 VETH_STYLE: Final[tuple[str, str]] = ("#0891b2", "solid")
 NESTING_STYLE: Final[tuple[str, str]] = ("#475569", "dotted")
 
+#: The containment line of the address plan: this block was carved out of
+#: that one. Not a path at all — nothing traverses it — so it borrows the
+#: encapsulation vocabulary of "this is held by that" and is dashed, in the
+#: teal the subnet edge already uses for "this is about addressing". Dashed
+#: rather than dotted so it is not read as a nesting edge of the netns view,
+#: which says something else about containment.
+ALLOCATION_STYLE: Final[tuple[str, str]] = (SUBNET_EDGE_STYLE[0], "dashed")
+
 #: The three verdicts of the security view (§24.5). A zone pair whose rules all
 #: accept is drawn solid green, one whose rules all deny solid red, and one
 #: holding both -- or holding nothing terminal at all -- dashed amber, because
@@ -242,6 +250,7 @@ EDGE_PALETTE: Final[Mapping[str, tuple[str, str]]] = MappingProxyType(
         **MEDIUM_STYLE,
         "attachment": ATTACHMENT_STYLE,
         "subnet": SUBNET_EDGE_STYLE,
+        "allocation": ALLOCATION_STYLE,
         "tunnel": TUNNEL_STYLE,
         "cleartext-tunnel": CLEARTEXT_TUNNEL_STYLE,
         "encapsulation": ENCAPSULATION_STYLE,
@@ -272,6 +281,7 @@ _EDGE_KIND_KEYS: Final[Mapping[EdgeKind, str]] = MappingProxyType(
     {
         EdgeKind.ATTACHMENT: "attachment",
         EdgeKind.SUBNET: "subnet",
+        EdgeKind.ALLOCATION: "allocation",
         EdgeKind.ENCAPSULATION: "encapsulation",
         EdgeKind.MEMBERSHIP: "membership",
         EdgeKind.BGP: "bgp",
@@ -292,6 +302,10 @@ _EDGE_KIND_KEYS: Final[Mapping[EdgeKind, str]] = MappingProxyType(
 CLUSTER_NOUN: Final[Mapping[Layer, str]] = MappingProxyType(
     {
         Layer.ROUTING: "vrf",
+        # The address plan boxes every prefix of one routing instance together,
+        # for the reason a VRF is what splits an address space in the first
+        # place (§16.1): the same prefix in two tables is two plans.
+        Layer.IPAM: "vrf",
         # The netns view boxes every stack of one machine together, so the box
         # *is* the machine — and saying so is what keeps it from being read as
         # one more namespace, which is exactly what the things inside it are.

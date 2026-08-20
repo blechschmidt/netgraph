@@ -1,0 +1,2024 @@
+{
+  "apiVersion": "netviz.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "ipam",
+  "nodes": [
+    {
+      "id": "subnet:10.1.0.0/30",
+      "type": "subnet",
+      "name": "10.1.0.0/30",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.1.0.0/30",
+        "family": "ipv4",
+        "addresses": [
+          "10.1.0.1/30",
+          "10.1.0.2/30"
+        ],
+        "elements": [
+          "sites/north/core/rtr-north-core-01",
+          "sites/north/distribution/sw-north-dist-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "10.1.0.0/30",
+        "family": "ipv4",
+        "vlans": [],
+        "capacity": 2,
+        "assigned": 2,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "2 of 2",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:10.1.10.0/24",
+      "type": "subnet",
+      "name": "10.1.10.0/24",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.1.10.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.1.10.1/24",
+          "10.1.10.51/24",
+          "10.1.10.52/24"
+        ],
+        "elements": [
+          "sites/north/distribution/sw-north-dist-01",
+          "sites/north/hosts/pc-north-01",
+          "sites/north/hosts/pc-north-02"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "10.1.10.0/24",
+        "family": "ipv4",
+        "vlans": [
+          10
+        ],
+        "capacity": 254,
+        "assigned": 3,
+        "free": 251,
+        "utilisation": 0.011811,
+        "devices": 3,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "3 of 254",
+        "freeText": "251",
+        "utilisationText": "1.2%",
+        "summarised": false
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:10.1.20.0/24",
+      "type": "subnet",
+      "name": "10.1.20.0/24",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.1.20.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.1.20.1/24",
+          "10.1.20.11/24"
+        ],
+        "elements": [
+          "sites/north/distribution/sw-north-dist-01",
+          "sites/north/hosts/srv-north-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "10.1.20.0/24",
+        "family": "ipv4",
+        "vlans": [
+          20
+        ],
+        "capacity": 254,
+        "assigned": 2,
+        "free": 252,
+        "utilisation": 0.007874,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 254",
+        "freeText": "252",
+        "utilisationText": "0.8%",
+        "summarised": false
+      },
+      "vlans": [
+        20
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:10.2.0.0/30",
+      "type": "subnet",
+      "name": "10.2.0.0/30",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.2.0.0/30",
+        "family": "ipv4",
+        "addresses": [
+          "10.2.0.1/30",
+          "10.2.0.2/30"
+        ],
+        "elements": [
+          "sites/south/core/rtr-south-core-01",
+          "sites/south/distribution/sw-south-dist-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "10.2.0.0/30",
+        "family": "ipv4",
+        "vlans": [],
+        "capacity": 2,
+        "assigned": 2,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "2 of 2",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:10.2.10.0/24",
+      "type": "subnet",
+      "name": "10.2.10.0/24",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.2.10.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.2.10.1/24",
+          "10.2.10.51/24",
+          "10.2.10.52/24"
+        ],
+        "elements": [
+          "sites/south/distribution/sw-south-dist-01",
+          "sites/south/hosts/pc-south-01",
+          "sites/south/hosts/pc-south-02"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "10.2.10.0/24",
+        "family": "ipv4",
+        "vlans": [
+          10
+        ],
+        "capacity": 254,
+        "assigned": 3,
+        "free": 251,
+        "utilisation": 0.011811,
+        "devices": 3,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "3 of 254",
+        "freeText": "251",
+        "utilisationText": "1.2%",
+        "summarised": false
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:10.2.20.0/24",
+      "type": "subnet",
+      "name": "10.2.20.0/24",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.2.20.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.2.20.1/24",
+          "10.2.20.11/24"
+        ],
+        "elements": [
+          "sites/south/distribution/sw-south-dist-01",
+          "sites/south/hosts/srv-south-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "10.2.20.0/24",
+        "family": "ipv4",
+        "vlans": [
+          20
+        ],
+        "capacity": 254,
+        "assigned": 2,
+        "free": 252,
+        "utilisation": 0.007874,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 254",
+        "freeText": "252",
+        "utilisationText": "0.8%",
+        "summarised": false
+      },
+      "vlans": [
+        20
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:10.3.0.0/30",
+      "type": "subnet",
+      "name": "10.3.0.0/30",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.3.0.0/30",
+        "family": "ipv4",
+        "addresses": [
+          "10.3.0.1/30",
+          "10.3.0.2/30"
+        ],
+        "elements": [
+          "sites/west/core/rtr-west-core-01",
+          "sites/west/distribution/sw-west-dist-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "10.3.0.0/30",
+        "family": "ipv4",
+        "vlans": [],
+        "capacity": 2,
+        "assigned": 2,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "2 of 2",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:10.3.10.0/24",
+      "type": "subnet",
+      "name": "10.3.10.0/24",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.3.10.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.3.10.1/24",
+          "10.3.10.51/24",
+          "10.3.10.52/24"
+        ],
+        "elements": [
+          "sites/west/distribution/sw-west-dist-01",
+          "sites/west/hosts/pc-west-01",
+          "sites/west/hosts/pc-west-02"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "10.3.10.0/24",
+        "family": "ipv4",
+        "vlans": [
+          10
+        ],
+        "capacity": 254,
+        "assigned": 3,
+        "free": 251,
+        "utilisation": 0.011811,
+        "devices": 3,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "3 of 254",
+        "freeText": "251",
+        "utilisationText": "1.2%",
+        "summarised": false
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:10.3.20.0/24",
+      "type": "subnet",
+      "name": "10.3.20.0/24",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.3.20.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.3.20.1/24",
+          "10.3.20.11/24"
+        ],
+        "elements": [
+          "sites/west/distribution/sw-west-dist-01",
+          "sites/west/hosts/srv-west-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "10.3.20.0/24",
+        "family": "ipv4",
+        "vlans": [
+          20
+        ],
+        "capacity": 254,
+        "assigned": 2,
+        "free": 252,
+        "utilisation": 0.007874,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 254",
+        "freeText": "252",
+        "utilisationText": "0.8%",
+        "summarised": false
+      },
+      "vlans": [
+        20
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:192.0.2.1/32",
+      "type": "subnet",
+      "name": "192.0.2.1/32",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "192.0.2.1/32",
+        "family": "ipv4",
+        "addresses": [
+          "192.0.2.1/32"
+        ],
+        "elements": [
+          "sites/north/core/rtr-north-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "192.0.2.1/32",
+        "family": "ipv4",
+        "vlans": [],
+        "capacity": 1,
+        "assigned": 1,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 1,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "1 of 1",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:192.0.2.2/32",
+      "type": "subnet",
+      "name": "192.0.2.2/32",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "192.0.2.2/32",
+        "family": "ipv4",
+        "addresses": [
+          "192.0.2.2/32"
+        ],
+        "elements": [
+          "sites/south/core/rtr-south-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "192.0.2.2/32",
+        "family": "ipv4",
+        "vlans": [],
+        "capacity": 1,
+        "assigned": 1,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 1,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "1 of 1",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:192.0.2.3/32",
+      "type": "subnet",
+      "name": "192.0.2.3/32",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "192.0.2.3/32",
+        "family": "ipv4",
+        "addresses": [
+          "192.0.2.3/32"
+        ],
+        "elements": [
+          "sites/west/core/rtr-west-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "192.0.2.3/32",
+        "family": "ipv4",
+        "vlans": [],
+        "capacity": 1,
+        "assigned": 1,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 1,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "1 of 1",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:198.51.100.0/29",
+      "type": "subnet",
+      "name": "198.51.100.0/29",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "198.51.100.0/29",
+        "family": "ipv4",
+        "addresses": [
+          "198.51.100.1/30",
+          "198.51.100.2/30",
+          "198.51.100.5/30",
+          "198.51.100.6/30"
+        ],
+        "elements": [
+          "sites/north/core/rtr-north-core-01",
+          "sites/south/core/rtr-south-core-01",
+          "sites/west/core/rtr-west-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "198.51.100.0/29",
+        "family": "ipv4",
+        "vlans": [],
+        "capacity": 4,
+        "assigned": 4,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 4,
+        "aggregated": [
+          "198.51.100.0/30",
+          "198.51.100.4/30"
+        ],
+        "parent": null,
+        "children": [
+          "subnet:198.51.100.0/30",
+          "subnet:198.51.100.4/30"
+        ],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "4 of 4",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": true
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:198.51.100.0/30",
+      "type": "subnet",
+      "name": "198.51.100.0/30",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "198.51.100.0/30",
+        "family": "ipv4",
+        "addresses": [
+          "198.51.100.1/30",
+          "198.51.100.2/30"
+        ],
+        "elements": [
+          "sites/north/core/rtr-north-core-01",
+          "sites/south/core/rtr-south-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "198.51.100.0/30",
+        "family": "ipv4",
+        "vlans": [],
+        "capacity": 2,
+        "assigned": 2,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": "subnet:198.51.100.0/29",
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "2 of 2",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:198.51.100.4/30",
+      "type": "subnet",
+      "name": "198.51.100.4/30",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "198.51.100.4/30",
+        "family": "ipv4",
+        "addresses": [
+          "198.51.100.5/30",
+          "198.51.100.6/30"
+        ],
+        "elements": [
+          "sites/south/core/rtr-south-core-01",
+          "sites/west/core/rtr-west-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "198.51.100.4/30",
+        "family": "ipv4",
+        "vlans": [],
+        "capacity": 2,
+        "assigned": 2,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": "subnet:198.51.100.0/29",
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "2 of 2",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:198.51.100.8/30",
+      "type": "subnet",
+      "name": "198.51.100.8/30",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "198.51.100.8/30",
+        "family": "ipv4",
+        "addresses": [
+          "198.51.100.10/30",
+          "198.51.100.9/30"
+        ],
+        "elements": [
+          "sites/north/core/rtr-north-core-01",
+          "sites/west/core/rtr-west-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "198.51.100.8/30",
+        "family": "ipv4",
+        "vlans": [],
+        "capacity": 2,
+        "assigned": 2,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "2 of 2",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8::1/128",
+      "type": "subnet",
+      "name": "2001:db8::1/128",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8::1/128",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8::1/128"
+        ],
+        "elements": [
+          "sites/north/core/rtr-north-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8::1/128",
+        "family": "ipv6",
+        "vlans": [],
+        "capacity": 1,
+        "assigned": 1,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 1,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "1 of 1",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8::2/128",
+      "type": "subnet",
+      "name": "2001:db8::2/128",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8::2/128",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8::2/128"
+        ],
+        "elements": [
+          "sites/south/core/rtr-south-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8::2/128",
+        "family": "ipv6",
+        "vlans": [],
+        "capacity": 1,
+        "assigned": 1,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 1,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "1 of 1",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8::3/128",
+      "type": "subnet",
+      "name": "2001:db8::3/128",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8::3/128",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8::3/128"
+        ],
+        "elements": [
+          "sites/west/core/rtr-west-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8::3/128",
+        "family": "ipv6",
+        "vlans": [],
+        "capacity": 1,
+        "assigned": 1,
+        "free": 0,
+        "utilisation": 1.0,
+        "devices": 1,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "████████████████",
+        "usedText": "1 of 1",
+        "freeText": "0",
+        "utilisationText": "100.0%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:1::/64",
+      "type": "subnet",
+      "name": "2001:db8:1::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:1::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:1::1/64",
+          "2001:db8:1::2/64"
+        ],
+        "elements": [
+          "sites/north/core/rtr-north-core-01",
+          "sites/north/distribution/sw-north-dist-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:1::/64",
+        "family": "ipv6",
+        "vlans": [],
+        "capacity": 18446744073709551615,
+        "assigned": 2,
+        "free": 18446744073709551613,
+        "utilisation": 0.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:1:10::/64",
+      "type": "subnet",
+      "name": "2001:db8:1:10::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:1:10::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:1:10::1/64",
+          "2001:db8:1:10::51/64",
+          "2001:db8:1:10::52/64"
+        ],
+        "elements": [
+          "sites/north/distribution/sw-north-dist-01",
+          "sites/north/hosts/pc-north-01",
+          "sites/north/hosts/pc-north-02"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:1:10::/64",
+        "family": "ipv6",
+        "vlans": [
+          10
+        ],
+        "capacity": 18446744073709551615,
+        "assigned": 3,
+        "free": 18446744073709551612,
+        "utilisation": 0.0,
+        "devices": 3,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "3 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:1:20::/64",
+      "type": "subnet",
+      "name": "2001:db8:1:20::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:1:20::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:1:20::1/64",
+          "2001:db8:1:20::11/64"
+        ],
+        "elements": [
+          "sites/north/distribution/sw-north-dist-01",
+          "sites/north/hosts/srv-north-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:1:20::/64",
+        "family": "ipv6",
+        "vlans": [
+          20
+        ],
+        "capacity": 18446744073709551615,
+        "assigned": 2,
+        "free": 18446744073709551613,
+        "utilisation": 0.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [
+        20
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:2::/64",
+      "type": "subnet",
+      "name": "2001:db8:2::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:2::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:2::1/64",
+          "2001:db8:2::2/64"
+        ],
+        "elements": [
+          "sites/south/core/rtr-south-core-01",
+          "sites/south/distribution/sw-south-dist-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:2::/64",
+        "family": "ipv6",
+        "vlans": [],
+        "capacity": 18446744073709551615,
+        "assigned": 2,
+        "free": 18446744073709551613,
+        "utilisation": 0.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:2:10::/64",
+      "type": "subnet",
+      "name": "2001:db8:2:10::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:2:10::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:2:10::1/64",
+          "2001:db8:2:10::51/64",
+          "2001:db8:2:10::52/64"
+        ],
+        "elements": [
+          "sites/south/distribution/sw-south-dist-01",
+          "sites/south/hosts/pc-south-01",
+          "sites/south/hosts/pc-south-02"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:2:10::/64",
+        "family": "ipv6",
+        "vlans": [
+          10
+        ],
+        "capacity": 18446744073709551615,
+        "assigned": 3,
+        "free": 18446744073709551612,
+        "utilisation": 0.0,
+        "devices": 3,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "3 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:2:20::/64",
+      "type": "subnet",
+      "name": "2001:db8:2:20::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:2:20::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:2:20::1/64",
+          "2001:db8:2:20::11/64"
+        ],
+        "elements": [
+          "sites/south/distribution/sw-south-dist-01",
+          "sites/south/hosts/srv-south-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:2:20::/64",
+        "family": "ipv6",
+        "vlans": [
+          20
+        ],
+        "capacity": 18446744073709551615,
+        "assigned": 2,
+        "free": 18446744073709551613,
+        "utilisation": 0.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [
+        20
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:3::/64",
+      "type": "subnet",
+      "name": "2001:db8:3::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:3::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:3::1/64",
+          "2001:db8:3::2/64"
+        ],
+        "elements": [
+          "sites/west/core/rtr-west-core-01",
+          "sites/west/distribution/sw-west-dist-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:3::/64",
+        "family": "ipv6",
+        "vlans": [],
+        "capacity": 18446744073709551615,
+        "assigned": 2,
+        "free": 18446744073709551613,
+        "utilisation": 0.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:3:10::/64",
+      "type": "subnet",
+      "name": "2001:db8:3:10::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:3:10::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:3:10::1/64",
+          "2001:db8:3:10::51/64",
+          "2001:db8:3:10::52/64"
+        ],
+        "elements": [
+          "sites/west/distribution/sw-west-dist-01",
+          "sites/west/hosts/pc-west-01",
+          "sites/west/hosts/pc-west-02"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:3:10::/64",
+        "family": "ipv6",
+        "vlans": [
+          10
+        ],
+        "capacity": 18446744073709551615,
+        "assigned": 3,
+        "free": 18446744073709551612,
+        "utilisation": 0.0,
+        "devices": 3,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "3 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:3:20::/64",
+      "type": "subnet",
+      "name": "2001:db8:3:20::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:3:20::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:3:20::1/64",
+          "2001:db8:3:20::11/64"
+        ],
+        "elements": [
+          "sites/west/distribution/sw-west-dist-01",
+          "sites/west/hosts/srv-west-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:3:20::/64",
+        "family": "ipv6",
+        "vlans": [
+          20
+        ],
+        "capacity": 18446744073709551615,
+        "assigned": 2,
+        "free": 18446744073709551613,
+        "utilisation": 0.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [
+        20
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:ff:1::/64",
+      "type": "subnet",
+      "name": "2001:db8:ff:1::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:ff:1::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:ff:1::1/64",
+          "2001:db8:ff:1::2/64"
+        ],
+        "elements": [
+          "sites/north/core/rtr-north-core-01",
+          "sites/south/core/rtr-south-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:ff:1::/64",
+        "family": "ipv6",
+        "vlans": [],
+        "capacity": 18446744073709551615,
+        "assigned": 2,
+        "free": 18446744073709551613,
+        "utilisation": 0.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:ff:2::/63",
+      "type": "subnet",
+      "name": "2001:db8:ff:2::/63",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:ff:2::/63",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:ff:2::1/64",
+          "2001:db8:ff:2::2/64",
+          "2001:db8:ff:3::2/64",
+          "2001:db8:ff:3::1/64"
+        ],
+        "elements": [
+          "sites/south/core/rtr-south-core-01",
+          "sites/west/core/rtr-west-core-01",
+          "sites/north/core/rtr-north-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:ff:2::/63",
+        "family": "ipv6",
+        "vlans": [],
+        "capacity": 36893488147419103230,
+        "assigned": 4,
+        "free": 36893488147419103226,
+        "utilisation": 0.0,
+        "devices": 4,
+        "aggregated": [
+          "2001:db8:ff:2::/64",
+          "2001:db8:ff:3::/64"
+        ],
+        "parent": null,
+        "children": [
+          "subnet:2001:db8:ff:2::/64",
+          "subnet:2001:db8:ff:3::/64"
+        ],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "4 of 2^65",
+        "freeText": "2^65",
+        "utilisationText": "<0.1%",
+        "summarised": true
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:ff:2::/64",
+      "type": "subnet",
+      "name": "2001:db8:ff:2::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:ff:2::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:ff:2::1/64",
+          "2001:db8:ff:2::2/64"
+        ],
+        "elements": [
+          "sites/south/core/rtr-south-core-01",
+          "sites/west/core/rtr-west-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:ff:2::/64",
+        "family": "ipv6",
+        "vlans": [],
+        "capacity": 18446744073709551615,
+        "assigned": 2,
+        "free": 18446744073709551613,
+        "utilisation": 0.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": "subnet:2001:db8:ff:2::/63",
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:ff:3::/64",
+      "type": "subnet",
+      "name": "2001:db8:ff:3::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:ff:3::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:ff:3::2/64",
+          "2001:db8:ff:3::1/64"
+        ],
+        "elements": [
+          "sites/north/core/rtr-north-core-01",
+          "sites/west/core/rtr-west-core-01"
+        ]
+      },
+      "ipam": {
+        "vrf": "",
+        "prefix": "2001:db8:ff:3::/64",
+        "family": "ipv6",
+        "vlans": [],
+        "capacity": 18446744073709551615,
+        "assigned": 2,
+        "free": 18446744073709551613,
+        "utilisation": 0.0,
+        "devices": 2,
+        "aggregated": [],
+        "parent": "subnet:2001:db8:ff:2::/63",
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "2 of 2^64",
+        "freeText": "2^64",
+        "utilisationText": "<0.1%",
+        "summarised": false
+      },
+      "vlans": [],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:mgmt/10.1.99.0/24",
+      "type": "subnet",
+      "name": "10.1.99.0/24 (vrf mgmt)",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.1.99.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.1.99.11/24",
+          "10.1.99.12/24",
+          "10.1.99.13/24",
+          "10.1.99.1/24"
+        ],
+        "elements": [
+          "sites/north/access/sw-north-acc-01",
+          "sites/north/access/sw-north-acc-02",
+          "sites/north/access/sw-north-acc-03",
+          "sites/north/distribution/sw-north-dist-01"
+        ],
+        "vrf": "mgmt"
+      },
+      "ipam": {
+        "vrf": "mgmt",
+        "prefix": "10.1.99.0/24",
+        "family": "ipv4",
+        "vlans": [
+          99
+        ],
+        "capacity": 254,
+        "assigned": 4,
+        "free": 250,
+        "utilisation": 0.015748,
+        "devices": 4,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "4 of 254",
+        "freeText": "250",
+        "utilisationText": "1.6%",
+        "summarised": false
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        99
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:mgmt/10.2.99.0/24",
+      "type": "subnet",
+      "name": "10.2.99.0/24 (vrf mgmt)",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.2.99.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.2.99.11/24",
+          "10.2.99.12/24",
+          "10.2.99.1/24"
+        ],
+        "elements": [
+          "sites/south/access/sw-south-acc-01",
+          "sites/south/access/sw-south-acc-02",
+          "sites/south/distribution/sw-south-dist-01"
+        ],
+        "vrf": "mgmt"
+      },
+      "ipam": {
+        "vrf": "mgmt",
+        "prefix": "10.2.99.0/24",
+        "family": "ipv4",
+        "vlans": [
+          99
+        ],
+        "capacity": 254,
+        "assigned": 3,
+        "free": 251,
+        "utilisation": 0.011811,
+        "devices": 3,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "3 of 254",
+        "freeText": "251",
+        "utilisationText": "1.2%",
+        "summarised": false
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        99
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:mgmt/10.3.99.0/24",
+      "type": "subnet",
+      "name": "10.3.99.0/24 (vrf mgmt)",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.3.99.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.3.99.11/24",
+          "10.3.99.12/24",
+          "10.3.99.1/24"
+        ],
+        "elements": [
+          "sites/west/access/sw-west-acc-01",
+          "sites/west/access/sw-west-acc-02",
+          "sites/west/distribution/sw-west-dist-01"
+        ],
+        "vrf": "mgmt"
+      },
+      "ipam": {
+        "vrf": "mgmt",
+        "prefix": "10.3.99.0/24",
+        "family": "ipv4",
+        "vlans": [
+          99
+        ],
+        "capacity": 254,
+        "assigned": 3,
+        "free": 251,
+        "utilisation": 0.011811,
+        "devices": 3,
+        "aggregated": [],
+        "parent": null,
+        "children": [],
+        "freeBlocks": [],
+        "bar": "█░░░░░░░░░░░░░░░",
+        "usedText": "3 of 254",
+        "freeText": "251",
+        "utilisationText": "1.2%",
+        "summarised": false
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        99
+      ],
+      "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "subnet:198.51.100.0/29#allocates:198.51.100.0/30",
+      "kind": "allocation",
+      "endpoints": [
+        {
+          "node": "subnet:198.51.100.0/29"
+        },
+        {
+          "node": "subnet:198.51.100.0/30"
+        }
+      ],
+      "medium": "",
+      "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:198.51.100.0/29#allocates:198.51.100.4/30",
+      "kind": "allocation",
+      "endpoints": [
+        {
+          "node": "subnet:198.51.100.0/29"
+        },
+        {
+          "node": "subnet:198.51.100.4/30"
+        }
+      ],
+      "medium": "",
+      "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:ff:2::/63#allocates:2001:db8:ff:2::/64",
+      "kind": "allocation",
+      "endpoints": [
+        {
+          "node": "subnet:2001:db8:ff:2::/63"
+        },
+        {
+          "node": "subnet:2001:db8:ff:2::/64"
+        }
+      ],
+      "medium": "",
+      "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
+    },
+    {
+      "id": "subnet:2001:db8:ff:2::/63#allocates:2001:db8:ff:3::/64",
+      "kind": "allocation",
+      "endpoints": [
+        {
+          "node": "subnet:2001:db8:ff:2::/63"
+        },
+        {
+          "node": "subnet:2001:db8:ff:3::/64"
+        }
+      ],
+      "medium": "",
+      "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
+    }
+  ],
+  "annotations": {
+    "notes": [
+      {
+        "id": "note-why-fibre",
+        "fqn": "why-fibre",
+        "text": "The backbone is **single-mode fibre**: 4.2 km between sites, which is\npast what copper does at any speed.\n\n- `os2`, LC, 10Gbps\n- the ring survives one break\n",
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "spans": [
+              {
+                "text": "The backbone is "
+              },
+              {
+                "style": "bold",
+                "text": "single-mode fibre"
+              },
+              {
+                "text": ": 4.2 km between sites, which is past what copper does at any speed."
+              }
+            ]
+          },
+          {
+            "kind": "bullet",
+            "spans": [
+              {
+                "style": "code",
+                "text": "os2"
+              },
+              {
+                "text": ", LC, 10Gbps"
+              }
+            ]
+          },
+          {
+            "kind": "bullet",
+            "spans": [
+              {
+                "text": "the ring survives one break"
+              }
+            ]
+          }
+        ],
+        "color": "#fef3c7",
+        "stroke": "#8b856d",
+        "leader": false
+      }
+    ]
+  },
+  "title": "Campus, address plan"
+}

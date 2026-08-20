@@ -823,7 +823,7 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         title="Switch layer…",
         section="The view",
         keys=(),
-        detail="Physical, l1, l2, l3, overlay, routing, rack, power, identity.",
+        detail="Physical, l1, l2, l3, ipam, overlay, routing, rack, power, identity.",
     ),
     Binding(
         id="view.layer.next",

@@ -3957,8 +3957,8 @@ value has not changed.
 ### 18.3 Views
 
 `spec.views` is keyed by the layer being drawn — `physical`, `l1`, `l2`, `l3`,
-`overlay`, `routing`, `rack`, `power`, `identity`, `netns` — because the same device sits
-somewhere different in each. The l3 diagram is a different graph with different neighbours,
+`ipam`, `overlay`, `routing`, `rack`, `power`, `identity`, `netns`, `security` — because
+the same device sits somewhere different in each. The l3 diagram is a different graph with different neighbours,
 not the same diagram recoloured.
 
 An unknown view name is `NV-Y003`.
@@ -4540,7 +4540,8 @@ renderer asks about one:
 | `color` | string | O | *unset* | Fill colour, `#rgb` or `#rrggbb`. Absent takes the kind's default. |
 
 `views` is the closed set §18 scopes geometry by — `physical`, `l1`, `l2`, `l3`,
-`overlay`, `routing`, `rack`, `power`, `identity`, `netns` — and an unknown name is
+`ipam`, `overlay`, `routing`, `rack`, `power`, `identity`, `netns`, `security` — and an
+unknown name is
 refused (`NV-G003`) rather than accepted and silently drawn nowhere. Empty is
 the default because a remark about a site is a remark about the site in every
 picture of it; `views: [l3]` is for the remark that only makes sense once the

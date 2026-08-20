@@ -33,6 +33,7 @@ from click.testing import CliRunner
 from netviz.cli import cli
 from netviz.config import ValidationConfig
 from netviz.ipam import (
+    BAR_WIDTH,
     DEFAULT_SIZE,
     IPAM_RULES,
     Utilisation,
@@ -40,6 +41,7 @@ from netviz.ipam import (
     allocations_within,
     build_report,
     conflicts,
+    format_bar,
     format_capacity,
     format_utilisation,
     free_space,
@@ -50,6 +52,11 @@ from netviz.ipam import (
     utilisation_of,
 )
 from netviz.loader import Inventory, load_tree
+from netviz.render.details import DETAIL_OPTIONS, build_details, detail_text
+from netviz.render.dot import to_dot
+from netviz.render.graph import EdgeKind, FilterSpec, Layer, build_graph, filter_graph
+from netviz.render.jsonexport import to_json
+from netviz.render.mermaid import to_mermaid
 from netviz.rules import RULE_IDS
 from netviz.subnets import subnets_of
 
@@ -821,3 +828,273 @@ def test_a_tree_with_no_addresses_says_so(runner: CliRunner, tmp_path: Path) -> 
     result = invoke(runner, "-i", str(tmp_path), "ipam")
     assert result.exit_code == 0
     assert "no addresses declared" in result.output
+
+
+# --------------------------------------------------------------------------- #
+# The ipam view
+# --------------------------------------------------------------------------- #
+#
+# The layer is the report drawn rather than printed, so what is asserted here is
+# that the two cannot drift: the boxes are the rows, the tree is containment as
+# ``ipaddress`` defines it, and nothing is drawn that no address puts there —
+# with the one documented exception, a supernet the plan fills exactly.
+
+
+@pytest.mark.parametrize(
+    ("assigned", "capacity", "expected"),
+    [
+        (0, 254, "░" * 16),
+        (254, 254, "█" * 16),
+        (127, 254, "█" * 8 + "░" * 8),
+        # Two hosts in a /64 round to nothing; one cell says "in use" the way
+        # ``format_utilisation`` says ``<0.1%``.
+        (2, 2**64, "█" + "░" * 15),
+        # Nearly full is not full: the last cell is kept empty so that a full bar
+        # is only ever drawn for a prefix with nothing left.
+        (253, 254, "█" * 15 + "░"),
+    ],
+)
+def test_the_bar_says_full_only_when_it_is_full(
+    assigned: int, capacity: int, expected: str
+) -> None:
+    assert format_bar(assigned, capacity) == expected
+    assert len(format_bar(assigned, capacity)) == BAR_WIDTH
+
+
+def test_a_row_and_the_subnet_it_was_sized_from_share_one_identity(overlapping: Inventory) -> None:
+    """``Utilisation.key`` is ``Subnet.key``; the plan looks one up by the other."""
+    subnets = {subnet.key: subnet for subnet in subnets_of(overlapping)}
+    for row in utilisation_of(subnets.values()):
+        assert subnets[row.key].prefix == row.prefix
+
+
+def test_the_view_draws_the_prefixes_and_no_hardware(overlapping: Inventory) -> None:
+    graph = build_graph(overlapping, layer=Layer.IPAM)
+    assert graph.element_nodes == ()
+    assert {node.name for node in graph.prefix_nodes} == {
+        "10.20.0.0/24",
+        "10.30.0.0/16",
+        "10.30.7.0/24",
+    }
+    # Same identity as the node layer 3 draws for the same prefix, so geometry,
+    # a query and an annotation address it by the one name it has.
+    routed = build_graph(overlapping, layer=Layer.L3)
+    assert set(graph.nodes) == {node.fqn for node in routed.subnet_nodes}
+    assert "subnet:10.30.7.0/24" in graph.nodes
+
+
+def test_a_prefix_hangs_off_the_block_it_was_carved_out_of(overlapping: Inventory) -> None:
+    graph = build_graph(overlapping, layer=Layer.IPAM)
+    nested = graph.nodes["subnet:10.30.7.0/24"]
+    summary = graph.nodes["subnet:10.30.0.0/16"]
+    assert nested.ipam is not None and summary.ipam is not None
+
+    assert nested.ipam.parent == "subnet:10.30.0.0/16"
+    assert summary.ipam.children == ("subnet:10.30.7.0/24",)
+    assert summary.ipam.is_container and not nested.ipam.is_container
+    assert graph.nodes["subnet:10.20.0.0/24"].ipam is not None
+    assert graph.nodes["subnet:10.20.0.0/24"].ipam.parent == ""
+
+    assert [(edge.kind, edge.source, edge.target) for edge in graph.edges] == [
+        (EdgeKind.ALLOCATION, "subnet:10.30.0.0/16", "subnet:10.30.7.0/24")
+    ]
+
+
+def test_a_block_reports_the_room_left_in_it_and_a_leaf_does_not(overlapping: Inventory) -> None:
+    """Free *blocks* answer "where does the next subnet go"; a leaf has no answer."""
+    graph = build_graph(overlapping, layer=Layer.IPAM)
+    summary = graph.nodes["subnet:10.30.0.0/16"]
+    assert summary.ipam is not None
+    blocks = summary.ipam.free_blocks
+
+    # The block does not consume itself -- it contains itself, and subtracting it
+    # would report every plan as full -- but its own two addresses each cost a
+    # host route, so the range around them is fragmented rather than whole.
+    assert "10.30.7.0/24" not in blocks
+    assert blocks[0] == "10.30.128.0/17"
+    assert [ipaddress.ip_network(block).prefixlen for block in blocks] == sorted(
+        ipaddress.ip_network(block).prefixlen for block in blocks
+    ), "widest first: an operator asks for the largest thing that is free"
+    assert not any(
+        ipaddress.ip_network(block).overlaps(ipaddress.ip_network("10.30.7.0/24"))
+        for block in blocks
+    )
+    # A leaf answers with a count instead; the holes between two hosts in a /24
+    # are not blocks anybody hands out.
+    leaf = graph.nodes["subnet:10.30.7.0/24"]
+    assert leaf.ipam is not None
+    assert leaf.ipam.free_blocks == ()
+    assert leaf.ipam.free == 252
+
+
+def test_a_supernet_the_plan_fills_exactly_is_drawn_and_says_so(tmp_path: Path) -> None:
+    """Two /25s that between them are a /24 mean the plan holds a /24."""
+    inventory = load(_tree(tmp_path, {"a": "10.0.0.10/25", "b": "10.0.0.130/25"}))
+    graph = build_graph(inventory, layer=Layer.IPAM)
+
+    summary = graph.nodes["subnet:10.0.0.0/24"]
+    assert summary.ipam is not None
+    assert summary.ipam.summarised
+    assert summary.ipam.children == ("subnet:10.0.0.0/25", "subnet:10.0.0.128/25")
+    # Its counts are the children's, and so are its members: the box is
+    # filterable by the elements underneath it.
+    assert summary.ipam.assigned == 2
+    assert summary.subnet is not None
+    assert {member.element for member in summary.subnet.members} == {"a", "b"}
+
+
+def test_a_half_declared_supernet_is_not_drawn(tmp_path: Path) -> None:
+    """Collapsing it would hide a genuinely empty half; nothing invents a block."""
+    inventory = load(_tree(tmp_path, {"a": "10.0.0.10/25", "b": "10.0.1.10/24"}))
+    graph = build_graph(inventory, layer=Layer.IPAM)
+    assert set(graph.nodes) == {"subnet:10.0.0.0/25", "subnet:10.0.1.0/24"}
+    assert graph.edges == ()
+
+
+def test_two_host_routes_are_not_a_plan_for_the_prefix_they_sit_in(tmp_path: Path) -> None:
+    """At /31 the supernet is two adjacent addresses, not a block anybody carved."""
+    inventory = load(_tree(tmp_path, {"a": "10.0.0.2/32", "b": "10.0.0.3/32"}))
+    graph = build_graph(inventory, layer=Layer.IPAM)
+    assert set(graph.nodes) == {"subnet:10.0.0.2/32", "subnet:10.0.0.3/32"}
+    assert graph.edges == ()
+
+
+def test_containment_never_crosses_a_routing_instance(tmp_path: Path) -> None:
+    """A VRF is an address space of its own (§16.1), so a /24 in blue is in no /16."""
+    inventory = load(
+        _tree(tmp_path, {"a": "10.0.0.1/16"}, blue={"b": "10.0.7.1/24"}),
+    )
+    graph = build_graph(inventory, layer=Layer.IPAM)
+    assert set(graph.nodes) == {"subnet:10.0.0.0/16", "subnet:blue/10.0.7.0/24"}
+    assert graph.edges == ()
+    assert graph.nodes["subnet:blue/10.0.7.0/24"].cluster == "blue"
+    assert graph.nodes["subnet:10.0.0.0/16"].cluster == ""
+
+
+def test_a_filter_narrows_the_plan_by_prefix_and_by_who_is_in_it(
+    overlapping: Inventory,
+) -> None:
+    graph = build_graph(overlapping, layer=Layer.IPAM)
+
+    by_prefix = filter_graph(graph, FilterSpec(names=("10.30.*",)))
+    assert set(by_prefix.nodes) == {"subnet:10.30.0.0/16", "subnet:10.30.7.0/24"}
+
+    # The elements are not nodes at this layer, so the predicates reach them
+    # through the placements -- which is what makes naming a server narrow the
+    # plan to the blocks it is addressed in.
+    by_element = filter_graph(graph, FilterSpec(names=("srv-nested-1",)))
+    assert set(by_element.nodes) == {"subnet:10.30.7.0/24"}
+
+    by_vlan = filter_graph(graph, FilterSpec(vlans=frozenset({40})))
+    assert set(by_vlan.nodes) == {"subnet:10.30.7.0/24"}
+
+    assert filter_graph(graph, FilterSpec(names=("nothing-*",))).is_empty
+
+
+def test_the_json_export_carries_the_plan_beside_the_prefix(overlapping: Inventory) -> None:
+    document = json.loads(to_json(build_graph(overlapping, layer=Layer.IPAM)))
+    assert document["layer"] == "ipam"
+    plans = {node["id"]: node["ipam"] for node in document["nodes"]}
+
+    summary = plans["subnet:10.30.0.0/16"]
+    row = next(
+        entry for entry in utilisation_of(subnets_of(overlapping)) if entry.prefix == "10.30.0.0/16"
+    )
+    # The row ``netviz ipam --format json`` prints, key for key, and then what a
+    # picture adds to it.
+    assert summary.items() >= row.record().items()
+    assert summary["children"] == ["subnet:10.30.7.0/24"]
+    assert plans["subnet:10.30.7.0/24"]["parent"] == "subnet:10.30.0.0/16"
+    assert plans["subnet:10.20.0.0/24"]["parent"] is None
+    assert summary["freeBlocks"][0] == "10.30.128.0/17"
+
+    assert {edge["kind"] for edge in document["edges"]} == {"allocation"}
+    # A subnet node in every other respect, so a consumer that knows what a
+    # prefix is keeps working.
+    node = next(entry for entry in document["nodes"] if entry["id"] == "subnet:10.30.7.0/24")
+    assert node["type"] == "subnet"
+    assert node["subnet"]["prefix"] == "10.30.7.0/24"
+
+
+def test_the_drawing_says_how_full_each_prefix_is(overlapping: Inventory) -> None:
+    source = to_dot(build_graph(overlapping, layer=Layer.IPAM))
+    assert "[ipv4 block, holds 1]" in source
+    assert "[ipv4 prefix]" in source
+    assert format_bar(2, 254) in source
+    assert "10.30.128.0/17" in source, "the widest free block is named on the box"
+
+    caption = to_mermaid(build_graph(overlapping, layer=Layer.IPAM))
+    assert "[ipv4 block, holds 1]" in caption
+    assert "2 of 254 used (0.8%)" in caption
+
+
+def test_the_tooltip_holds_the_free_blocks_the_box_counted_off(overlapping: Inventory) -> None:
+    graph = build_graph(overlapping, layer=Layer.IPAM)
+    records = build_details(graph, DETAIL_OPTIONS)
+    text = next(
+        detail_text(record)
+        for record in records.values()
+        if record.get("id") == "subnet:10.30.0.0/16"
+    )
+    assert "ipv4 block" in text
+    assert "free blocks: " in text
+    assert "holds: 10.30.7.0/24" in text
+    assert "2 of 65534 used" in text
+
+
+def test_a_tree_with_no_routable_address_draws_nothing_and_says_why(
+    runner: CliRunner, tmp_path: Path
+) -> None:
+    (tmp_path / "sw.yaml").write_text(
+        "apiVersion: netviz.dev/v1alpha1\n"
+        "kind: switch\n"
+        "metadata:\n  name: sw\n"
+        "spec:\n  interfaces:\n"
+        "    - name: Ethernet1\n      type: ethernet\n      enabled: false\n",
+        encoding="utf-8",
+    )
+    result = invoke(
+        runner,
+        "-i",
+        str(tmp_path),
+        "render",
+        "--layer",
+        "ipam",
+        "-f",
+        "dot",
+        "-o",
+        str(tmp_path / "plan.dot"),
+    )
+    assert "nothing to draw in the ipam view" in result.stderr
+
+
+def _tree(root: Path, addresses: dict[str, str], *, blue: dict[str, str] | None = None) -> Path:
+    """A tree of one-interface servers, one per ``name: address`` pair.
+
+    ``blue`` puts its interfaces in a VRF of that name, which is the one thing
+    that splits an address space in two.
+    """
+    documents = [_server(name, address, vrf=None) for name, address in addresses.items()] + [
+        _server(name, address, vrf="blue") for name, address in (blue or {}).items()
+    ]
+    target = root / "tree.yaml"
+    target.write_text("---\n".join(documents), encoding="utf-8")
+    return target
+
+
+def _server(name: str, address: str, *, vrf: str | None) -> str:
+    instance = f"  vrfs:\n    - name: {vrf}\n      rd: '65000:1'\n" if vrf else ""
+    binding = f"      vrf: {vrf}\n" if vrf else ""
+    return (
+        "apiVersion: netviz.dev/v1alpha1\n"
+        "kind: router\n"
+        f"metadata:\n  name: {name}\n"
+        "spec:\n"
+        f"{instance}"
+        "  interfaces:\n"
+        "    - name: eth0\n"
+        "      type: ethernet\n"
+        f"{binding}"
+        "      ipv4:\n"
+        f"        addresses: [{address}]\n"
+    )

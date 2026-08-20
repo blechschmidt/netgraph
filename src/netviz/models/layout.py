@@ -132,6 +132,7 @@ LAYOUT_VIEWS: Final[tuple[str, ...]] = (
     "l1",
     "l2",
     "l3",
+    "ipam",
     "overlay",
     "routing",
     "rack",

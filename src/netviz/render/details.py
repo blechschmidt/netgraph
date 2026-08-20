@@ -48,7 +48,8 @@ from collections.abc import Callable, Iterable, Iterator, Mapping
 from typing import Any, Final
 
 from netviz.errors import clip_text, count_text
-from netviz.render.graph import Graph
+from netviz.ipam import format_capacity, format_utilisation
+from netviz.render.graph import SUBNET_ID_PREFIX, Graph
 from netviz.render.ids import ElementIds, element_ids
 from netviz.render.jsonexport import graph_to_dict
 from netviz.render.options import RenderOptions
@@ -270,6 +271,9 @@ def _node_lines(record: Mapping[str, Any]) -> Iterator[str]:
     rack = record.get("rack")
     if isinstance(rack, Mapping):
         yield from _rack_lines(rack)
+    plan = record.get("ipam")
+    if isinstance(plan, Mapping):
+        yield from _ipam_lines(plan)
     zone = record.get("zone")
     if isinstance(zone, Mapping):
         yield from _zone_lines(zone)
@@ -284,6 +288,13 @@ def _node_lines(record: Mapping[str, Any]) -> Iterator[str]:
 def _subtitle(record: Mapping[str, Any]) -> str:
     """The bracketed kind after a node's name, as the diagram itself spells it."""
     subnet, tunnel = record.get("subnet"), record.get("tunnel")
+    plan = record.get("ipam")
+    if isinstance(plan, Mapping) and isinstance(subnet, Mapping):
+        # The address plan calls a prefix holding other prefixes a block, and
+        # the diagram's own subtitle says so; a tooltip that said "subnet" here
+        # would name the same box a second thing.
+        noun = "block" if plan.get("children") else "prefix"
+        return f"{subnet.get('family', 'ip')} {noun}"
     if isinstance(subnet, Mapping):
         return f"{subnet.get('family', 'ip')} subnet"
     if isinstance(tunnel, Mapping):
@@ -302,6 +313,35 @@ def _subtitle(record: Mapping[str, Any]) -> str:
         # in the one line a reader sees before any detail.
         return f"{kind}, AS {routing['asn']}"
     return kind
+
+
+def _ipam_lines(plan: Mapping[str, Any]) -> Iterator[str]:
+    """A prefix of the address plan: how full it is, and where the room is.
+
+    The free blocks are the reason to hover a block rather than read its label:
+    the card in the drawing names the widest three, and the tooltip is where the
+    rest of them fit.
+    """
+    assigned = int(plan.get("assigned", 0))
+    capacity = int(plan.get("capacity", 0))
+    yield (
+        f"{assigned} of {format_capacity(capacity)} used "
+        f"({format_utilisation(assigned, capacity)}), "
+        f"{format_capacity(int(plan.get('free', 0)))} free"
+    )
+    if plan.get("summarised"):
+        yield "summary: nothing declares this block; the prefixes below it fill it"
+    parent = plan.get("parent")
+    if parent:
+        yield f"carved out of {plain_text(str(parent).removeprefix(SUBNET_ID_PREFIX))}"
+    children = list(plan.get("children", ()))
+    if children:
+        yield "holds: " + _listed(
+            plain_text(str(child).removeprefix(SUBNET_ID_PREFIX)) for child in children
+        )
+    blocks = list(plan.get("freeBlocks", ()))
+    if blocks:
+        yield "free blocks: " + _listed(plain_text(str(block)) for block in blocks)
 
 
 def _rack_lines(rack: Mapping[str, Any]) -> Iterator[str]:

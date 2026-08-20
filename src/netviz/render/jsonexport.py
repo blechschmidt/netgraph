@@ -35,6 +35,12 @@ carries interfaces. An ``element`` node is exactly what it is at layer 1. A
 object holding the elevation: how tall the cabinet is, and which units each
 element occupies.
 
+A ``--layer ipam`` document is subnet nodes and nothing else. Each carries
+its ``subnet`` object as it does at layer 3, *and* an ``ipam`` object: the
+utilisation row ``netviz ipam`` prints, plus the prefix it was carved out of,
+the prefixes carved out of it and the free blocks left in it. Its edges are
+``allocation``, and they run from the block to what was taken out of it.
+
 Patch panels
 ------------
 
@@ -111,6 +117,7 @@ from netviz.render.graph import (
     Edge,
     EdgeKind,
     Graph,
+    IpamView,
     NetnsView,
     Node,
     PatchView,
@@ -407,6 +414,8 @@ def _node(
         payload["aggregate"] = _aggregate(node.aggregate)
     if node.rack is not None:
         payload["rack"] = _rack(node.rack)
+    if node.ipam is not None:
+        payload["ipam"] = _ipam(node.ipam)
     if node.routing is not None:
         payload["routing"] = _routing(node.routing)
     if node.power is not None:
@@ -456,6 +465,37 @@ def _aggregate(view: AggregateView) -> dict[str, Any]:
         # The links the summary swallowed. Absent from ``edges`` by
         # construction, so a consumer counting cables needs them named.
         "internalLinks": list(view.internal_links),
+    }
+
+
+def _ipam(view: IpamView) -> dict[str, Any]:
+    """A prefix of the address plan: how full it is, and what is around it.
+
+    The counts are :func:`netviz.ipam.utilisation_of`'s, spelled the way
+    ``netviz ipam --format json`` spells them, so a consumer reading a rendering
+    and a consumer reading the report get one vocabulary. What the rendering adds
+    is the tree — ``parent`` and ``children`` — and ``freeBlocks``, which is the
+    question a picture is opened to answer and a row of a table has no column
+    for.
+    """
+    return {
+        **view.utilisation.record(),
+        "parent": view.parent or None,
+        "children": list(view.children),
+        "freeBlocks": list(view.free_blocks),
+        # The four display strings, for the same reason a link carries
+        # ``speedText`` beside its bit rate: a ``/64`` holds 2^64 addresses, and
+        # the abbreviation, the ``<0.1%`` floor and the bar are decisions
+        # :mod:`netviz.ipam` has already made. A front end that re-made them in
+        # its own language would eventually make them differently.
+        "bar": view.bar,
+        "usedText": f"{view.assigned} of {view.capacity_text}",
+        "freeText": view.free_text,
+        "utilisationText": view.percent,
+        # Whether anything declares this prefix, or whether the plan implies it.
+        # A consumer that writes the diagram back must not offer to edit a block
+        # no document holds.
+        "summarised": view.summarised,
     }
 
 

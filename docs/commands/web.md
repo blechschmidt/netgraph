@@ -748,7 +748,7 @@ cable it, undo both — without dispatching a single mouse event.
 | Keys | Command | Where | Needs | What it does |
 |---|---|---|---|---|
 | `Ctrl-Shift-F` | Draw only what the query selects | anywhere | — | Narrows the drawing itself rather than highlighting inside it — the same narrowing 'netviz render --select' does. |
-| *palette only* | Switch layer… | anywhere | — | Physical, l1, l2, l3, overlay, routing, rack, power, identity. |
+| *palette only* | Switch layer… | anywhere | — | Physical, l1, l2, l3, ipam, overlay, routing, rack, power, identity. |
 | `]` | Next layer | anywhere | — | The next entry of the layer menu. |
 | `[` | Previous layer | anywhere | — | The previous entry of the layer menu. |
 | `Alt-I` | Toggle IP addresses | anywhere | — | Whether the picture prints addresses. The inspector shows them either way. |

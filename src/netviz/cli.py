@@ -3645,7 +3645,9 @@ _LAYER_OPTION: Final[Callable[[Any], Any]] = click.option(
     shell_complete=complete_layer,
     help=(
         "l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets "
-        "and the elements addressed in them; overlay draws the tunnels; routing draws the "
+        "and the elements addressed in them; ipam draws the address plan — the same "
+        "prefixes without the devices, nested inside the blocks they came out of and "
+        "showing how full each is; overlay draws the tunnels; routing draws the "
         "BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels "
         "l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the "
         "feeds into everything they power; identity draws the users and groups; netns opens "
@@ -4368,6 +4370,12 @@ def _empty_graph_reason(layer: Layer, spec: FilterSpec) -> str:
             "nothing to draw at layer 3: no element carries a routable address. "
             "Loopback and link-local addresses are excluded; run 'netviz list subnets' "
             "to see what the inventory is addressed in"
+        )
+    if layer is Layer.IPAM:
+        return (
+            "nothing to draw in the ipam view: no element carries a routable address, so "
+            "there is no address plan to draw. Loopback and link-local addresses are "
+            "excluded; run 'netviz ipam' to see what the inventory is addressed in"
         )
     if layer is Layer.OVERLAY:
         return (

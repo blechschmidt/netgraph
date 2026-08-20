@@ -16,6 +16,34 @@ publish a version whose section is missing or empty — see
 
 ## [Unreleased]
 
+### Added
+
+- **An `ipam` view: the address plan as a diagram, at `--layer ipam`.** Everything
+  [`netviz ipam`](docs/ipam.md) prints as a table is now also a picture — one box per prefix,
+  with a utilisation bar, the counts, and the free blocks left in it. The devices are left
+  off, which is the whole difference from `l3`: a plan with the hosts on it answers "who is
+  in this subnet", and burying "how much room is left and where" is the one thing an address
+  plan must not do.
+
+  A prefix is drawn inside the block it was carved out of, joined by a dashed `allocation`
+  line, per routing instance — a VRF is an address space of its own, so containment never
+  crosses one. Nothing is invented except the one case the plan itself implies: a supernet
+  whose halves are *both* declared is drawn and marked `summarised`, exactly as
+  `netviz ipam --aggregate` reports it. A `/16` the inventory has one `/24` of is not drawn,
+  and two host routes are never summarised into the `/31` they happen to be adjacent in.
+
+  The layer is offered everywhere every other layer is: the `netviz web` switcher and its
+  command palette, `render -f html` behind the same layer switcher, `-f dot`, `-f svg`,
+  `-f png`, `-f mermaid`, `export drawio --view ipam`, `netviz report --layer ipam`, stored
+  geometry (`views: [ipam]`) and annotations. `-f json` gives every box an `ipam` object —
+  the utilisation row `netviz ipam --format json` prints, plus the parent, the children and
+  the free blocks — beside the `subnet` object it already carried, and the editor's info box
+  and the HTML page's detail panel show the same numbers. `--name`, `--namespace` and
+  `--vlan` narrow the plan through the addresses in each prefix, so naming a server shows the
+  blocks it is addressed in.
+
+  Written up in [`docs/rendering.md`](docs/rendering.md#ipam-the-address-plan-and-where-the-room-is).
+
 ## [0.0.3] - 2026-08-18
 
 ### Changed

@@ -155,6 +155,7 @@ _LAYER_LABELS: Final[Mapping[Layer, str]] = {
     Layer.L1: "l1 — physical",
     Layer.L2: "l2 — VLANs",
     Layer.L3: "l3 — IP subnets",
+    Layer.IPAM: "ipam — address plan",
     Layer.OVERLAY: "overlay — tunnels",
     Layer.ROUTING: "routing — BGP and OSPF",
     Layer.POWER: "power — PDUs and feeds",

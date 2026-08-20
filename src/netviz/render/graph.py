@@ -89,6 +89,7 @@ pass-through without the panel being a hop.
 
 from __future__ import annotations
 
+import ipaddress
 import itertools
 from collections import deque
 from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
@@ -102,6 +103,19 @@ from typing import TYPE_CHECKING, Final, TypeAlias
 from netviz.annotations import AnnotationSet, annotations_for_view, area_members, note_anchor
 from netviz.errors import count_text
 from netviz.identity import identities, identity_plan
+from netviz.ipam import (
+    Utilisation,
+    format_bar,
+    format_capacity,
+    format_utilisation,
+    free_space,
+    utilisation_of,
+)
+
+# Aliased: ``netviz.render.aggregate`` is a module of this package, and an
+# unqualified ``aggregate`` here would read as that rather than as the prefix
+# arithmetic. ``Node.aggregate`` is a third thing again.
+from netviz.ipam import aggregate as aggregate_prefixes
 from netviz.layout.geometry import Geometry, Placement
 from netviz.layout.resolve import resolve_geometry
 from netviz.loader.inventory import Inventory, SourceLocation, namespace_of, short_name
@@ -134,7 +148,9 @@ from netviz.power import Feed, PowerNode, PowerPlan, power_plan
 from netviz.subnets import (
     SUBNET_ID_PREFIX,
     AddressPlacement,
+    IPNetwork,
     Subnet,
+    SubnetKey,
     is_routable_address,
     subnets_of,
 )
@@ -167,6 +183,7 @@ __all__ = [
     "EdgeKind",
     "FilterSpec",
     "Graph",
+    "IpamView",
     "Layer",
     "NetnsView",
     "Node",
@@ -185,6 +202,7 @@ __all__ = [
     "WirelessView",
     "build_graph",
     "filter_graph",
+    "ipam_plan",
     "is_routable_address",
     "netns_node_id",
     "netns_views",
@@ -208,6 +226,12 @@ class Layer(str, Enum):
     L2 = "l2"
     #: Routed: IP prefixes as nodes, joined to the elements addressed in them.
     L3 = "l3"
+    #: The address plan: the prefixes on their own, nested inside the prefixes
+    #: they are carved out of, each showing how full it is and what is left
+    #: (``docs/rendering.md``). Layer 3 answers "who is in this subnet?"; this answers "where does
+    #: the next subnet go?", which is a question about the *space* and not about
+    #: the devices, so none of them is drawn.
+    IPAM = "ipam"
     #: Encapsulation: tunnels as nodes, joined to their endpoints and to the
     #: tunnels they run inside (§14).
     OVERLAY = "overlay"
@@ -247,13 +271,21 @@ class Layer(str, Enum):
     def builds_own_nodes(self) -> bool:
         """Does this layer replace the topology's node set with one of its own?
 
-        ``rack``, ``power``, ``identity`` and ``security`` all do. The first two need the panels
-        left in the map they are built from: a panel occupies rack units, and a
-        run to a PoE device crosses one. Splicing panels out of a graph nobody
-        draws would cost nothing but the walk that finds the switch at the far
-        end. ``identity`` draws no hardware whatsoever.
+        ``rack``, ``power``, ``identity``, ``security`` and ``ipam`` all do. The
+        first two need the panels left in the map they are built from: a panel
+        occupies rack units, and a run to a PoE device crosses one. Splicing
+        panels out of a graph nobody draws would cost nothing but the walk that
+        finds the switch at the far end. ``identity`` draws no hardware
+        whatsoever, and ``ipam`` draws no hardware either — its nodes are the
+        prefixes.
         """
-        return self in (Layer.RACK, Layer.POWER, Layer.IDENTITY, Layer.SECURITY)
+        return self in (
+            Layer.RACK,
+            Layer.POWER,
+            Layer.IDENTITY,
+            Layer.SECURITY,
+            Layer.IPAM,
+        )
 
 
 class NodeType(str, Enum):
@@ -408,6 +440,11 @@ class EdgeKind(str, Enum):
     #: (§23.1). Directed in the only sense an undirected edge can be — source is
     #: the containing namespace — because nesting is what the edge says.
     NESTING = "nesting"
+    #: One prefix is carved out of another: the source contains the
+    #: target. Directed in the only sense an undirected edge can be — source is
+    #: the block, target what was taken out of it — because containment is the
+    #: whole of what the line says.
+    ALLOCATION = "allocation"
     #: What a device's firewall does to traffic from one zone to another (§24.5).
     #: Directed, and meant that way: policy is asymmetric — *lan to wan* is a
     #: different statement from *wan to lan*, and a firewall that treated them as
@@ -1129,6 +1166,134 @@ class RackView:
 
 
 @dataclass(frozen=True, slots=True)
+class IpamView:
+    """One prefix of the address plan, and how much of it is left.
+
+    The address-space arithmetic is :mod:`netviz.ipam`'s and is not repeated
+    here: :attr:`utilisation` is exactly the row ``netviz ipam`` prints, so the
+    table and the diagram cannot disagree about how full a prefix is. What this
+    adds is the two things a *picture* needs and a table has no column for —
+    which prefix a prefix was carved out of, and where the holes in it are.
+    """
+
+    #: How full the prefix is, sized and counted by :func:`netviz.ipam.utilisation_of`.
+    utilisation: Utilisation
+    #: Node ids of the prefixes carved directly out of this one, in address
+    #: order. Only the *direct* children: a ``/16`` holding four ``/24``s that
+    #: each hold two ``/25``s is a tree, and an edge to every descendant would
+    #: draw the same containment several times.
+    children: tuple[str, ...] = ()
+    #: Node id of the nearest prefix this one is inside, or ``""`` when nothing
+    #: in the plan contains it.
+    parent: str = ""
+    #: The unallocated CIDR blocks inside this prefix, **widest first** — the
+    #: answer to "where does the next subnet go?". Empty for a leaf, where the
+    #: question is "how many addresses are left" and :attr:`free` answers it: the
+    #: holes between three hosts in a ``/24`` are not blocks anyone hands out.
+    free_blocks: tuple[str, ...] = ()
+    #: True when no address is configured with this prefix length and it is in
+    #: the plan because the blocks below it fill it exactly
+    #: (:func:`netviz.ipam.aggregate`). Such a prefix is a summary of the plan
+    #: rather than something the inventory declares, and a reader should be able
+    #: to tell which they are looking at.
+    summarised: bool = False
+
+    @property
+    def prefix(self) -> str:
+        """The prefix in ``10.0.0.0/24`` form."""
+        return self.utilisation.prefix
+
+    @property
+    def network(self) -> IPNetwork:
+        return self.utilisation.network
+
+    @property
+    def vrf(self) -> str:
+        """The routing instance, or ``""`` for the global one (§16.1)."""
+        return self.utilisation.vrf
+
+    @property
+    def family(self) -> str:
+        """``ipv4`` or ``ipv6``."""
+        return self.utilisation.family
+
+    @property
+    def assigned(self) -> int:
+        return self.utilisation.assigned
+
+    @property
+    def capacity(self) -> int:
+        return self.utilisation.capacity
+
+    @property
+    def free(self) -> int:
+        return self.utilisation.free
+
+    @property
+    def devices(self) -> int:
+        return self.utilisation.devices
+
+    @property
+    def is_container(self) -> bool:
+        """Is anything carved out of this prefix?"""
+        return bool(self.children)
+
+    @property
+    def percent(self) -> str:
+        """``9.4%``, as :func:`netviz.ipam.format_utilisation` writes it."""
+        return format_utilisation(self.assigned, self.capacity)
+
+    @property
+    def bar(self) -> str:
+        """The utilisation as a bar of block characters; see :func:`netviz.ipam.format_bar`."""
+        return format_bar(self.assigned, self.capacity)
+
+    @property
+    def noun(self) -> str:
+        """``prefix``, ``block, holds 4`` or ``block, summarised``.
+
+        What the box *is*, in the two words a subtitle has room for — and here
+        rather than in a renderer, because the DOT subtitle, the Mermaid caption
+        and the tooltip must not name one box three things. A block nothing
+        declares is called summarised rather than counted: the count is the
+        reason it exists, and saying both would say it twice.
+        """
+        if self.summarised:
+            return "block, summarised"
+        if self.is_container:
+            return f"block, holds {len(self.children)}"
+        return "prefix"
+
+    @property
+    def capacity_text(self) -> str:
+        """The capacity, abbreviated so a ``/64`` does not take twenty columns."""
+        return format_capacity(self.capacity, host_bits=self.utilisation.host_bits)
+
+    @property
+    def free_text(self) -> str:
+        """Free addresses, abbreviated for the same reason :attr:`capacity_text` is."""
+        return format_capacity(self.free, host_bits=self.utilisation.host_bits)
+
+    def describe(self) -> tuple[str, ...]:
+        """The plan's facts about this prefix, one clause a line.
+
+        What every backend that can only hold *text* prints — the Mermaid
+        caption, a tooltip, the report. The Graphviz label lays the same facts
+        out in columns instead; see :func:`netviz.render.dot._ipam_rows`.
+        """
+        lines = [f"{self.assigned} of {self.capacity_text} used ({self.percent})"]
+        if self.free:
+            lines.append(f"{self.free_text} free")
+        if self.devices:
+            lines.append(count_text(self.devices, "element"))
+        if self.children:
+            lines.append(f"holds {count_text(len(self.children), 'prefix')}")
+        if self.summarised:
+            lines.append("summary of the blocks below it")
+        return tuple(lines)
+
+
+@dataclass(frozen=True, slots=True)
 class Node:
     """One drawable thing: an element, or — at layer 3 — an IP subnet.
 
@@ -1162,6 +1327,11 @@ class Node:
     aggregate: AggregateView | None = None
     #: The rack this node stands for; set exactly for a rack node.
     rack: RackView | None = None
+    #: What the address plan says about this prefix; set at :attr:`Layer.IPAM`
+    #: only. A node carrying one is *also* a subnet node — :attr:`subnet`
+    #: holds the placements — so every consumer that already knows what a prefix
+    #: is keeps working, and one that wants the utilisation asks for it here.
+    ipam: IpamView | None = None
     #: What this element contributes to the control plane; set at
     #: :attr:`Layer.ROUTING` only, where it is the whole reason the node is drawn.
     routing: RoutingView | None = None
@@ -1330,6 +1500,28 @@ class Node:
             vlans=subnet.vlans,
             type=NodeType.SUBNET,
             subnet=subnet,
+        )
+
+    @classmethod
+    def for_prefix(cls, subnet: Subnet, view: IpamView) -> Node:
+        """The node standing for one prefix of the address plan.
+
+        A subnet node in every respect — same identity as the one layer 3 draws,
+        so geometry, a query and an annotation all address the prefix by the one
+        name it has — plus what the plan says about it. The routing instance is
+        the :attr:`cluster` rather than the namespace: a prefix belongs to no
+        directory, and the box a reader needs around it is its table.
+        """
+        return cls(
+            fqn=subnet.node_id,
+            name=subnet.label,
+            kind=SUBNET_KIND,
+            namespace="",
+            vlans=subnet.vlans,
+            type=NodeType.SUBNET,
+            subnet=subnet,
+            ipam=view,
+            cluster=subnet.vrf,
         )
 
     @property
@@ -1661,6 +1853,15 @@ class Graph:
         return tuple(node for node in self.nodes.values() if node.is_rack)
 
     @property
+    def prefix_nodes(self) -> tuple[Node, ...]:
+        """The nodes carrying an address plan; empty outside :attr:`Layer.IPAM`.
+
+        Narrower than :attr:`subnet_nodes`, which is every prefix drawn anywhere:
+        these are the ones that know how full they are.
+        """
+        return tuple(node for node in self.nodes.values() if node.ipam is not None)
+
+    @property
     def aggregate_nodes(self) -> tuple[Node, ...]:
         """The collapsed-namespace nodes, in graph order; empty without ``--collapse``."""
         return tuple(node for node in self.nodes.values() if node.is_aggregate)
@@ -1806,9 +2007,11 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
             graph instead: subnets become nodes, cables disappear, and elements
             without a routable address drop out. ``overlay`` builds the
             encapsulation graph: tunnels become nodes, joined to their endpoints
-            and to the tunnels they run inside. ``rack`` builds no topology at
-            all — one node per rack, holding its elevation. See the module
-            docstring.
+            and to the tunnels they run inside. ``ipam`` builds the address plan
+            from the same prefixes ``l3`` derives, with the devices left off and
+            the prefixes nested inside the blocks they were carved from.
+            ``rack`` builds no topology at all — one node per rack, holding its
+            elevation. See the module docstring.
 
     Returns:
         A graph whose every edge references two nodes that exist. Cables and
@@ -1868,6 +2071,8 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
 
     if layer is Layer.L3:
         nodes, edges = _routed_view(nodes, subnets_of(inventory))
+    elif layer is Layer.IPAM:
+        nodes, edges = _ipam_view(inventory)
     elif layer is Layer.OVERLAY:
         nodes, edges = _overlay_view(nodes, tunnels)
     elif layer is Layer.ROUTING:
@@ -2238,6 +2443,188 @@ def _rack_view(inventory: Inventory) -> tuple[dict[str, Node], tuple[Edge, ...]]
     one would put a line between two elevations that says nothing about either.
     """
     return {view.id: Node.for_rack(view) for view in rack_elevations(inventory)}, ()
+
+
+# --------------------------------------------------------------------------- #
+# Address plan
+# --------------------------------------------------------------------------- #
+
+
+def ipam_plan(subnets: Sequence[Subnet]) -> tuple[tuple[Subnet, IpamView], ...]:
+    """The address plan as a tree: every prefix, and what is carved out of it.
+
+    Two kinds of prefix are in it. Every prefix an address sits in, which is what
+    :func:`~netviz.subnets.subnets_of` derives; and every **supernet the plan
+    fills exactly**, which is what :func:`netviz.ipam.aggregate` finds — two
+    ``/25``s that between them are a ``/24`` mean the plan has a ``/24`` in it,
+    even though nothing writes one down. Nothing else is invented: a ``/16``
+    nobody has half of is not in the plan, because drawing it would claim an
+    allocation the inventory never made.
+
+    A prefix's parent is the *nearest* prefix of the plan containing it, so the
+    result is a forest and not a mesh: a ``/25`` inside a ``/24`` inside a
+    ``/16`` hangs off the ``/24``. Containment is per routing instance for the
+    reason everything in :mod:`netviz.ipam` is — a VRF is an address space of its
+    own, and a ``/24`` in ``blue`` is not inside a ``/16`` in the global table.
+
+    Returns:
+        One ``(subnet, view)`` pair per prefix, ordered as
+        :func:`~netviz.subnets.subnets_of` orders its prefixes: instance, then
+        family, then network address, then length. A summarised supernet
+        therefore comes immediately before the blocks it holds.
+    """
+    entries = _plan_entries(subnets)
+    parents = _plan_parents([row for row, _ in entries])
+    children: dict[SubnetKey, list[str]] = {}
+    for row, subnet in entries:
+        parent = parents.get(row.key)
+        if parent is not None:
+            children.setdefault(parent, []).append(subnet.node_id)
+
+    identities = {row.key: subnet.node_id for row, subnet in entries}
+    return tuple(
+        (
+            subnet,
+            IpamView(
+                utilisation=row,
+                children=tuple(children.get(row.key, ())),
+                parent=identities.get(parents[row.key], "") if row.key in parents else "",
+                free_blocks=_free_blocks(subnet, subnets) if row.key in children else (),
+                summarised=row.is_aggregate,
+            ),
+        )
+        for row, subnet in entries
+    )
+
+
+#: What :func:`ipam_plan` groups a prefix by; see :data:`~netviz.subnets.SubnetKey`.
+_PlanKey: TypeAlias = SubnetKey
+
+
+def _plan_entries(subnets: Sequence[Subnet]) -> tuple[tuple[Utilisation, Subnet], ...]:
+    """Every prefix of the plan, with the placements behind it, in plan order.
+
+    A summarised supernet has no placements of its own, so it is given its
+    members' — every address inside it. That is what makes it filterable
+    (``--name srv-01`` reaches the summary holding that server's prefix) and what
+    keeps its VLAN set honest; the *counts* still come from
+    :func:`netviz.ipam.aggregate`, which sums the children rather than re-deriving
+    them.
+    """
+    declared = {subnet.key: subnet for subnet in subnets}
+    rows = utilisation_of(subnets)
+    entries = [(row, declared[row.key]) for row in rows if row.key in declared]
+
+    for row in aggregate_prefixes(rows):
+        if not row.is_aggregate or row.key in declared:
+            continue
+        members = tuple(
+            placement
+            for member in row.members
+            for placement in _members_of(declared, row.vrf, member)
+        )
+        summary = Subnet(prefix=row.prefix, network=row.network, members=members, vrf=row.vrf)
+        if summary.is_point_to_point:
+            # Two host routes are not a plan for a ``/31``, and two ``/31``s are
+            # not a plan for a ``/30``: at that size the supernet is an artefact
+            # of two addresses being adjacent, not a block anybody carved. A
+            # ``/29`` holding two point-to-point links is a real allocation and
+            # is kept, which is where the line falls.
+            continue
+        entries.append((row, summary))
+
+    entries.sort(key=lambda entry: entry[0].sort_key)
+    return tuple(entries)
+
+
+def _members_of(
+    declared: Mapping[_PlanKey, Subnet], vrf: str, prefix: str
+) -> tuple[AddressPlacement, ...]:
+    """The placements of one member of an aggregate, or none when it has gone."""
+    subnet = declared.get((vrf, ipaddress.ip_network(prefix)))
+    return subnet.members if subnet is not None else ()
+
+
+def _plan_parents(rows: Sequence[Utilisation]) -> dict[_PlanKey, _PlanKey]:
+    """Which prefix each one is carved out of: the nearest that contains it.
+
+    Quadratic in the number of prefixes and deliberately so. The alternative — a
+    trie over the address space — buys nothing at the sizes a *diagram* has (the
+    largest inventory netviz ships has ninety prefixes) and would be a second
+    implementation of containment beside :mod:`ipaddress`.
+    """
+    parents: dict[_PlanKey, _PlanKey] = {}
+    by_instance: dict[str, list[Utilisation]] = {}
+    for row in rows:
+        by_instance.setdefault(row.vrf, []).append(row)
+
+    for instance in by_instance.values():
+        for row in instance:
+            best: Utilisation | None = None
+            for candidate in instance:
+                if candidate.network == row.network or candidate.version != row.version:
+                    continue
+                if not candidate.network.supernet_of(row.network):  # type: ignore[arg-type]
+                    continue
+                if best is None or candidate.network.prefixlen > best.network.prefixlen:
+                    best = candidate
+            if best is not None:
+                parents[row.key] = best.key
+    return parents
+
+
+def _free_blocks(own: Subnet, subnets: Sequence[Subnet]) -> tuple[str, ...]:
+    """The unallocated CIDR blocks inside a prefix that holds other prefixes.
+
+    The prefix itself is left out of what is subtracted, because it contains
+    itself: :func:`netviz.ipam.allocations_within` would take the whole of it and
+    report every plan as full. Its own *addresses* are put back one host route at
+    a time, which is what a router holding ``10.0.0.1/16`` inside the
+    ``10.0.0.0/16`` it heads actually consumes — one address, not the block.
+    """
+    hosts = [
+        Subnet(
+            prefix=f"{member.ip}/{own.network.max_prefixlen}",
+            network=ipaddress.ip_network(member.ip),
+            members=(member,),
+            vrf=own.vrf,
+        )
+        for member in own.members
+    ]
+    others = [subnet for subnet in subnets if subnet.key != own.key]
+    blocks = free_space(own.network, [*others, *hosts], vrf=own.vrf)
+    # Widest first. ``free_space`` answers in address order, which puts the
+    # fragments a stray host punched out of the front of the block ahead of the
+    # half of the plan nobody has touched — and a reader asking where the next
+    # subnet goes wants the largest thing that is free, not the lowest.
+    return tuple(
+        str(block)
+        for block in sorted(blocks, key=lambda net: (net.prefixlen, int(net.network_address)))
+    )
+
+
+def _ipam_view(inventory: Inventory) -> tuple[dict[str, Node], tuple[Edge, ...]]:
+    """The address plan: the prefixes, joined to the prefixes they came out of.
+
+    No device is drawn. That is the whole difference from layer 3, and it is the
+    point: a prefix diagram with the hosts on it answers "who is in this subnet",
+    which layer 3 already answers, and the answer buries the one thing an address
+    plan is opened for — how much room is left and where.
+    """
+    plan = ipam_plan(subnets_of(inventory))
+    nodes = {subnet.node_id: Node.for_prefix(subnet, view) for subnet, view in plan}
+    edges = tuple(
+        Edge(
+            id=f"{view.parent}#allocates:{subnet.prefix}",
+            kind=EdgeKind.ALLOCATION,
+            source=view.parent,
+            target=subnet.node_id,
+            medium="",
+        )
+        for subnet, view in plan
+        if view.parent and view.parent in nodes
+    )
+    return nodes, edges
 
 
 # --------------------------------------------------------------------------- #
@@ -3706,7 +4093,17 @@ def _kept_derived(
         if reachable is not None and fqn not in reachable:
             continue
         pinned = fqn == seed or fqn in chosen
-        if node.subnet is not None:
+        if node.ipam is not None:
+            # A prefix of the address plan, whose members are *not* nodes of this
+            # graph — nothing at :attr:`Layer.IPAM` stands for a device — so the
+            # predicates are applied to the placements directly, exactly as a
+            # rack applies them to its slots. Narrowing the subnet the way the
+            # branch below does would empty every prefix, since ``kept`` is empty
+            # at a layer that draws no elements.
+            if not _prefix_selected(node, spec) and not pinned:
+                continue
+            surviving[fqn] = node
+        elif node.subnet is not None:
             narrowed = node.subnet.restricted_to(elements)
             if not narrowed.members and not pinned:
                 continue
@@ -3830,6 +4227,38 @@ def _stack_selected(node: Node, spec: FilterSpec) -> bool:
         or fnmatchcase(short_name(view.element), pattern)
         or fnmatchcase(view.qualified_label, pattern)
         for pattern in spec.names
+    )
+
+
+def _prefix_selected(node: Node, spec: FilterSpec) -> bool:
+    """Does ``spec`` select this prefix of the address plan?
+
+    A prefix is selected by its own name — ``--name '10.1.*'`` is what somebody
+    looking at an address plan types — or by any element addressed in it, which
+    is what makes ``--namespace sites/north`` narrow the plan to the blocks that
+    site uses. A VLAN filter is answered from the node, which carries the VLANs
+    of every interface in the prefix.
+
+    ``--kind`` is not answerable and is therefore ignored rather than silently
+    emptying the plan: a placement records where an address is configured, not
+    what sort of box it is configured on. This is the same call
+    :func:`_slot_selected` makes about VLANs for the same reason.
+    """
+    members = node.subnet.members if node.subnet is not None else ()
+    if spec.namespaces and not any(
+        _in_namespaces(namespace_of(member.element), spec.namespaces) for member in members
+    ):
+        return False
+    if spec.vlans and not node.vlans & spec.vlans:
+        return False
+    return (
+        not spec.names
+        or _matches_name(node, spec.names)
+        or any(
+            fnmatchcase(member.element, pattern) or fnmatchcase(short_name(member.element), pattern)
+            for member in members
+            for pattern in spec.names
+        )
     )
 
 

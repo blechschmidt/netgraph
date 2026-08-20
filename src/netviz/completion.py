@@ -96,6 +96,7 @@ _LAYER_HELP: Final[dict[str, str]] = {
     Layer.L1.value: "physical topology: what is plugged into what",
     Layer.L2.value: "the same topology annotated with VLANs",
     Layer.L3.value: "IP subnets and the elements addressed in them",
+    Layer.IPAM.value: "the address plan: how full every prefix is and what is free",
     Layer.OVERLAY.value: "tunnels, their endpoints and what they run inside",
     Layer.ROUTING.value: "BGP sessions and OSPF adjacencies, clustered by VRF",
     Layer.RACK.value: "rack elevations: what is bolted where, and what is free",

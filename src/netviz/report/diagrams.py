@@ -50,6 +50,7 @@ LAYER_TITLES: Final[Mapping[Layer, str]] = {
     Layer.L1: "Physical topology",
     Layer.L2: "VLANs",
     Layer.L3: "IP subnets",
+    Layer.IPAM: "Address plan: how full every prefix is",
     Layer.OVERLAY: "Tunnels",
     Layer.ROUTING: "Routing: BGP sessions and OSPF adjacencies",
     Layer.RACK: "Rack elevations",

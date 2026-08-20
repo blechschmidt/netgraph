@@ -305,7 +305,7 @@ host variables are set are [Groups](../export.md#groups),
 | `--label` | `KEY=VALUE` | — | Static label merged into every prometheus-sd target. Repeatable. |
 | `--table-format` | `[csv\|markdown]` | `csv` | How cable-list is laid out. The rows and columns are the same either way. |
 | `--schedule-format` | `[csv\|json]` | `csv` | How the power load schedule is laid out. json adds the per-PDU and per-PSE totals; the feed rows are the same either way. |
-| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | `l1` | Which view the drawio diagram draws. Unlike the other formats this one is a picture, and the arrangement it opens with is the one stored for that view. |
+| `--view` | `[physical\|l1\|l2\|l3\|ipam\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | `l1` | Which view the drawio diagram draws. Unlike the other formats this one is a picture, and the arrangement it opens with is the one stored for that view. |
 | `--icons` | `THEME\|DIR` | `cisco` | Icon theme inlined into the drawio file as data URIs, so the file needs nothing beside it. Built in: cisco, none. 'none' draws coloured boxes. |
 | `--theme` | `NAME\|PATH` | — | Apply a stylesheet to the exported diagram (§22). mxGraph spells netviz's style vocabulary almost one for one, so a colour chosen here opens in draw.io as that colour and survives a round-trip. Built in: blueprint, mono, none. |
 | `--style`, `--no-style` | — | `--style` | Honour the styles the inventory and the theme declare. --no-style exports plain. |

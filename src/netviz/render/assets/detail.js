@@ -116,9 +116,36 @@ var netvizDetail = (function () {
     ]));
   }
 
+  // The address plan. A prefix drawn at --layer ipam is the same subnet
+  // node layer 3 draws, so the subnet section still says who is in it; what
+  // this adds is the plan's own answer -- how full, how much room is left, and
+  // where the next block goes. Every number arrives pre-formatted: a /64 holds
+  // 2^64 addresses, and netviz.ipam has already decided how to write that.
+  function planSection(plan) {
+    if (!plan) { return null; }
+    return section("address plan", definitions([
+      ["utilisation", plan.bar + "  " + plan.utilisationText],
+      ["used", plan.usedText],
+      ["free", plan.freeText],
+      ["elements", plan.devices || ""],
+      ["carved out of", plan.parent],
+      ["holds", join(plan.children)],
+      ["free blocks", join(plan.freeBlocks)],
+      ["summarised", plan.summarised ? "no document declares this block" : ""]
+    ]));
+  }
+
+  /** What the heading calls this node. Its kind, except for a prefix of the
+   *  address plan: there every box is a subnet, and what the reader needs is
+   *  whether this one holds hosts or holds other blocks. */
+  function nodeKind(record) {
+    if (!record.ipam || !record.subnet) { return record.kind; }
+    return record.subnet.family + ((record.ipam.children || []).length ? " block" : " prefix");
+  }
+
   function describeNode(record, view) {
     var box = document.createDocumentFragment();
-    box.appendChild(heading(record, record.name, record.kind, view));
+    box.appendChild(heading(record, record.name, nodeKind(record), view));
 
     var identity = [["id", record.id]];
     if (record.namespace) { identity.push(["namespace", record.namespace]); }
@@ -137,6 +164,7 @@ var netvizDetail = (function () {
       ])));
     }
 
+    append(box, planSection(record.ipam));
     append(box, tunnelSection(record.tunnel));
 
     if (view.showVlans) {
@@ -244,6 +272,11 @@ var netvizDetail = (function () {
     if (record.subnet) {
       parts.push(record.subnet.prefix, record.subnet.family);
       (record.subnet.addresses || []).forEach(function (address) { parts.push(address); });
+    }
+    if (record.ipam) {
+      // A free block is searchable: "which of these has a /26 left in it?" is
+      // the question the address plan is opened with.
+      (record.ipam.freeBlocks || []).forEach(function (block) { parts.push(block); });
     }
     if (record.tunnel) {
       parts.push(record.tunnel.type, record.tunnel.transport, record.tunnel.cipher);
