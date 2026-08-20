@@ -661,7 +661,14 @@ class _Builder:
         self._neighbours()
 
     def _link_document(self, one: Obj, data: Mapping[str, Any]) -> None:
-        """Point the link at the cable or tunnel it came from, and it back."""
+        """Point the link at the document it came from, and — where there is a
+        two-sided relation to fill — point that document back at its ports.
+
+        An attachment's document is the *adapter*, which owns one of the two
+        ends rather than joining them, so it gets the forward pointer and no
+        ``ends``: what a cable's ``ends`` means for an adapter is
+        ``.interfaces``, which it already has.
+        """
         edge = data.get("edge")
         document = getattr(edge, "document", None) if edge is not None else None
         if document is None:

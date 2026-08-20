@@ -461,7 +461,13 @@ _LINK = ObjectType(
         Link("interfaces", "interface", _MANY, "The two ports it terminates on."),
         Link("vlans", "vlan", _MANY, "VLANs the link carries."),
         Link("broadcast_domains", "broadcast_domain", _MANY, "Domains the link is inside."),
-        Link("element", "element", _OPT, "The declared cable or tunnel, when there is one."),
+        Link(
+            "element",
+            "element",
+            _OPT,
+            "The document the link came from: a cable, a tunnel, or the adapter "
+            "whose `upstream.attached_to` it is.",
+        ),
     ),
 )
 
