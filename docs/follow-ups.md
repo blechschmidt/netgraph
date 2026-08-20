@@ -2614,6 +2614,34 @@ in different directions. Probably "changed" whenever any member is anything but
 untouched, but that is a claim about a shape nobody has drawn yet, and it should
 be drawn before it is asserted.
 
+## 28. The relational language answers one command, and three other places still ask the selector
+
+`netviz query 'select …'` is the only entry to `netviz.nql`. Three consumers of
+the *selector* were left alone, deliberately and for different reasons:
+
+**`--select` on render, watch, show, list, export and report.** These narrow a
+graph to a set of elements, which is precisely what a predicate returns and what
+a projection does not. `--select 'select interface { mac }'` has no meaning: a
+renderer cannot draw a list of MAC addresses. Wiring it would mean deciding what
+a relational query *selects* — presumably the elements reachable from its result
+— and that is a rule nobody has needed yet.
+
+**`assert: query` in a test suite.** This one is real and is the obvious next
+step. An assertion like "every access switch has an uplink" is already sayable
+as a selector; "no subnet is more than 90% full" is not, and is one line of NQL:
+`select subnet filter .utilisation > 0.9`. The work is a second assertion kind
+(the shape of the answer differs, so it cannot reuse `query:`) plus deciding
+what a non-empty *object* result means in a pass/fail context — probably that
+any row at all is a failure, with the rows as the report.
+
+**The editor's search box.** It runs on every keystroke and highlights, filters
+or selects nodes, so it wants element ids and wants them in single-digit
+milliseconds. `build_world` costs ~435 ms on a 1056-device tree, which is fine
+once per command and not fine per keystroke; caching it against the session's
+revision would fix that, and the payload shape would still have to be decided.
+Nothing about the language prevents it — the cost is a cache and a UI decision,
+neither of which this task needed.
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.
