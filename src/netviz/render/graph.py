@@ -1198,19 +1198,10 @@ class IpamView:
     #: to tell which they are looking at.
     summarised: bool = False
 
-    @property
-    def prefix(self) -> str:
-        """The prefix in ``10.0.0.0/24`` form."""
-        return self.utilisation.prefix
-
-    @property
-    def network(self) -> IPNetwork:
-        return self.utilisation.network
-
-    @property
-    def vrf(self) -> str:
-        """The routing instance, or ``""`` for the global one (§16.1)."""
-        return self.utilisation.vrf
+    # The prefix itself, the routing instance it is in and the network object
+    # are :attr:`utilisation`'s and are not restated here: that field is the row
+    # ``netviz ipam`` prints, and a second spelling of ``prefix`` is a second
+    # thing to keep in step. What follows is only what a *drawing* asks for.
 
     @property
     def family(self) -> str:
@@ -1281,11 +1272,14 @@ class IpamView:
         caption, a tooltip, the report. The Graphviz label lays the same facts
         out in columns instead; see :func:`netviz.render.dot._ipam_rows`.
         """
-        lines = [f"{self.assigned} of {self.capacity_text} used ({self.percent})"]
+        lines = [
+            f"{self.assigned} of {self.capacity_text} used ({self.percent})",
+            # Never zero: a prefix is in the plan because something is addressed
+            # in it, and a summarised block sums the children that are.
+            count_text(self.devices, "element"),
+        ]
         if self.free:
-            lines.append(f"{self.free_text} free")
-        if self.devices:
-            lines.append(count_text(self.devices, "element"))
+            lines.insert(1, f"{self.free_text} free")
         if self.children:
             lines.append(f"holds {count_text(len(self.children), 'prefix')}")
         if self.summarised:
@@ -2560,17 +2554,30 @@ def _plan_parents(rows: Sequence[Utilisation]) -> dict[_PlanKey, _PlanKey]:
 
     for instance in by_instance.values():
         for row in instance:
-            best: Utilisation | None = None
-            for candidate in instance:
-                if candidate.network == row.network or candidate.version != row.version:
-                    continue
-                if not candidate.network.supernet_of(row.network):  # type: ignore[arg-type]
-                    continue
-                if best is None or candidate.network.prefixlen > best.network.prefixlen:
-                    best = candidate
-            if best is not None:
-                parents[row.key] = best.key
+            holders = [
+                candidate for candidate in instance if _holds(candidate.network, row.network)
+            ]
+            if holders:
+                # The longest of them, which is the nearest: everything that
+                # contains a prefix also contains everything else that contains
+                # it, so "narrowest wins" is what turns a chain into a tree.
+                parents[row.key] = max(
+                    holders, key=lambda candidate: candidate.network.prefixlen
+                ).key
     return parents
+
+
+def _holds(outer: IPNetwork, inner: IPNetwork) -> bool:
+    """Is ``inner`` strictly inside ``outer``, both in one family?
+
+    Strictly: a prefix does not hold itself, or every box of the plan would hang
+    off itself. The family check is what makes the call safe — ``supernet_of``
+    is defined for a pair of networks of one version and raises otherwise, which
+    a plan holding both families would hit on its first comparison.
+    """
+    if outer.version != inner.version or outer == inner:
+        return False
+    return outer.supernet_of(inner)  # type: ignore[arg-type]
 
 
 def _free_blocks(own: Subnet, subnets: Sequence[Subnet]) -> tuple[str, ...]:

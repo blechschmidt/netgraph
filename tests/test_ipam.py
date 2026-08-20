@@ -959,6 +959,18 @@ def test_two_host_routes_are_not_a_plan_for_the_prefix_they_sit_in(tmp_path: Pat
     assert graph.edges == ()
 
 
+def test_a_prefix_hangs_off_the_nearest_block_that_holds_it(tmp_path: Path) -> None:
+    """Three levels make a tree, not a mesh: the /28 is in the /24, not the /16."""
+    inventory = load(_tree(tmp_path, {"a": "10.0.0.1/16", "b": "10.0.7.1/24", "c": "10.0.7.17/28"}))
+    plan = {node.name: node.ipam for node in build_graph(inventory, layer=Layer.IPAM).prefix_nodes}
+    assert plan["10.0.7.16/28"] is not None
+    assert plan["10.0.7.16/28"].parent == "subnet:10.0.7.0/24"
+    assert plan["10.0.7.0/24"] is not None
+    assert plan["10.0.7.0/24"].parent == "subnet:10.0.0.0/16"
+    assert plan["10.0.0.0/16"] is not None
+    assert plan["10.0.0.0/16"].children == ("subnet:10.0.7.0/24",)
+
+
 def test_containment_never_crosses_a_routing_instance(tmp_path: Path) -> None:
     """A VRF is an address space of its own (§16.1), so a /24 in blue is in no /16."""
     inventory = load(
@@ -989,6 +1001,16 @@ def test_a_filter_narrows_the_plan_by_prefix_and_by_who_is_in_it(
     assert set(by_vlan.nodes) == {"subnet:10.30.7.0/24"}
 
     assert filter_graph(graph, FilterSpec(names=("nothing-*",))).is_empty
+
+
+def test_a_namespace_filter_narrows_the_plan_to_the_blocks_that_site_uses() -> None:
+    """A prefix belongs to no directory; the elements addressed in it do."""
+    graph = build_graph(load(EXAMPLES / "campus"), layer=Layer.IPAM)
+    north = filter_graph(graph, FilterSpec(namespaces=("sites/north",)))
+
+    assert set(north.nodes) < set(graph.nodes)
+    assert "subnet:10.1.10.0/24" in north.nodes
+    assert "subnet:10.2.10.0/24" not in north.nodes, "the south site is another plan"
 
 
 def test_the_json_export_carries_the_plan_beside_the_prefix(overlapping: Inventory) -> None:
@@ -1022,6 +1044,7 @@ def test_the_drawing_says_how_full_each_prefix_is(overlapping: Inventory) -> Non
     assert "[ipv4 prefix]" in source
     assert format_bar(2, 254) in source
     assert "10.30.128.0/17" in source, "the widest free block is named on the box"
+    assert "more free block" in source, "and the rest are counted off rather than listed"
 
     caption = to_mermaid(build_graph(overlapping, layer=Layer.IPAM))
     assert "[ipv4 block, holds 1]" in caption

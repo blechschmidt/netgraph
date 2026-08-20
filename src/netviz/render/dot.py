@@ -2659,8 +2659,8 @@ def _ipam_rows(view: IpamView, options: RenderOptions) -> tuple[_Row, ...]:
     ]
     if view.free:
         rows.append(_Row(port="free", addresses=view.free_text))
-    if view.devices:
-        rows.append(_Row(port="in use by", addresses=count_text(view.devices, "element")))
+    # Never zero; see :meth:`IpamView.describe`.
+    rows.append(_Row(port="in use by", addresses=count_text(view.devices, "element")))
     if options.show_vlans and view.utilisation.vlans:
         rows.append(_Row(port="vlan", addresses=compact_ids(view.utilisation.vlans)))
     for index, block in enumerate(view.free_blocks[:_MAX_FREE_BLOCKS]):
