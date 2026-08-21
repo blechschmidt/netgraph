@@ -1506,6 +1506,67 @@ catastrophic-regression guard on every platform now, which is what the
 pure-Python row has always honestly been, and `validate` — 7.2–8.7 against 9.5,
 9.5 being the number that has held — remains the sharp one.
 
+**2026-08-21: 9.5 stopped holding, and the reason is a tail rather than a
+spread.** CI read **9.87** on `eae5606`, `ubuntu-24.04` 3.12 pure Python — a
+commit whose whole diff is the editor's pointer handling and which does not
+touch a rule, a model or the loader.
+
+This is the third time this ceiling has been reset — 8.5, 9.0, 9.5 — so the
+harvest was made big enough to argue from: **384 samples, the forty CI runs of
+2026-08-15 to -21**, every `test (…)` job's log grepped for `^\[perf\]`.
+
+| job | validate/floor | samples | median | p99 | worst |
+|---|---|---|---|---|---|
+| ubuntu-24.04, all four jobs | 6.84–9.87 | 256 | 8.02 | 9.35 | 9.87 |
+| macos-14 3.12 | 6.80–8.64 | 64 | 7.51 | 8.64 | 8.64 |
+| windows-latest 3.12 | 8.08–10.13 | 64 | 8.84 | 10.13 | 10.13 |
+
+**What eight samples could not show is the shape of the top of it.** Exactly one
+Linux sample of 256 is above 9.5, and the next-worst is 9.39 — the 9.87 stands a
+half point clear of the body of the distribution, and the four jobs each own
+part of the tail, so it is not one job to be treated separately. That is a
+population where a ceiling set from the observed maximum is set from a sample
+that will be beaten, and 9.5 — 5 % above the body — fails about one run in
+sixty. Which is what it did: three green weeks and then a red one.
+
+So **`MAX_VALIDATE_RATIO = 10.5`**, 12 % above the 99th percentile rather than
+11 % above the maximum, which is the rule this file used for the load guard and
+is the wrong rule for a distribution whose worst sample is 23 % above its median
+where the load guard's is 7 % above its own. `MAX_VALIDATE_RATIO_WINDOWS` stays
+at 11.0: nothing has come within 9 % of it in 64 samples, and a ceiling nothing
+has hit does not get raised because a different one did.
+
+**De-noising was tried first, and measured, and does not work here.** The
+collector is the one mechanism left that taxes the two halves differently —
+`validate` builds a context and a finding list over an inventory that is
+entirely live, the address walk builds nothing, so a gen-2 pass lands in the
+numerator far more often. Uninstrumented and outside pytest that is real and
+worth about 2.5 %: six repetitions read 8.44–8.88 with the collector running and
+8.07–8.62 with `gc.collect()` then `gc.disable()` around each measurement. Under
+the conditions CI actually runs — pytest, coverage installed, the tracer paused —
+a paired A/B over six interleaved rounds is a wash: 8.44–9.16 running against
+8.39–8.97 paused. It was reverted rather than shipped with a docstring claiming
+a benefit that the real configuration does not show. More samples is the other
+candidate, and it was already measured on the load guard above — resampling 120
+interleaved rounds put `min/min` at a 0.06 spread over eight samples and 0.03
+over twenty-four, so tripling the work buys a few hundredths of a problem that
+is half a point wide.
+
+**The drift is real but is not what failed.** Over the same week the
+`ubuntu-24.04` 3.12 job's median moved 7.83 → 8.14 → 8.23, about 5 %, and it
+steps where the work does: the namespace, policy-routing and firewall models
+(`6bfe151`, `2cb4e27`, `ab1c766`, schema §§23–24) all landed on 2026-08-16 and
+they are the only commits since 2026-08-15 to touch `validate.py` or
+`rules.py` at all. Where it lands is measured rather than inferred:
+`tools/profile_validate.py` on a 1056-device tree puts `_build_context` at
+**48 %** of `validate` and no single rule above 6.3 % — the top three are
+`W132` (6.4 ms), `I001` (6.2 ms) and `E004` (5.0 ms), none of them new. A guard
+whose catch table is written in multiples cannot see 5 %, and should not be
+retuned to. **The follow-up worth having is on `_build_context`**, which has
+never had a profiling round of its own the way `load_tree` (entries 1, 5) and the
+rules (entry 7) have; that is where the ratio's baseline would come back down,
+and it would make the next threshold argument unnecessary rather than shorter.
+
 ---
 
 ## 13. `netviz --version --json` is not the spelling that works

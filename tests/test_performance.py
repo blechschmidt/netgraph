@@ -98,6 +98,26 @@ macos-14 3.12                  6.87-8.33    8
 windows-latest 3.12            8.54-9.85    8
 =============================  ===========  ==========
 
+Forty runs later — three hundred and eighty-four samples, 2026-08-15 to -21 —
+the platform claim holds and the Linux number did not:
+
+=============================  ===========  ==========  =======  ======  =====
+Job                            validate     samples     median   p99     worst
+=============================  ===========  ==========  =======  ======  =====
+ubuntu-24.04 (all four jobs)   6.84-9.87    256         8.02     9.35    9.87
+macos-14 3.12                  6.80-8.64    64          7.51     8.64    8.64
+windows-latest 3.12            8.08-10.13   64          8.84     10.13   10.13
+=============================  ===========  ==========  =======  ======  =====
+
+Windows still sits about 0.8 above the others' centre, so the split stays. But
+this distribution has a **tail**, which eight samples could not show and which
+is the whole of why 9.5 failed on ``eae5606``: one Linux sample in 256 reads
+9.87 where the next-worst reads 9.39, so a ceiling set from the spread's top
+edge is set from a sample that will be beaten, and one set 5 % above the body of
+the distribution fails about one run in sixty. 10.5 is set 12 % above the 99th
+percentile instead. Entry 12 of ``docs/follow-ups.md`` has the reasoning and the
+two de-noising alternatives that were measured and rejected before blunting.
+
 Windows is not noisier around the same centre; it sits about 0.8 above it, and
 the one sample that broke 9.5 -- 9.85, which failed the run on ``10f9284c`` --
 was 12 % above its own median rather than an outlier from the pooled spread. A
@@ -110,7 +130,7 @@ So this guard is split the same way, and for a reason of the same shape.
 
 The "headroom" column is the load guard's, and the Linux rows are the thin ones.
 Each guard prints its own figures on every run — ``[perf] validate: 8.48x
-against a budget of 9.50x (11% headroom)`` — so the table above can be rebuilt
+against a budget of 10.50x (19% headroom)`` — so the table above can be rebuilt
 from any run rather than inferred from whichever job happened to fail.
 
 The pure-Python row is honestly weaker. With a parse eight times slower in the
@@ -131,12 +151,16 @@ millisecond on the guard's tree, which is small enough that the timer's own
 noise moves the ratio by several per cent; eight of them cost enough to measure
 cleanly, and the ratio only has to be compared with itself.
 
-==============  ===============  ============  ==============
+==============  ===============  ============  ===============
 Measured        Before entry 7   Today         Threshold
-==============  ===============  ============  ==============
-validate/floor  21.5-22.0        6.9-8.6       9.5 (not Windows)
-validate/floor  --               8.5-9.9       11.0 (Windows)
-==============  ===============  ============  ==============
+==============  ===============  ============  ===============
+validate/floor  21.5-22.0        6.8-9.9       10.5 (not Windows)
+validate/floor  --               8.1-10.1      11.0 (Windows)
+==============  ===============  ============  ===============
+
+Those "today" columns are three hundred and eighty-four CI samples, not a
+spread off one run; the harvest that produced them is in entry 12 of
+``docs/follow-ups.md`` and the table is a few paragraphs below.
 
 The "today" range widened when the routing rules of §16 landed — not because
 those rules cost anything (0.0 ms each by ``tools/profile_validate.py``, and
@@ -168,14 +192,15 @@ all of entry 7          21.6   yes
 ``subnets.py``            7.5  no
 ======================  =====  ========
 
-Those figures are against the ratio as it read when they were taken; each of the
-three it catches is a multiple of today's 8.4, not a few per cent above it. It
-does *not* catch the ``subnets.py`` piece, which is worth about 9 % of
-``validate`` and so sits inside the 11 % of headroom the threshold leaves above
-today's worst sample. Buying that last piece would mean a threshold within a few
-per cent of the measured spread, which on a shared runner buys flakiness rather
-than coverage — 9.0 was exactly that, and it failed a run that had regressed
-nothing.
+Those figures are against the ratio as it read when they were taken, so read
+each as a multiple of the baseline it was taken against — 3.1x, 2.0x and 1.32x
+of 6.9 — rather than as a number to compare with today's 8.0 median. It does
+*not* catch the ``subnets.py`` piece, which is worth about 9 % of ``validate``
+and so sits inside the headroom any usable threshold leaves above today's worst
+sample. Buying that last piece would mean a threshold within a few per cent of
+the measured spread, which on a shared runner buys flakiness rather than
+coverage — 9.0 was exactly that and failed a run that had regressed nothing, and
+so, on a longer view of the same distribution, was 9.5.
 
 **And the same technique again for the cache.** Entry 14 made a repeated load
 incremental; the floor there is the *cold* load itself, and the guard asserts that
@@ -236,10 +261,23 @@ MAX_LOAD_RATIO_PURE_PYTHON = 1.25
 #: run over an inventory that is already in memory — but *not* platform
 #: independent; see the module docstring. History, in entry 12 of
 #: ``docs/follow-ups.md``: 8.5, then 9.0 when the routing model's context
-#: building landed, then 9.5, over a measured 6.9-8.6 on Linux and macOS.
+#: building landed, then 9.5, then this.
+#:
+#: 10.5 is read off three hundred and twenty samples rather than off a spread:
+#: the four Linux jobs put 255 of their 256 below 9.5 and one at 9.87, and their
+#: 99th percentile is 9.35. It is the percentile this number is 12 % above, not
+#: the maximum, because this population has a heavy tail — its worst sample is
+#: 23 % above its median where the load guard's is 7 % above its own, and a
+#: ceiling 11 % above *that* maximum would be 11.0 and would stop catching the
+#: thing below.
+#:
 #: A revert of any piece of entry 7's work lands at 9.1 against a *6.9*
-#: baseline, which is 11.0 against this one, so the guard keeps what it is for.
-MAX_VALIDATE_RATIO = 9.5
+#: baseline, which is 1.32x whatever the baseline is; against today's Linux
+#: median of 8.02 that reads 10.6, so the guard keeps — only just — the sharpest
+#: catch in its table. If 10.5 fails a run that regressed nothing, that margin is
+#: gone and the honest next step is 11.0 and no platform split at all, not
+#: another few points.
+MAX_VALIDATE_RATIO = 10.5
 
 #: What that ceiling becomes on Windows, where the same ratio reads 8.5-9.9.
 #:
@@ -255,8 +293,15 @@ MAX_VALIDATE_RATIO = 9.5
 #: against a 6.9 baseline; scaled to the 8.8 one this platform has, a revert of
 #: ``validate.py`` reads 11.6 and one of ``models/interface.py`` reads 17.5, so
 #: the two pieces of entry 7 the Linux copy catches are both still caught here —
-#: the first of them only just, which is the price of the platform and is why
-#: 9.5 stays everywhere else rather than everyone moving up to this.
+#: the first of them only just, which is the price of the platform.
+#:
+#: **Unmoved on 2026-08-21, when the row above went to 10.5**, and deliberately.
+#: Sixty-four samples since put this job at 8.08-10.13 with a median of 8.84, so
+#: 11.0 is 9 % above the worst of them and has never been reached; a ceiling that
+#: nothing has hit does not get raised because a different one did. What that
+#: does mean is that the split is half a point now rather than a point and a
+#: half, which is the right size for how far apart the two medians are (8.84
+#: against 8.02) and is the first evidence that this ceiling was set generously.
 MAX_VALIDATE_RATIO_WINDOWS = 11.0
 
 #: Ceilings on a *warm* load as a fraction of a cold one, for the two tiers of
