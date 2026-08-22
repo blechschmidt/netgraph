@@ -80,9 +80,28 @@ ROUTER_FQN: Final = "routers/rtr-home"
 #: The query a template writes, and the one the docs lead with.
 ADDRESSES: Final = "select (device filter .fqn = $fqn).addresses.address"
 
+
+def ansible_command(name: str) -> Path | None:
+    """``name`` as installed *beside this interpreter*, or ``None``.
+
+    Not :func:`shutil.which`. These plugins run in Ansible's own process and
+    import netviz there, so the only ansible worth running here is one sharing
+    the environment the suite is running in — and a control node that happens to
+    have a *system* ansible-playbook on PATH has one that cannot import netviz
+    at all. GitHub's ubuntu runner image is exactly that machine, and trusting
+    PATH made every ``test`` matrix job run these tests against an interpreter
+    that was never going to pass them.
+    """
+    for suffix in ("", ".exe"):
+        candidate = Path(sys.executable).parent / f"{name}{suffix}"
+        if candidate.exists():
+            return candidate
+    return None
+
+
 ANSIBLE = pytest.mark.skipif(
-    shutil.which("ansible-playbook") is None,
-    reason="ansible-core is not installed on the control node; "
+    ansible_command("ansible-playbook") is None,
+    reason="ansible-core is not installed beside this interpreter; "
     "install it with 'uv pip install ansible-core' (see docs/testing.md)",
 )
 
@@ -620,12 +639,16 @@ def run_ansible(command: list[str], cwd: Path) -> subprocess.CompletedProcess[st
     environment["ANSIBLE_COLLECTIONS_PATH"] = str(collections_path())
     environment["ANSIBLE_LOCALHOST_WARNING"] = "False"
     environment["ANSIBLE_INVENTORY_UNPARSED_WARNING"] = "False"
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(REPO_ROOT / "src"), environment.get("PYTHONPATH", "")]
-    ).strip(os.pathsep)
     environment["ANSIBLE_PYTHON_INTERPRETER"] = sys.executable
+    found = ansible_command(command[0])
+    assert found is not None, f"{command[0]} is not installed beside {sys.executable}"
     return subprocess.run(
-        command, cwd=cwd, env=environment, capture_output=True, text=True, timeout=600
+        [str(found), *command[1:]],
+        cwd=cwd,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=600,
     )
 
 

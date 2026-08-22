@@ -208,6 +208,12 @@ Those tests run a real `ansible-inventory` over the shipped plugin and a real
 `ansible-playbook` rendering the collection's systemd-networkd units from
 `examples/home-lab`, and assert the addresses in the generated unit are the ones
 the YAML declares. Without ansible-core they skip, naming the command above.
+
+What they look for is an `ansible-playbook` **beside the interpreter running the
+suite**, not one on `PATH`: these plugins run inside Ansible's own process and
+import netviz there, so a machine with a *system* ansible has one that cannot
+import netviz at all and would fail every one of these tests for a reason that
+is not about netviz. GitHub's ubuntu runner image is exactly that machine.
 ansible-core is deliberately **not** a netviz dependency and is not in `uv.lock`:
 netviz must never depend on Ansible, and a control node is a consumer of netviz
 the way `dot` is a binary netviz calls. The `ansible` job in
