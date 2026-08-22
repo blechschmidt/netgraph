@@ -1,0 +1,5 @@
+---
+# The oldest ansible-core these plugins are written against. 2.15 is where the
+# option forms used here -- `vars:` on a lookup option, `plugin_utils` for
+# controller-side shared code -- are all present and stable.
+requires_ansible: ">=2.15"

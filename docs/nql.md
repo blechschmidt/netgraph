@@ -207,6 +207,7 @@ multiplicative := prefix (("*" | "/" | "%") prefix)*
 prefix       := "-" prefix | postfix
 postfix      := primary ("." NAME | "[" "is" TYPE "]")*
 primary      := NUMBER | STRING | "true" | "false" | "none"
+              | "$" NAME                            -- a value the caller supplied
               | "(" statement ")"
               | "{" expr ("," expr)* "}"            -- a set
               | "{" NAME ":=" expr ("," …)* "}"     -- a free object
@@ -510,6 +511,70 @@ is why a typo costs a millisecond.
 
 ---
 
+## Parameters
+
+A query may leave a hole for a value, written `$name`, and take it from the
+caller. `netviz query` fills them from `--param`; an
+[Ansible template](ansible.md) fills them from the host it is rendering for.
+
+<!-- run: cwd=examples/home-lab -->
+```console
+$ netviz query 'select vlan { id, name } filter .id in $ids' --param 'ids:=[10, 20]'
+ID  NAME
+--  -----
+10  home
+20  guest
+```
+
+The point is not brevity. It is that a query built by *interpolation* is a query
+whose meaning depends on the value pasted into it:
+
+```text
+"select device filter .name = '" + host + "'"      # don't
+```
+
+That means what it says only while nobody puts an apostrophe in a device name,
+and the day somebody does, it either fails to parse or parses into a different
+question. Quoting fixes the apostrophe and nothing else — the *type* is still
+whatever the concatenation produced, so a VLAN id arrives as text.
+
+A parameter is a token, so:
+
+* **The value is never read as query text.** There is nothing to escape, because
+  nothing is being parsed.
+* **It carries a type**, taken from the value the caller passed. `10` is an int
+  and `'10'` is a string, and the parser checks the query against that before the
+  inventory is read: `.name = $id` with `$id` bound to a number is refused where
+  it is written.
+* **A list is a set.** `filter .name in $names` takes one name or ten, without a
+  loop and without any quoting.
+* **A parameter the query names and nobody supplied is a parse error**, and it
+  says which parameters *were* supplied — so a template with a typo in it fails
+  before it reads a tree, not after it has written a file.
+
+| Passed | Type | Written as |
+|---|---|---|
+| `"sw-01"` | `one str` | `--param name=sw-01` |
+| `10` | `one int` | `--param 'id:=10'` |
+| `true` | `one bool` | `--param 'up:=true'` |
+| `["a", "b"]` | `many str` | `--param 'names:=["a","b"]'` |
+| `None`, `[]` | the empty set | — |
+
+`NAME=VALUE` on the command line is text, whatever it looks like; `NAME:=JSON`
+is a JSON value, which is how a number, a boolean or a list is said on a command
+line with no types of its own. An `ipaddress` object passed from Python arrives
+as the text the inventory stores.
+
+A parameter is a *value*: it stands where a literal would, and never where a
+type name, a member or a clause would. `select $type.name` is not a thing, and
+that is deliberate — a query whose *shape* came from outside would be back to
+where the string concatenation was.
+
+The selector language ([`docs/query.md`](query.md)) has no parameters; passing
+one is an error rather than a silent no-op.
+
+---
+
 ## Limits
 
 | Limit | Value | Why |
@@ -518,6 +583,7 @@ is why a typo costs a millisecond.
 | Nesting depth | 48 | A hand-written query reaches four or five. |
 | Terms | 1024 | Past this it is generated. |
 | Regex length | 512 characters | Same. |
+| Items in one parameter | 1024 | A parameter is a value, not a table. |
 
 There is no user-defined function, no lambda and no recursion: a query is a
 bounded walk of the schema, and the only unbounded search in the language is
@@ -571,6 +637,8 @@ select interface { fqn } filter .type = 'ethernet' and not exists .cable
 ## See also
 
 - [`docs/query.md`](query.md) — the selector language, and where it is used.
+- [`docs/ansible.md`](ansible.md) — the same language in a configuration
+  template, which is what parameters exist for.
 - [`netviz query`](commands/query.md) — the command, its flags and its exit codes.
 - [`docs/schema.md`](schema.md) — the specification the type graph mirrors.
 - `netviz query --describe` — the same reference, generated, at the terminal.

@@ -49,6 +49,9 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netviz query`](query.md) | Ask a question about the network, in either of two query languages. | [query.md](query.md) |
 | [`netviz ipam`](ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](ipam.md) |
 | [`netviz export`](export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](export.md) |
+| [`netviz ansible path`](ansible.md) | Print the collections path holding the shipped Ansible collection. | [ansible.md](ansible.md) |
+| [`netviz ansible install`](ansible.md) | Copy that collection into a control node's collections path. | [ansible.md](ansible.md) |
+| [`netviz ansible inventory`](ansible.md) | Print the dynamic inventory the plugin builds, queries and all. | [ansible.md](ansible.md) |
 | [`netviz report`](report.md) | Write the as-built documentation: a page per site and per device. | [report.md](report.md) |
 | [`netviz show`](show.md) | Print one element as it was resolved, expansions included. | [show.md](show.md) |
 | [`netviz rules`](rules.md) | List the validation rules and their ids. | [rules.md](rules.md) |

@@ -31,6 +31,8 @@ GRAMMAR: Final[tuple[str, ...]] = (
     "            | NAME : shape [clause]  -- project linked objects, shaped",
     "            | NAME := expr [shape]   -- project anything, under a new name",
     "            | *                      -- every property of the type",
+    "value      := 'text' | NUMBER | true | false | none | { value, ... }",
+    "            | $NAME                  -- a value the caller supplied",
     "path       := .NAME ...              -- from the object being considered",
     "            | TYPE.NAME ...          -- from every object of a type",
     "            | expr[is TYPE]          -- narrow a polymorphic link",

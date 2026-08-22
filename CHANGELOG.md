@@ -18,6 +18,50 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **An Ansible integration, and a query language that can be templated safely.** netviz now
+  ships an Ansible collection, `netviz.netviz`, holding a dynamic inventory plugin, a lookup
+  plugin and five filters. The inventory plugin builds the same document
+  `netviz export ansible-inventory` writes — one implementation, so a checked-in inventory
+  file and the plugin that replaces it cannot disagree about who is a server — and adds host
+  variables and groups that are *queries*. The lookup is the piece a file cannot have: a
+  template asks the network for the address it is about to write down.
+
+  ```jinja
+  [Network]
+  {% for address in query('netviz.netviz.query',
+                          'select (device filter .fqn = $fqn).addresses.address') %}
+  Address={{ address }}
+  {% endfor %}
+  ```
+
+  `$fqn` is the element the host being configured came from, bound automatically along with
+  `$host`, `$name`, `$namespace` and `$kind`. The collection also ships a playbook,
+  `netviz.netviz.systemd_network`, that renders a systemd-networkd unit per addressed
+  interface, so the whole loop is runnable in one command.
+  [`docs/ansible.md`](docs/ansible.md) is the guide.
+
+- **Query parameters: `$name` in a relational query, and `netviz query --param`.** A query
+  may leave a hole for a value and take it from the caller, which is what a *generated*
+  query needs — one written by a script, a CI job or a configuration template.
+
+  ```console
+  $ netviz query 'select (device filter .name = $host).addresses.address' --param host=rtr-home
+  $ netviz query 'select vlan { id, name } filter .id in $ids' --param 'ids:=[10, 20]'
+  ```
+
+  A parameter is a token rather than text, so nothing in the value can change what the query
+  asks — a device name with an apostrophe in it is a device name. It is also *typed*, by the
+  value that was passed, and the type is checked against the query before an inventory is
+  read: `.name = $id` with `$id` bound to a number is refused where it is written. A list
+  binds to a set, so `filter .name in $names` takes one name or ten.
+  [`docs/nql.md`](docs/nql.md#parameters) has the reasoning.
+
+- **`netviz ansible`** — `path` prints the collections path holding the shipped collection
+  (`export ANSIBLE_COLLECTIONS_PATH="$(netviz ansible path)"` and nothing is copied),
+  `install` copies it into a control node's own collections path, and `inventory` prints the
+  document the plugin builds — for reading, for diffing, and for use as a dynamic inventory
+  script by a control node that would rather not load a plugin.
+
 - **A relational query language, and `netviz query` now answers two.** A query that begins
   with `select` or `with` walks the schema, joins by following links, and returns the shape
   it is asked for — a value, an object, or an array of nested objects. Anything else is the

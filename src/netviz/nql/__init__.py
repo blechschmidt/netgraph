@@ -54,6 +54,7 @@ and both directions of every link. After that a query is dictionary lookups.
 from __future__ import annotations
 
 from netviz.nql.ast import Query
+from netviz.nql.binding import MAX_PARAM_ITEMS, Params, bind, declare, read_assignment
 from netviz.nql.describe import EXAMPLES, GRAMMAR, describe, explain, overview
 from netviz.nql.execute import Column, Result, execute
 from netviz.nql.parser import MAX_DEPTH, MAX_NODES, MAX_PATTERN, is_relational, parse
@@ -67,11 +68,13 @@ __all__ = [
     "GRAMMAR",
     "MAX_DEPTH",
     "MAX_NODES",
+    "MAX_PARAM_ITEMS",
     "MAX_PATTERN",
     "SCHEMA",
     "Cardinality",
     "Column",
     "ObjectType",
+    "Params",
     "Query",
     "QueryError",
     "Result",
@@ -80,21 +83,37 @@ __all__ = [
     "ValueType",
     "World",
     "answer",
+    "bind",
     "build_world",
+    "declare",
     "describe",
     "execute",
     "explain",
     "is_relational",
     "overview",
     "parse",
+    "read_assignment",
 ]
 
 
-def answer(text: str, world: World, *, source: str = "query") -> Result:
+def answer(
+    text: str, world: World, *, source: str = "query", params: Params | None = None
+) -> Result:
     """Parse ``text`` and run it against ``world``.
+
+    Args:
+        text: The query as written.
+        source: What a diagnostic calls the origin.
+        world: What to answer it from.
+        params: A value for each ``$name`` the query uses. Typed by what is
+            passed, checked while parsing, substituted while executing — so a
+            caller building a query from a template never has to quote
+            anything.
 
     Raises:
         QueryError: The query does not parse, names something the schema does
-            not have, or cannot be evaluated.
+            not have, names a parameter that was not supplied, or cannot be
+            evaluated.
     """
-    return execute(parse(text, source=source, schema=world.schema), world)
+    query = parse(text, source=source, schema=world.schema, params=declare(params))
+    return execute(query, world, bind(params))

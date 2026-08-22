@@ -293,6 +293,22 @@ Interfaces keep declaration order deliberately: the *set* of hosts and groups is
 sorted, but a template rendering one host's interfaces back into a device
 configuration should produce the order a person wrote.
 
+### Or skip the file: the plugin
+
+This document is a *snapshot*, which is the right thing for a control node that
+cannot have netviz installed and the wrong thing everywhere else. The
+`netviz.netviz` collection ([`docs/ansible.md`](ansible.md)) builds the same
+document at play time — plus host variables and groups that are queries — and
+adds the piece a file cannot have: a lookup, so a template can ask the network
+for the address it is about to write down.
+
+```jinja
+{% for address in query('netviz.netviz.query',
+                        'select (device filter .fqn = $fqn).addresses.address') %}
+Address={{ address }}
+{% endfor %}
+```
+
 ---
 
 ## `prometheus-sd`

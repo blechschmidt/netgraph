@@ -19,6 +19,13 @@ That is what SQL asks for, what EdgeQL asks for, and the only rule under which
 
 Comments run from ``#`` to the end of the line, because a query long enough to
 need ``order by`` is long enough to be kept in a file and explained.
+
+One more token than the selector has: ``$name``. A query that is written by a
+person is all literals, but one that is written by a *template* has a hole in it
+— the host being configured, the site being reported on — and the two ways to
+fill a hole are to paste the value in and to name it. Pasting means quoting, and
+quoting a value that came from an inventory somebody else can edit is how a
+query stops meaning what it says. So the hole is a token.
 """
 
 from __future__ import annotations
@@ -43,6 +50,10 @@ class TokenKind(str, Enum):
     NUMBER = "number"
     #: One of :data:`PUNCTUATION` or :data:`OPERATORS`.
     SYMBOL = "symbol"
+    #: ``$name`` — a value supplied by the caller. The text is the name without
+    #: its ``$``, so a parameter and the key it is bound under are spelled the
+    #: same thing.
+    PARAM = "param"
     #: The zero-width token at the end, so every error has something to point at.
     END = "end"
 
@@ -87,6 +98,8 @@ class Token:
             return "the end of the query"
         if self.kind is TokenKind.STRING:
             return f"the string {self.text!r}"
+        if self.kind is TokenKind.PARAM:
+            return f"the parameter '${self.text}'"
         return repr(self.text)
 
 
@@ -202,6 +215,10 @@ def tokenize(text: str, *, source: str = "query") -> tuple[Token, ...]:
             token, at = _string_at(text, at, source=source)
             tokens.append(token)
             continue
+        if char == "$":
+            token, at = _param_at(text, at, source=source)
+            tokens.append(token)
+            continue
         # A '.' followed by a digit is the start of a decimal written without a
         # leading zero; anywhere else it is the path operator.
         if char == "." and at + 1 < size and text[at + 1].isdigit():
@@ -253,6 +270,33 @@ def _number_at(text: str, at: int) -> tuple[Token, int]:
         while at < size and text[at].isdigit():
             at += 1
     return Token(TokenKind.NUMBER, text[start:at], start, at - start), at
+
+
+def _param_at(text: str, at: int, *, source: str) -> tuple[Token, int]:
+    """Scan the ``$name`` starting at ``at``; return it and the next offset.
+
+    The name is a word and nothing else, so ``$1`` and ``$`` are refused here
+    rather than parsed into something the caller would have to bind by number.
+    A generated query that interpolated a value would have to quote and escape
+    it; one that names a parameter cannot be made to mean something else by the
+    value, which is the whole reason this token exists.
+
+    Raises:
+        QueryError: A ``$`` with no name after it.
+    """
+    cursor = at + 1
+    size = len(text)
+    while cursor < size and text[cursor] in _WORD_BODY:
+        cursor += 1
+    if cursor == at + 1 or text[at + 1] not in _WORD_START:
+        raise QueryError(
+            "'$' introduces a parameter and this one has no name",
+            text=text,
+            offset=at,
+            help="write '$host', and supply its value with --param host=VALUE",
+            source=source,
+        )
+    return Token(TokenKind.PARAM, text[at + 1 : cursor], at, cursor - at), cursor
 
 
 def _string_at(text: str, at: int, *, source: str) -> tuple[Token, int]:

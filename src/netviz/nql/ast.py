@@ -36,6 +36,7 @@ __all__ = [
     "IsType",
     "Literal",
     "OrderItem",
+    "Param",
     "Query",
     "Root",
     "Select",
@@ -153,6 +154,22 @@ class Root:
 @dataclass(frozen=True, slots=True)
 class Var:
     """A reference to a ``with`` binding."""
+
+    name: str
+    type: ValueType
+    span: Span = field(default_factory=Span)
+
+
+@dataclass(frozen=True, slots=True)
+class Param:
+    """``$name`` — a value the caller supplied, standing where a literal would.
+
+    It is a *literal* in every way that matters to the rest of the tree: it
+    carries a type, it never navigates, and the executor reads its values from a
+    table instead of from the world. What it is not is *text*: a query built by
+    interpolation can be made to mean something else by the value pasted into
+    it, and one that names a parameter cannot.
+    """
 
     name: str
     type: ValueType
@@ -316,6 +333,7 @@ Expr = (
     | SetLiteral
     | Root
     | Var
+    | Param
     | This
     | Step
     | TypeFilter

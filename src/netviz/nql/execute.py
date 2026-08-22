@@ -28,7 +28,7 @@ from __future__ import annotations
 import fnmatch
 import ipaddress
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final
 
@@ -40,6 +40,7 @@ from netviz.nql.ast import (
     FreeObject,
     IsType,
     Literal,
+    Param,
     Query,
     Root,
     Select,
@@ -106,15 +107,27 @@ class Result:
         return bool(self.columns) and all(isinstance(row, dict) for row in self.rows)
 
 
-def execute(query: Query, world: World) -> Result:
-    """Answer ``query`` against ``world``."""
-    return _Executor(world).run(query)
+def execute(query: Query, world: World, params: Mapping[str, Any] | None = None) -> Result:
+    """Answer ``query`` against ``world``.
+
+    Args:
+        query: A query parsed against ``world``'s schema.
+        params: The value of each ``$name`` the query uses, as
+            :func:`~netviz.nql.binding.bind` returns them. The parser has
+            already checked that every parameter the query names is here, so a
+            missing one is a caller that parsed with one table and ran with
+            another; it evaluates to the empty set rather than raising, which is
+            what an absent value means everywhere else in the language.
+    """
+    return _Executor(world, params=dict(params or {})).run(query)
 
 
 @dataclass
 class _Executor:
     world: World
     bindings: dict[str, tuple[Value, ...]] = field(default_factory=dict)
+    #: What each ``$name`` was bound to, by the caller rather than by the query.
+    params: dict[str, tuple[Value, ...]] = field(default_factory=dict)
     #: The query as written, so a failure at run time underlines it the way a
     #: parse error does.
     text: str = ""
@@ -177,6 +190,8 @@ class _Executor:
             return tuple(self.world.all(node.type_name))
         if isinstance(node, Var):
             return self.bindings.get(node.name, ())
+        if isinstance(node, Param):
+            return self.params.get(node.name, ())
         if isinstance(node, This):
             return (scope,) if scope is not None else ()
         if isinstance(node, Step):

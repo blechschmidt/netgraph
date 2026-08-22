@@ -1,0 +1,73 @@
+---
+# Generate one systemd-networkd unit per addressed interface, from the netviz
+# inventory rather than from the machine.
+#
+#   ansible-playbook netviz.netviz.systemd_network \
+#       -i inventory/netviz.yml -e netviz_units="$PWD/build/units"
+#
+# Every address, VLAN and MTU below is an answer to a query. Nothing is gathered
+# from the target -- the point is to say what the machine *should* have -- so the
+# play runs entirely on the control node and writes files you can read, diff and
+# then ship with your own copy/handler tasks.
+- name: Render systemd-networkd units from the netviz inventory
+  hosts: all
+  gather_facts: false
+  connection: local
+
+  vars:
+    # The interfaces to write a unit for: this host's, addressed, and not the
+    # loopback, which systemd-networkd manages itself. $fqn is bound to the
+    # element this host came from; nothing is interpolated into the query.
+    netviz_interface_query: >-
+      select (device filter .fqn = $fqn).interfaces {
+        name,
+        mtu,
+        addresses := .addresses.address,
+        vlans := .vlans.id
+      } filter exists .addresses and .type != 'loopback' order by .name
+
+  tasks:
+    # An absolute path, and required. A relative one would be resolved against
+    # this playbook's directory -- which is inside the installed netviz package,
+    # and is the last place anybody means to write to.
+    - name: Check where the units are to go
+      ansible.builtin.assert:
+        that:
+          - netviz_units is defined
+          - netviz_units is string
+          - netviz_units.startswith('/')
+        fail_msg: >-
+          Say where the units go, as an absolute path:
+          ansible-playbook netviz.netviz.systemd_network -i inventory/netviz.yml
+          -e netviz_units="$PWD/build/units"
+        quiet: true
+      run_once: true
+      delegate_to: localhost
+
+    - name: Ask the inventory what this host's interfaces are
+      ansible.builtin.set_fact:
+        netviz_interfaces_wanted: "{{ query('netviz.netviz.query', netviz_interface_query) }}"
+
+    - name: Say what will be written
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} ({{ netviz_element | default('?') }}):
+          {{ netviz_interfaces_wanted | map(attribute='name') | join(', ') or 'nothing addressed' }}
+
+    - name: Make a directory for this host's units
+      ansible.builtin.file:
+        path: "{{ netviz_units }}/{{ inventory_hostname }}"
+        state: directory
+        mode: "0755"
+      when: netviz_interfaces_wanted | length > 0
+      delegate_to: localhost
+
+    - name: Write one unit per addressed interface
+      ansible.builtin.template:
+        src: systemd.network.j2
+        dest: "{{ netviz_units }}/{{ inventory_hostname }}/10-{{ item.name }}.network"
+        mode: "0644"
+      loop: "{{ netviz_interfaces_wanted }}"
+      loop_control:
+        label: "{{ inventory_hostname }}/{{ item.name }}"
+      delegate_to: localhost

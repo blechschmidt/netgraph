@@ -41,6 +41,7 @@ This whole documentation set is also published, with those demos beside it, at
 | stop retyping the same flags | [configuration.md](configuration.md) |
 | run it without installing Python or Graphviz | [docker.md](docker.md) |
 | turn the inventory into hosts files, DNS zones, Ansible or Prometheus | [export.md](export.md) |
+| run Ansible against the inventory, and query it from a template | [ansible.md](ansible.md) |
 | generate the netplan, systemd-networkd, ifupdown, FRR, nftables or WireGuard configuration a device would run | [export.md](export.md#device-configuration-the-seven-dialects) |
 | hand a diagram to somebody who only has draw.io, and take it back | [drawio.md](drawio.md) |
 | hand over as-built documentation: a page per site and per device | [commands/report.md](commands/report.md) |
@@ -100,6 +101,10 @@ This whole documentation set is also published, with those demos beside it, at
 * **[export.md](export.md)** — the eight operational artefacts, what each guarantees, what
   each drops, and how names are folded; then the seven configuration dialects, which
   generate the file a device would actually run from.
+* **[ansible.md](ansible.md)** — the Ansible integration: the shipped
+  `netviz.netviz` collection, a dynamic inventory whose host variables are queries,
+  and the lookup that lets a template ask the network for the address it is about to
+  write down.
 * **[drawio.md](drawio.md)** — the draw.io round trip: what the exported diagram
   carries, what a draw.io user may and may not safely change, and how an edited file
   comes back as a reviewable changeset.

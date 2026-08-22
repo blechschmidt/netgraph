@@ -218,6 +218,15 @@ ignore = [
 [tool.mypy]
 python_version = "3.10"
 files = ["src/netviz", "tests", "tools"]
+# The Ansible collection netviz ships (docs/ansible.md). Those files are plugins
+# for a *different* program: they subclass base classes from a package netviz
+# does not depend on and must not import, and they are written in the style
+# ansible-doc parses -- a module-level DOCUMENTATION string, then the imports.
+# Nothing under src/ imports them, and everything they decide lives in
+# netviz.ansible, which is checked here like the rest of the package. The gate
+# on them is tests/test_ansible.py, which compiles every one and validates its
+# documentation.
+exclude = ["^src/netviz/ansible/collections/"]
 strict = true
 warn_unreachable = true
 show_error_codes = true
@@ -296,6 +305,15 @@ xfail_strict = true
 [tool.coverage.run]
 branch = true
 source = ["netviz"]
+# The shipped Ansible collection. ``source = ["netviz"]`` measures every file in
+# the package, imported or not, and these are not imported by anything netviz
+# runs: they are plugins Ansible loads in its own process, from a copy of this
+# tree on its collections path. The job that does load them
+# (``ansible`` in .github/workflows/ci.yml) runs pytest with ``--no-cov``, so
+# counting them here would only ever report zero for code this suite cannot
+# reach. What holds them is tests/test_ansible.py: every plugin compiled, every
+# documentation block parsed, and a real playbook run against the collection.
+omit = ["*/netviz/ansible/collections/*"]
 
 [tool.coverage.report]
 show_missing = true

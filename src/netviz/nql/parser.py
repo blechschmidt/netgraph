@@ -36,6 +36,7 @@ Grammar
     prefix       := "-" prefix | postfix
     postfix      := primary ("." NAME | "[" "is" TYPE "]")*
     primary      := NUMBER | STRING | "true" | "false" | "none"
+                  | "$" NAME                          -- a value the caller supplied
                   | "(" expr ")"
                   | "{" expr ("," expr)* "}"          -- set
                   | "{" NAME ":=" expr ("," …)* "}"   -- free object
@@ -53,12 +54,20 @@ Grammar
 
 Precedence runs loosest to tightest down that list, so ``a or b and c`` is
 ``a or (b and c)`` and ``.mtu + 8 > 1500`` compares the sum.
+
+``$NAME`` is a value the caller bound (:mod:`netviz.nql.binding`), and it is
+checked here like everything else: its *type* comes from the value that was
+passed, so a query comparing a name to a number is refused where it is written
+rather than answering nothing at run time. It is deliberately a *primary* and
+nothing more — a parameter stands where a literal would, and never where a type
+name, a member or a clause would, because a query whose shape came from outside
+would be back to the string concatenation this exists to replace.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Final, NoReturn
 
@@ -71,6 +80,7 @@ from netviz.nql.ast import (
     IsType,
     Literal,
     OrderItem,
+    Param,
     Query,
     Root,
     Select,
@@ -158,24 +168,48 @@ def is_relational(text: str) -> bool:
     return word is not None and word.group(0).lower() in _OPENERS
 
 
-def parse(text: str, *, source: str = "query", schema: Schema = SCHEMA) -> Query:
+def parse(
+    text: str,
+    *,
+    source: str = "query",
+    schema: Schema = SCHEMA,
+    params: Mapping[str, ValueType] | None = None,
+) -> Query:
     """Read ``text`` into a checked query.
+
+    Args:
+        text: The query as written.
+        source: What a diagnostic calls the origin.
+        schema: The table every name is checked against.
+        params: The type of each ``$name`` the caller will supply, as
+            :func:`~netviz.nql.binding.declare` reads them off the values. A
+            query naming a parameter that is not here is refused, which is the
+            point: the check happens once, at parse time, and not per row.
 
     Raises:
         QueryError: The text does not parse, names something the schema does not
             have, or asks for an operation the types do not support. The error
             underlines the span it is about.
     """
-    return _Parser(text, source=source, schema=schema).run()
+    return _Parser(text, source=source, schema=schema, params=params).run()
 
 
 class _Parser:
     """Recursive descent, one token of lookahead, checking as it goes."""
 
-    def __init__(self, text: str, *, source: str, schema: Schema) -> None:
+    def __init__(
+        self,
+        text: str,
+        *,
+        source: str,
+        schema: Schema,
+        params: Mapping[str, ValueType] | None = None,
+    ) -> None:
         self.text = text
         self.source = source
         self.schema = schema
+        #: What each ``$name`` the caller supplied evaluates to.
+        self.params: Mapping[str, ValueType] = params or {}
         self.tokens = tokenize(text, source=source)
         self.at = 0
         self.depth = 0
@@ -449,12 +483,13 @@ class _Parser:
             for side in (left, right):
                 if side.type.is_object:
                     self.fail_at(f"{op} needs a scalar, and this is an object", side.span)
-                # A written value is not checked: ``.ip > '10.0.0.1'`` is how an
+                # A supplied value is not checked: ``.ip > '10.0.0.1'`` is how an
                 # address comparison is spelled, and the address on the right is
-                # a string until something coerces it. What is checked is the
-                # *other* side — the one read off the model, where ``.name < 3``
-                # is a mistyped comparison rather than a question about order.
-                if isinstance(side, Literal):
+                # a string until something coerces it. A ``$param`` is the same
+                # value arriving by another road. What is checked is the *other*
+                # side — the one read off the model, where ``.name < 3`` is a
+                # mistyped comparison rather than a question about order.
+                if isinstance(side, (Literal, Param)):
                     continue
                 if side.type.scalar is not None and not side.type.scalar.orders:
                     self.fail_at(
@@ -669,6 +704,8 @@ class _Parser:
                 ValueType(scalar=ScalarKind.STR, card=Cardinality.ONE),
                 self.span_of(token),
             )
+        if token.kind is TokenKind.PARAM:
+            return self.parse_param()
         if token.is_word("true", "false"):
             self.advance()
             return Literal(token.word == "true", _BOOL, self.span_of(token))
@@ -693,6 +730,28 @@ class _Parser:
         if token.kind is TokenKind.WORD:
             return self.parse_name()
         self.fail(f"expected a value, a name or 'select', found {token.describe()}")
+
+    def parse_param(self) -> Expr:
+        """``$name`` — a value the caller bound, typed by what they bound.
+
+        Refused here rather than at run time: a template that misspells a
+        parameter should say so before an inventory is read, and the name it
+        offers instead is one of the values it was actually given.
+        """
+        token = self.advance()
+        found = self.params.get(token.text)
+        if found is None:
+            offered = ", ".join(f"'${one}'" for one in sorted(self.params)[:3])
+            self.fail(
+                f"no value was supplied for '${token.text}'",
+                token=token,
+                help=(
+                    f"the parameters supplied are {offered}"
+                    if offered
+                    else "supply it with --param " + token.text + "=VALUE"
+                ),
+            )
+        return Param(token.text, found, self.span_of(token))
 
     def parse_this(self) -> Expr:
         """The implicit subject a leading ``.`` navigates from."""

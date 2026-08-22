@@ -153,6 +153,46 @@ keeps the number.
 
 ---
 
+## `--param`: a value the query does not carry
+
+A relational query may leave a hole for a value, written `$name`, and take it
+from `--param`. This is what a *generated* query wants — one written by a
+script, a CI job or an [Ansible template](../ansible.md) — because the value
+never reaches the parser as query text:
+
+<!-- run: cwd=examples/campus -->
+```console
+$ netviz query 'select (device filter .name = $host).addresses.address' --param host=srv-north-01
+ADDRESS
+--------------------
+127.0.0.1/8
+::1/128
+10.1.20.11/24
+2001:db8:1:20::11/64
+```
+
+`NAME=VALUE` is text, whatever it looks like: a device called `0755` is a device
+called `0755`. `NAME:=JSON` is typed, which is how a number, a boolean or a list
+is said on a command line that has no types of its own:
+
+<!-- run: cwd=examples/campus -->
+```console
+$ netviz query 'select vlan { id, name } filter .id in $ids' -p 'ids:=[10, 20]' -F csv
+ID,NAME
+10,staff
+20,lab
+```
+
+The value is checked before the inventory is read, and it is checked *as a
+value*: `$ids` above is a set of integers, so comparing it to a name would be
+refused at parse time. Concatenating the same value into the text could not be —
+which is the whole reason to have parameters at all.
+
+A selector has no parameters, and `--param` with one is a usage error rather
+than a flag that binds nothing.
+
+---
+
 ## The layer
 
 `--layer` picks which view the query is answered against, exactly as it picks
@@ -260,6 +300,7 @@ inventory is an answer about a network that is not the one described.
 | `--print` | `[elements\|interfaces\|links]` | `elements` | elements prints what the query selected; interfaces and links print the sub-objects an interface[...] or link[...] scope matched inside them. |
 | `-F`, `--output-format` | `[table\|json\|yaml\|csv]` | `table` | How to print a relational answer. table and csv flatten a nested field into one cell; json and yaml carry it whole. |
 | `--json` | — | off | Report as JSON. |
+| `-p`, `--param` | `NAME=VALUE` | — | Bind a '$NAME' in a relational query. NAME=VALUE is text; NAME:=JSON is a number, a boolean or a list. Repeatable. A value is never parsed as query text, so a name with a quote in it cannot change what the query asks. |
 | `--count` | — | off | Print how many matched, and nothing else. |
 | `--explain` | — | off | Print the selector grammar and the attribute vocabulary instead of running a query, and — with the filter flags — the query they are sugar for. |
 | `--describe` | `[TYPE]` | — | Print the relational language instead of running a query: with no value its grammar, types and functions; with a type name, that type's members. |

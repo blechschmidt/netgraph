@@ -91,6 +91,14 @@ import click.core
 import yaml
 from click.core import ParameterSource
 
+from netviz.ansible import COLLECTION as COLLECTION_NAME
+from netviz.ansible import DEFAULT_DESTINATION as ANSIBLE_COLLECTIONS_DEFAULT
+from netviz.ansible import NAMESPACE as NAMESPACE_NAME
+from netviz.ansible import InventoryOptions
+from netviz.ansible import collection_path as ansible_collection_path
+from netviz.ansible import collections_path as ansible_collections_path
+from netviz.ansible import install as install_ansible_collection
+from netviz.ansible import inventory_document as ansible_inventory
 from netviz.completion import (
     SHELLS,
     complete_element,
@@ -254,12 +262,15 @@ from netviz.loader import (
 from netviz.models import DOCUMENT_KINDS, KINDS, Element, Medium
 from netviz.models.layout import LAYOUT_VIEWS, ROUTING_STYLES
 from netviz.nql import Result as QueryAnswer
+from netviz.nql import bind as bind_query_params
 from netviz.nql import build_world as build_query_world
+from netviz.nql import declare as declare_query_params
 from netviz.nql import describe as describe_type
 from netviz.nql import execute as execute_relational
 from netviz.nql import explain as explain_relational
 from netviz.nql import is_relational
 from netviz.nql import parse as parse_relational
+from netviz.nql import read_assignment as read_query_param
 from netviz.nql.format import headings as query_headings
 from netviz.nql.format import payload as query_payload
 from netviz.nql.format import table as query_table
@@ -6587,6 +6598,18 @@ def _query_flags(command: _Command) -> _Command:
 )
 @click.option("--json", "as_json", is_flag=True, default=False, help="Report as JSON.")
 @click.option(
+    "-p",
+    "--param",
+    "param_values",
+    metavar="NAME=VALUE",
+    multiple=True,
+    help=(
+        "Bind a '$NAME' in a relational query. NAME=VALUE is text; NAME:=JSON is a "
+        "number, a boolean or a list. Repeatable. A value is never parsed as query "
+        "text, so a name with a quote in it cannot change what the query asks."
+    ),
+)
+@click.option(
     "--count",
     "count_only",
     is_flag=True,
@@ -6625,6 +6648,7 @@ def query_command(
     subject: str,
     output_format: str,
     as_json: bool,
+    param_values: tuple[str, ...],
     count_only: bool,
     explain: bool,
     describe: str | None,
@@ -6652,6 +6676,13 @@ def query_command(
     netviz query 'interface[address in 10.20.0.0/16 and not has vrf]' --print interfaces
     netviz query 'within 2 hops of fw-edge'
 
+    A relational query may leave a hole for a value and take it from --param,
+    which is what a generated query wants: the value is never read as query
+    text, so nothing in it can change the question.
+
+    \b
+    netviz query 'select (device filter .name = $host).addresses.address' --param host=rtr-home
+
     --describe prints the relational grammar, its types and its functions, or one
     type's members; --explain prints the selector's grammar and attributes.
     --layer and --print scope a selector and have no meaning for a relational
@@ -6678,8 +6709,20 @@ def query_command(
         output_format = "json"
 
     if is_relational(expression):
-        _answer_relational(ctx, app, expression, output_format=output_format, count_only=count_only)
+        _answer_relational(
+            ctx,
+            app,
+            expression,
+            output_format=output_format,
+            count_only=count_only,
+            param_values=param_values,
+        )
         return
+    if param_values:
+        raise click.UsageError(
+            "--param binds a '$name' in a relational query, one that begins with "
+            "'select' or 'with'; a selector has no parameters"
+        )
     if output_format not in ("table", "json"):
         raise click.UsageError(
             f"--output-format {output_format} is only available for a relational query, "
@@ -6734,12 +6777,15 @@ def _answer_relational(
     *,
     output_format: str,
     count_only: bool,
+    param_values: tuple[str, ...] = (),
 ) -> None:
     """Parse, run and print a relational query.
 
     Parsing happens before the inventory is loaded — every name is checked
     against the schema and not against the data — so a typo costs a
-    millisecond rather than a full parse of the tree.
+    millisecond rather than a full parse of the tree. A ``--param`` is checked
+    there too: it is typed by the value that was passed, so a query comparing a
+    name to a number is refused before anything is read.
     """
     console = app.console()
     for flag, what in (("layers", "--layer"), ("subject", "--print")):
@@ -6750,12 +6796,16 @@ def _answer_relational(
                 "one, which reads the whole inventory"
             )
     try:
-        query = parse_relational(expression, source="query")
+        params = dict(read_query_param(one) for one in param_values)
+    except QueryError as exc:
+        raise click.BadParameter(str(exc), ctx=ctx, param_hint="'--param'") from exc
+    try:
+        query = parse_relational(expression, source="query", params=declare_query_params(params))
     except QueryError as exc:
         raise click.BadParameter(str(exc), ctx=ctx, param_hint="'QUERY'") from exc
 
     inventory = _query_inventory(app, console, ctx.params)
-    result = execute_relational(query, build_query_world(inventory))
+    result = execute_relational(query, build_query_world(inventory), bind_query_params(params))
     _report_relational(console, result, output_format=output_format, count_only=count_only)
     if not result:
         raise click.exceptions.Exit(EXIT_NO_MATCH)
@@ -8722,6 +8772,190 @@ def format_bytes(count: int) -> str:
         if size < 1000 or unit == "GB":
             return f"{size:.1f} {unit}"
     raise AssertionError  # pragma: no cover - the loop always returns
+
+
+# --------------------------------------------------------------------------- #
+# ansible
+# --------------------------------------------------------------------------- #
+
+
+@cli.group("ansible")
+def ansible_group() -> None:
+    """Use the inventory from Ansible: the collection, and what it answers.
+
+    netviz ships an Ansible collection, 'netviz.netviz', holding an inventory
+    plugin, a lookup plugin and five filters. The lookup is the point of it: a
+    template can ask the network a question -- 'what addresses does this host
+    have?' -- and get the answer the inventory declares rather than a fact
+    gathered from the machine it is about to configure.
+
+    \b
+    export ANSIBLE_COLLECTIONS_PATH="$(netviz ansible path)"
+    ansible-doc -t lookup netviz.netviz.query
+
+    See docs/ansible.md. 'netviz export ansible-inventory' is the other half,
+    for a control node that would rather have a file than a plugin.
+    """
+
+
+@ansible_group.command("path")
+@click.pass_obj
+def ansible_path_command(app: AppContext) -> None:
+    """Print the collections path holding the shipped collection.
+
+    What ANSIBLE_COLLECTIONS_PATH wants: the directory that *holds*
+    ansible_collections/, not the collection itself. Nothing is copied, so the
+    plugins are always the ones belonging to this netviz.
+    """
+    app.console(err=True).info(f"collection: {ansible_collection_path()}")
+    click.echo(ansible_collections_path())
+
+
+@ansible_group.command("install")
+@click.argument(
+    "path",
+    type=click.Path(file_okay=False, writable=True, path_type=Path),
+    default=None,
+    required=False,
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Replace an installation that is already there, rather than refusing.",
+)
+@click.pass_obj
+def ansible_install_command(app: AppContext, path: Path | None, force: bool) -> None:
+    """Copy the collection into PATH, or into ~/.ansible/collections.
+
+    PATH is a collections path -- the directory Ansible looks for
+    ansible_collections/ in -- so the tree lands beside every other collection
+    the control node has. A copy can go stale against the netviz beside it, and
+    the galaxy.yml written with it records which version it came from.
+
+    'netviz ansible path' is the alternative: point Ansible at the package and
+    copy nothing.
+    """
+    console = app.console()
+    target = Path(path or ANSIBLE_COLLECTIONS_DEFAULT).expanduser()
+    try:
+        written = install_ansible_collection(target, force=force)
+    except NetvizError as error:
+        raise click.ClickException(str(error)) from error
+
+    into = target / "ansible_collections" / NAMESPACE_NAME / COLLECTION_NAME
+    console.info(f"installed {_plural(len(written), 'file')} into {into}")
+    console.info("check it with:")
+    console.info(f"  ANSIBLE_COLLECTIONS_PATH={target} ansible-doc -t lookup netviz.netviz.query")
+
+
+@ansible_group.command("inventory")
+@click.option(
+    "--var",
+    "variables",
+    metavar="NAME=QUERY",
+    multiple=True,
+    help="A host variable that is a query, answered once per host. Repeatable.",
+)
+@click.option(
+    "--group",
+    "group_queries",
+    metavar="NAME=QUERY",
+    multiple=True,
+    help="A group whose members a query names, answered once. Repeatable.",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    default=None,
+    help="Write to this file instead of stdout.",
+)
+@click.option(
+    "--list",
+    "as_list",
+    is_flag=True,
+    default=False,
+    help="Accepted and ignored: this command always lists. Here so the output can be piped "
+    "from a two-line script Ansible calls as a dynamic inventory.",
+)
+@click.option("--strict", is_flag=True, default=False, help="Treat warnings as errors.")
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Build an inventory from a tree that has errors in it.",
+)
+@click.option(
+    "--select",
+    "select",
+    metavar="QUERY",
+    default=None,
+    shell_complete=complete_query,
+    help="A selector narrowing which elements become hosts.",
+)
+@click.pass_obj
+def ansible_inventory_command(
+    app: AppContext,
+    variables: tuple[str, ...],
+    group_queries: tuple[str, ...],
+    output: Path | None,
+    as_list: bool,
+    strict: bool,
+    force: bool,
+    select: str | None,
+) -> None:
+    """Print what the inventory plugin would hand Ansible, as JSON.
+
+    The same document 'netviz export ansible-inventory' writes, plus the
+    variables and groups that are queries -- which is exactly what the plugin
+    adds. For reading and diffing without a control node, and for the case where
+    a plugin is one moving part too many: wrap this in a two-line executable and
+    Ansible will call it as a dynamic inventory script.
+
+    \b
+    netviz ansible inventory --var mgmt='select (device filter .fqn = $fqn).addresses.address'
+    netviz ansible inventory --group unaddressed='select device.fqn filter not exists .addresses'
+    """
+    console = app.console(err=True)
+    try:
+        options = InventoryOptions(
+            select=select,
+            host_vars=_query_assignments(variables, "--var"),
+            groups=_query_assignments(group_queries, "--group"),
+        )
+        document = ansible_inventory(app.inventory, options, strict=strict, force=force)
+    except QueryError as error:
+        raise click.BadParameter(str(error), param_hint="'QUERY'") from error
+    except NetvizError as error:
+        raise click.ClickException(str(error)) from error
+
+    # Which tree this came from, as the inventory plugin also records it: a
+    # template reaching for 'netviz.netviz.query' reads it, so a playbook driven
+    # by this command as a dynamic inventory script needs no other configuration.
+    # It is a fact about where the document was read, not about the network,
+    # which is why it is added here rather than by the builder.
+    document["all"].setdefault("vars", {})["netviz_root"] = str(app.inventory)
+    payload = json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+    _write_output(payload.encode("utf-8"), output=output)
+    hosts = len(document["_meta"]["hostvars"])
+    groups = len([one for one in document if one not in ("_meta", "all")])
+    console.info(f"{_plural(hosts, 'host')} in {_plural(groups, 'group')}")
+
+
+def _query_assignments(given: Sequence[str], flag: str) -> dict[str, str]:
+    """Parse ``NAME=QUERY`` arguments, keeping the query's own ``=`` signs.
+
+    Raises:
+        click.UsageError: No ``=``, or an empty half.
+    """
+    parsed: dict[str, str] = {}
+    for one in given:
+        name, separator, query = one.partition("=")
+        if not separator or not name.strip() or not query.strip():
+            raise click.UsageError(f"{flag} takes NAME=QUERY, not {one!r}")
+        parsed[name.strip()] = query.strip()
+    return parsed
 
 
 @cli.command("version")

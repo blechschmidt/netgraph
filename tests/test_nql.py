@@ -41,13 +41,16 @@ from netviz.nql import (
     SCHEMA,
     QueryError,
     answer,
+    bind,
     build_world,
+    declare,
     describe,
     execute,
     explain,
     is_relational,
     overview,
     parse,
+    read_assignment,
 )
 from netviz.nql.format import cell, headings, label, payload, table, type_name
 from netviz.nql.functions import FUNCTIONS
@@ -326,7 +329,7 @@ def test_an_unclosed_quote_is_underlined() -> None:
 
 def test_a_character_no_token_may_hold_is_named() -> None:
     with pytest.raises(QueryError, match="not part of any operator or name"):
-        tokenize("select device filter .name = $x")
+        tokenize("select device filter .name = @x")
 
 
 # --------------------------------------------------------------------------- #
@@ -1022,3 +1025,216 @@ def test_negation_is_a_partition(campus) -> None:
 def test_offset_past_the_end_and_a_zero_limit(campus) -> None:
     assert rows(campus, "select device offset 9999") == []
     assert rows(campus, "select device limit 0") == []
+
+
+# --------------------------------------------------------------------------- #
+# Parameters
+# --------------------------------------------------------------------------- #
+
+
+def test_a_parameter_stands_where_a_literal_would(campus) -> None:
+    """``$name`` is the value the caller bound, and means what a literal means."""
+    written = rows(campus, "select device.fqn filter .name = 'srv-north-01'")
+    bound = list(
+        answer("select device.fqn filter .name = $who", campus, params={"who": "srv-north-01"}).rows
+    )
+    assert bound == written
+    assert bound
+
+
+def test_a_parameter_is_not_query_text(campus) -> None:
+    """The whole point: a value cannot change what the query asks.
+
+    Concatenated into the text, ``' or true or '`` would close the string and
+    turn a lookup into "every device". Bound, it is a device name that nobody
+    has, and the honest answer is nothing.
+    """
+    hostile = "srv-north-01' or true or '"
+    assert (
+        answer("select device.fqn filter .name = $who", campus, params={"who": hostile}).rows == ()
+    )
+
+
+def test_a_list_parameter_is_a_set(campus) -> None:
+    """``in $names`` takes the whole list, without a loop and without quoting."""
+    names = ["srv-north-01", "srv-south-01"]
+    found = list(
+        answer("select device.name filter .name in $names", campus, params={"names": names}).rows
+    )
+    assert sorted(found) == sorted(names)
+
+
+def test_a_parameter_is_typed_by_the_value_it_was_given(campus) -> None:
+    """The type comes from the value, and the parser then checks the query with it.
+
+    So ``$id`` bound to 20 is an int: it compares against a VLAN id, it carries
+    that type into the result, and arithmetic against text is refused before
+    anything is read — which a value pasted into the text could not be.
+    """
+    assert answer("select vlan.name filter .id = $id", campus, params={"id": 20}).rows == ("lab",)
+    answered = answer("select $id", campus, params={"id": 20})
+    assert answered.rows == (20,)
+    assert str(answered.type) == "one int"
+    with pytest.raises(QueryError) as caught:
+        answer("select 1 + $n", campus, params={"n": "x"})
+    assert "needs numbers" in str(caught.value)
+
+
+def test_a_parameter_orders_like_a_written_value(campus) -> None:
+    """``.mtu > $floor`` is the comparison a literal on the right would be."""
+    assert rows(campus, "select interface.mtu filter .mtu > 1500") == list(
+        answer("select interface.mtu filter .mtu > $floor", campus, params={"floor": 1500}).rows
+    )
+
+
+def test_a_parameter_nobody_supplied_is_refused_while_parsing(campus) -> None:
+    """Before the inventory is read, and the message offers what *was* supplied."""
+    with pytest.raises(QueryError) as caught:
+        parse("select device filter .name = $host", params=declare({"who": "x"}))
+    assert "no value was supplied for '$host'" in str(caught.value)
+    assert "'$who'" in str(caught.value)
+
+
+def test_a_dollar_with_no_name_is_a_lexical_error() -> None:
+    with pytest.raises(QueryError) as caught:
+        tokenize("select device filter .name = $")
+    assert "no name" in str(caught.value)
+
+
+def test_a_parameter_carries_its_span(campus) -> None:
+    """A diagnostic underlines ``$host`` including the ``$``."""
+    with pytest.raises(QueryError) as caught:
+        answer("select device filter .name = $host", campus)
+    assert "^^^^^" in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("srv-01", ("one str", ("srv-01",))),
+        (10, ("one int", (10,))),
+        (1.5, ("one float", (1.5,))),
+        (True, ("one bool", (True,))),
+        (None, ("optional empty", ())),
+        (["a", "b"], ("many str", ("a", "b"))),
+        ([], ("many empty", ())),
+    ],
+)
+def test_what_a_python_value_binds_to(value: Any, expected: tuple[str, tuple[Any, ...]]) -> None:
+    """Each kind of value has one type and one set, and nothing else does."""
+    spelled, values = expected
+    assert str(declare({"x": value})["x"]) == spelled
+    assert bind({"x": value})["x"] == values
+
+
+def test_an_address_object_binds_as_the_world_spells_it() -> None:
+    """``ipaddress`` types are accepted and arrive as text, which is what is stored."""
+    import ipaddress
+
+    assert bind({"x": ipaddress.ip_address("10.0.0.1")})["x"] == ("10.0.0.1",)
+    assert bind({"x": ipaddress.ip_network("10.0.0.0/24")})["x"] == ("10.0.0.0/24",)
+
+
+def test_a_value_no_scalar_can_hold_is_refused() -> None:
+    for value in ({"a": 1}, object(), b"bytes"):
+        with pytest.raises(QueryError) as caught:
+            declare({"x": value})
+        assert "not a value a query can hold" in str(caught.value)
+
+
+def test_a_mixed_list_is_refused() -> None:
+    with pytest.raises(QueryError) as caught:
+        declare({"x": ["a", 1]})
+    assert "mixes" in str(caught.value)
+
+
+def test_a_parameter_name_has_to_be_one() -> None:
+    with pytest.raises(QueryError) as caught:
+        declare({"not a name": "x"})
+    assert "not a parameter name" in str(caught.value)
+
+
+def test_a_list_parameter_is_bounded() -> None:
+    from netviz.nql.binding import MAX_PARAM_ITEMS
+
+    with pytest.raises(QueryError) as caught:
+        declare({"x": ["a"] * (MAX_PARAM_ITEMS + 1)})
+    assert "over the" in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    ("written", "expected"),
+    [
+        ("host=srv-01", ("host", "srv-01")),
+        ("host=", ("host", "")),
+        ("host=a=b", ("host", "a=b")),
+        ("id:=10", ("id", 10)),
+        ("ok:=true", ("ok", True)),
+        ('names:=["a","b"]', ("names", ["a", "b"])),
+        ("port:=0755", None),
+    ],
+)
+def test_reading_a_param_assignment(written: str, expected: tuple[str, Any] | None) -> None:
+    """``=`` is text whatever it looks like; ``:=`` is JSON, and says when it is not."""
+    if expected is None:
+        with pytest.raises(QueryError):
+            read_assignment(written)
+        return
+    assert read_assignment(written) == expected
+
+
+def test_an_assignment_needs_a_separator() -> None:
+    with pytest.raises(QueryError) as caught:
+        read_assignment("host")
+    assert "is not a parameter" in str(caught.value)
+
+
+def test_the_command_binds_a_parameter(runner: CliRunner) -> None:
+    result = invoke(
+        runner,
+        "-i",
+        str(HOME_LAB),
+        "query",
+        "select (device filter .name = $host).addresses.address",
+        "--param",
+        "host=rtr-home",
+        "-F",
+        "json",
+    )
+    assert result.exit_code == 0
+    assert json.loads(result.output)["results"] == [
+        "192.0.2.1/32",
+        "2001:db8::1/128",
+        "203.0.113.2/30",
+        "192.168.10.1/24",
+        "2001:db8:10::1/64",
+    ]
+
+
+def test_the_command_types_a_json_parameter(runner: CliRunner) -> None:
+    result = invoke(
+        runner,
+        "-i",
+        str(HOME_LAB),
+        "query",
+        "select vlan.name filter .id in $ids",
+        "-p",
+        "ids:=[10]",
+        "-F",
+        "json",
+    )
+    assert result.exit_code == 0
+    assert json.loads(result.output)["results"] == ["home"]
+
+
+def test_a_parameter_on_a_selector_is_a_usage_error(runner: CliRunner) -> None:
+    """A selector has no parameters, and saying so beats binding nothing."""
+    result = invoke(runner, "-i", str(HOME_LAB), "query", "kind = switch", "--param", "x=1")
+    assert result.exit_code == 2
+    assert "relational query" in result.output
+
+
+def test_a_malformed_param_is_a_usage_error(runner: CliRunner) -> None:
+    result = invoke(runner, "-i", str(HOME_LAB), "query", "select device.name", "--param", "oops")
+    assert result.exit_code == 2
+    assert "--param" in result.output

@@ -181,6 +181,39 @@ so a grant that did not take fails the job loudly instead of quietly turning the
 gate off for the rest of the run. The skip is what a developer's unprivileged
 shell, macOS and Windows get.
 
+## The Ansible layer
+
+`tests/test_ansible.py` is in three parts, and the split is the same one the
+browser layer makes for the same reason. Everything that *decides* an answer is
+in `netviz.ansible` — which hosts exist, what a query answers, what a per-host
+variable is bound to — and is plain Python tested without Ansible installed,
+including the property that keeps the integration honest: that the document the
+inventory plugin builds is the one `netviz export ansible-inventory` writes.
+
+The plugin files themselves are data as much as code — a YAML documentation
+block that `ansible-doc` parses and that Ansible validates its options against —
+so they are checked for what can be checked without a control node: that every
+file compiles, that every block is YAML, and that every option the code reads is
+one the documentation declares. That last one is the real failure mode:
+`get_option` on an undeclared name raises at play time and nowhere else.
+
+The rest is wiring, and wiring can only be tested by running it.
+
+```console
+$ uv pip install ansible-core
+$ uv run pytest tests/test_ansible.py --no-cov
+```
+
+Those tests run a real `ansible-inventory` over the shipped plugin and a real
+`ansible-playbook` rendering the collection's systemd-networkd units from
+`examples/home-lab`, and assert the addresses in the generated unit are the ones
+the YAML declares. Without ansible-core they skip, naming the command above.
+ansible-core is deliberately **not** a netviz dependency and is not in `uv.lock`:
+netviz must never depend on Ansible, and a control node is a consumer of netviz
+the way `dot` is a binary netviz calls. The `ansible` job in
+`.github/workflows/ci.yml` installs it beside the locked environment and fails if
+any of those tests skipped, so the gate is never quietly absent.
+
 ## The browser layer
 
 `netviz web` is about fourteen hundred lines of CSS and JavaScript, and until

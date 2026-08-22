@@ -626,6 +626,82 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # The Ansible integration (docs/ansible.md). Everything that decides an answer
+  # is in netviz and is tested by the matrix above; what this job adds is the
+  # wiring, and wiring can only be tested by running it -- a real
+  # ``ansible-inventory`` over the shipped inventory plugin, and a real
+  # ``ansible-playbook`` rendering the shipped systemd-networkd units.
+  #
+  # ansible-core is installed as a *tool* rather than as a dependency, which is
+  # what it is: netviz must never depend on Ansible, and a control node is a
+  # consumer of netviz the way the ``dot`` binary is a thing netviz calls. So it
+  # is installed the way Graphviz is in the jobs above, on top of the locked
+  # environment, and nothing about uv.lock changes.
+  ansible:
+    name: ansible (control node)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install netviz and its dev extras, from uv.lock
+        run: |
+          set -euo pipefail
+          uv sync --locked --extra dev
+          uv pip list
+
+      # Into the same environment, so ansible-playbook's interpreter is the one
+      # that can import netviz -- which is the arrangement a control node has.
+      - name: Install ansible-core beside it
+        run: |
+          set -euo pipefail
+          uv pip install ansible-core
+          ansible --version
+
+      - name: Confirm Ansible sees the shipped collection
+        run: |
+          set -euo pipefail
+          export ANSIBLE_COLLECTIONS_PATH="$(netviz ansible path)"
+          ansible-doc -t lookup netviz.netviz.query >/dev/null
+          ansible-doc -t inventory netviz.netviz.netviz >/dev/null
+          echo "netviz.netviz is loadable from $ANSIBLE_COLLECTIONS_PATH"
+
+      - name: pytest tests/test_ansible.py
+        id: pytest
+        # ``--no-cov`` for the same reason the browser job passes it: this job
+        # must not be measured against the coverage gate the matrix enforces.
+        run: |
+          pytest tests/test_ansible.py --no-cov -ra --junitxml=ansible-junit.xml
+
+      # The gated tests skip themselves when ansible-core is absent, which is
+      # right for a contributor and would be a green job that ran no playbook
+      # here. So the skips are counted rather than trusted.
+      - name: Fail if no playbook actually ran
+        if: ${{ !cancelled() && steps.pytest.outcome != 'skipped' }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          suite = ET.parse("ansible-junit.xml").getroot()
+          skipped = [case for case in suite.iter("testcase") if case.findall("skipped")]
+          for case in skipped:
+              print(f"skipped: {case.get('name')}")
+          if skipped:
+              raise SystemExit(
+                  "::error::the Ansible wiring tests skipped; was ansible-core missing?"
+              )
+          PY
+
   # The example inventories are the only trees this repository ships that a user
   # would recognise, so they are also what the CI integrations are exercised
   # against: if the composite action, the SARIF upload or the annotation format

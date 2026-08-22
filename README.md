@@ -238,6 +238,9 @@ report.txt` both do what they look like they do.
 | [`netviz query`](docs/commands/query.md) | Ask a question about the network, in either of two query languages. | [query.md](docs/commands/query.md) |
 | [`netviz ipam`](docs/commands/ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](docs/commands/ipam.md) |
 | [`netviz export`](docs/commands/export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](docs/commands/export.md) |
+| [`netviz ansible path`](docs/commands/ansible.md) | Print the collections path holding the shipped Ansible collection. | [ansible.md](docs/commands/ansible.md) |
+| [`netviz ansible install`](docs/commands/ansible.md) | Copy that collection into a control node's collections path. | [ansible.md](docs/commands/ansible.md) |
+| [`netviz ansible inventory`](docs/commands/ansible.md) | Print the dynamic inventory the plugin builds, queries and all. | [ansible.md](docs/commands/ansible.md) |
 | [`netviz report`](docs/commands/report.md) | Write the as-built documentation: a page per site and per device. | [report.md](docs/commands/report.md) |
 | [`netviz show`](docs/commands/show.md) | Print one element as it was resolved, expansions included. | [show.md](docs/commands/show.md) |
 | [`netviz rules`](docs/commands/rules.md) | List the validation rules and their ids. | [rules.md](docs/commands/rules.md) |
@@ -270,6 +273,7 @@ The files describe the network once; each command asks something different of th
 | how full is that /24, and where is the next free /28? | [`netviz ipam`](docs/ipam.md) |
 | what should `/etc/hosts`, the DNS zone, the Ansible inventory, the pull list or the routing script say? | [`netviz export`](docs/export.md) |
 | what should this device's netplan, systemd-networkd, ifupdown, FRR, nftables or WireGuard configuration say? | [`netviz export netplan`](docs/export.md#device-configuration-the-seven-dialects) |
+| how do I run Ansible against this, and query it from my own template? | [the `netviz.netviz` collection](docs/ansible.md) |
 | can I hand the diagram to somebody who only has draw.io, and take their edits back? | [`netviz export drawio`](docs/drawio.md) |
 | what do I hand over as the as-built documentation? | [`netviz report`](docs/commands/report.md), and [an example of what it writes](docs/example-report/) |
 | what did that template and that interface range actually expand to? | [`netviz show`](docs/commands/show.md) |
